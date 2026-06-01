@@ -1,0 +1,379 @@
+<!--
+  Purple Team Home Lab — SOC L2 Detection Dashboard
+  Segment 9 deliverable.
+
+  INSTALL (dva načina):
+  A) Splunk UI: Dashboards → Create New Dashboard → "Classic Dashboard" →
+     Edit Source → paste ceo XML → Save
+  B) Fajl: kopiraj u
+     $SPLUNK_HOME/etc/apps/purple_lab/default/data/ui/views/purple_team_dashboard.xml
+     → restart Splunk → pojavljuje se u Purple Lab Detections app
+-->
+
+<dashboard version="1.1" theme="dark">
+  <label>Purple Team Home Lab — SOC L2 Detection Dashboard</label>
+  <description>AD attack chain detection coverage | MARVEL.LOCAL | Sysmon + Windows Security</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time_range" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 1 — Single value counters per attack phase
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>Password Spray Events</title>
+      <single>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4771
+| rex field=Message "Failure Code:\s+(?&lt;fc&gt;\S+)"
+| search fc="0x18"
+| stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1,5]</option>
+        <option name="useColors">true</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Kerberoasting RC4 Tickets</title>
+      <single>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4769
+| rex field=Message "Ticket Encryption Type:\s+(?&lt;enc&gt;\S+)"
+| search enc="0x17"
+| stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+        <option name="useColors">true</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>C2 Beacon Connections</title>
+      <single>
+        <search>
+          <query>source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+| rex field=Message "Image:\s*(?&lt;Image&gt;[^\r\n]+)"
+| search Image="*\\Temp\\*" OR Image="*\\AppData\\*" OR Image="*\\ProgramData\\*"
+| stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+        <option name="useColors">true</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Defender / AMSI Blocks</title>
+      <single>
+        <search>
+          <query>source="WinEventLog:Microsoft-Windows-Windows Defender/Operational"
+(EventCode=1116 OR EventCode=1117)
+| stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+        <option name="useColors">true</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+
+    <panel>
+      <title>Lateral Movement (Type 3 from Kali)</title>
+      <single>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4624
+| rex field=Message "Logon Type:\s+(?&lt;lt&gt;\S+)"
+| rex field=Message "Source Network Address:\s+(?&lt;src&gt;[^\r\n]+)"
+| search lt="3" src="192.168.182.133"
+| stats count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+        <option name="useColors">true</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 2 — MITRE coverage + attack timeline
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>MITRE ATT&amp;CK Coverage — Events by Technique</title>
+      <chart>
+        <search>
+          <query>index=main (source="WinEventLog:Security" OR source="WinEventLog:Microsoft-Windows-Sysmon/Operational" OR source="WinEventLog:Microsoft-Windows-Windows Defender/Operational")
+| eval technique=case(
+    EventCode=4768, "T1087.002 Recon/Enum",
+    EventCode=4771, "T1110.003 Password Spray",
+    EventCode=4769, "T1558.003 Kerberoasting",
+    EventCode=4688 AND match(Message,"InstallUtil"), "T1218.004 LOLBin",
+    EventCode=3    AND match(Message,"\\\\Temp\\\\"), "T1071.001 C2 Beacon",
+    EventCode=4624 AND match(Message,"Logon Type:\s+3"), "T1550 Lateral Move",
+    EventCode=4688 AND match(Message,"reg.*save"), "T1003.002 SAM Dump",
+    EventCode=4662 AND match(Message,"1131f6aa"), "T1003.006 DCSync",
+    EventCode=4698, "T1053.005 Persistence",
+    (EventCode=1116 OR EventCode=1117), "T1059 AMSI Block",
+    true(), null()
+)
+| where isnotnull(technique)
+| stats count by technique
+| sort - count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.text">Event Count</option>
+        <option name="charting.seriesColors">[0x4e9dd1]</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="height">300</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <title>Attack Timeline — All Phases</title>
+      <chart>
+        <search>
+          <query>index=main (source="WinEventLog:Security" OR source="WinEventLog:Microsoft-Windows-Sysmon/Operational")
+EventCode IN (4768, 4771, 4769, 4624, 4688, 4698, 4662, 3, 10)
+| eval phase=case(
+    EventCode=4768 OR EventCode=4771, "Spray/Enum",
+    EventCode=4769, "Kerberoasting",
+    EventCode=3,    "C2 Beacon",
+    EventCode=4624, "Lateral Move",
+    EventCode=4688, "Execution",
+    EventCode=4698, "Persistence",
+    EventCode=4662, "DCSync",
+    EventCode=10,   "LSASS Access",
+    true(), "Other"
+)
+| timechart span=10m count by phase limit=10</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="height">300</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 3 — Password Spray + Kerberoasting tables
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>Password Spray — 4771 Multi-User/Source (T1110.003)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4771
+| rex field=Message "Account Name:\s+(?&lt;Account_Name&gt;\S+)"
+| rex field=Message "Client Address:\s+(?&lt;Client_Address&gt;\S+)"
+| rex field=Message "Failure Code:\s+(?&lt;Failure_Code&gt;\S+)"
+| search Failure_Code="0x18"
+| bucket _time span=5m
+| stats dc(Account_Name) as unique_users values(Account_Name) as targets by _time Client_Address
+| where unique_users >= 3
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="dataOverlayMode">none</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="unique_users">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" midColor="#F8BE34" minColor="#53A051"/>
+          <scale type="minMidMax" minValue="1" midValue="3" maxValue="10"/>
+        </format>
+      </table>
+    </panel>
+
+    <panel>
+      <title>Kerberoasting — RC4 Service Tickets (T1558.003)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4769
+| rex field=Message "Account Name:\s+(?&lt;Account_Name&gt;[^\r\n]+)"
+| rex field=Message "Service Name:\s+(?&lt;Service_Name&gt;[^\r\n]+)"
+| rex field=Message "Ticket Encryption Type:\s+(?&lt;Encryption_Type&gt;\S+)"
+| rex field=Message "Client Address:\s+::ffff:(?&lt;Client_Address&gt;\S+)"
+| search Encryption_Type="0x17" Service_Name!="krbtgt" Service_Name!="*$"
+| table _time Client_Address Account_Name Service_Name Encryption_Type
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <format type="color" field="Encryption_Type">
+          <colorPalette type="map">[{"value":"0x17","color":"#DC4E41"}]</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 4 — C2 Beacon + Lateral Movement
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>C2 Beacon — User-Writable Path Egress (T1071.001)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+| rex field=Message "Image:\s*(?&lt;Image&gt;[^\r\n]+)"
+| rex field=Message "DestinationIp:\s*(?&lt;DestIp&gt;[^\r\n]+)"
+| rex field=Message "DestinationPort:\s*(?&lt;DestPort&gt;[^\r\n]+)"
+| rex field=Message "User:\s*(?&lt;User&gt;[^\r\n]+)"
+| search Image="*\\Temp\\*" OR Image="*\\AppData\\*" OR Image="*\\ProgramData\\*"
+| table _time host User Image DestIp DestPort
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <format type="color" field="DestPort">
+          <colorPalette type="map">[{"value":"443","color":"#DC4E41"}]</colorPalette>
+        </format>
+      </table>
+    </panel>
+
+    <panel>
+      <title>Lateral Movement — Network Logon from Kali (T1550)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4624
+| rex field=Message "Account Name:\s+(?&lt;Account_Name&gt;[^\r\n]+)"
+| rex field=Message "Logon Type:\s+(?&lt;Logon_Type&gt;\S+)"
+| rex field=Message "Source Network Address:\s+(?&lt;Source_IP&gt;[^\r\n]+)"
+| search Logon_Type="3" Source_IP="192.168.182.133"
+| table _time host Account_Name Logon_Type Source_IP
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 5 — Credential Dump + Persistence
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>DCSync — Replication Rights from User Account (T1003.006)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4662
+| rex field=Message "Account Name:\s+(?&lt;Account_Name&gt;[^\r\n]+)"
+| rex field=Message "Properties:\s+(?&lt;Properties&gt;[^\r\n]+)"
+| search (Properties="*1131f6aa*" OR Properties="*1131f6ad*") Account_Name!="*$"
+| table _time host Account_Name Properties
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+
+    <panel>
+      <title>Persistence — Scheduled Task SYSTEM/User Path (T1053.005)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Security" EventCode=4698
+| rex field=Message "Account Name:\s+(?&lt;Account_Name&gt;[^\r\n]+)"
+| rex field=Message "Task Name:\s+(?&lt;Task_Name&gt;[^\r\n]+)"
+| rex field=Message "&lt;Command&gt;(?&lt;Command&gt;[^&lt;]+)&lt;/Command&gt;"
+| rex field=Message "&lt;UserId&gt;(?&lt;RunAs&gt;[^&lt;]+)&lt;/UserId&gt;"
+| where like(Command,"%\\Temp\\%") OR like(Command,"%\\AppData\\%") OR RunAs="S-1-5-18"
+| table _time host Account_Name Task_Name Command RunAs
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ═══════════════════════════════════════════════
+       ROW 6 — Defender AMSI
+       ═══════════════════════════════════════════════ -->
+  <row>
+    <panel>
+      <title>Defender / AMSI Blocks — Blue Team Win (T1059)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Microsoft-Windows-Windows Defender/Operational"
+(EventCode=1116 OR EventCode=1117)
+| rex field=Message "Threat Name:\s+(?&lt;Threat&gt;[^\r\n]+)"
+| rex field=Message "Action:\s+(?&lt;Action&gt;[^\r\n]+)"
+| rex field=Message "Path:\s+(?&lt;Path&gt;[^\r\n]+)"
+| table _time host Threat Action Path
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <format type="color" field="Action">
+          <colorPalette type="map">[{"value":"Quarantine","color":"#53A051"},{"value":"Block","color":"#53A051"}]</colorPalette>
+        </format>
+      </table>
+    </panel>
+
+    <panel>
+      <title>LSASS Access — Credential Theft Mask (T1003.001)</title>
+      <table>
+        <search>
+          <query>source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=10
+| rex field=Message "TargetImage:\s*(?&lt;TargetImage&gt;[^\r\n]+)"
+| rex field=Message "SourceImage:\s*(?&lt;SourceImage&gt;[^\r\n]+)"
+| rex field=Message "GrantedAccess:\s*(?&lt;GrantedAccess&gt;\S+)"
+| search TargetImage="*lsass.exe"
+    (GrantedAccess="0x1010" OR GrantedAccess="0x1410" OR GrantedAccess="0x1438" OR GrantedAccess="0x1fffff")
+    SourceImage!="*wininit.exe" SourceImage!="*MsMpEng.exe"
+| table _time host SourceImage TargetImage GrantedAccess
+| sort - _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <format type="color" field="GrantedAccess">
+          <colorPalette type="map">[{"value":"0x1fffff","color":"#DC4E41"}]</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>
