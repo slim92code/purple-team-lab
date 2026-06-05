@@ -125,7 +125,7 @@ Full series (10 segments, ~75 min): [YouTube Playlist](https://www.youtube.com/p
 ├── lab_issues.md                   <- real build/debug log (GPO/auditpol, ACLs, forwarder)
 ├── commands.md                     <- command quick-reference
 ├── config/sysmonconfig.xml         <- Sysmon config incl. the C:\Temp NetworkConnect fix
-├── screenshots/                    <- 5 detection screenshots (spray, kerb, lateral, amsi, c2)
+├── screenshots/                    <- 12 detection screenshots (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
 └── detections/
     ├── sigma/sigma_rules.yml       <- Detection-as-Code, vendor-agnostic
     └── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)

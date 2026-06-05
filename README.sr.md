@@ -123,7 +123,7 @@ Kompletan serijal (10 segmenata, ~75 min): [YouTube Playlist](https://www.youtub
 ├── lab_issues.md                   <- realni build/debug log (GPO/auditpol, ACL, forwarder)
 ├── commands.md                     <- brza referenca komandi
 ├── config/sysmonconfig.xml         <- Sysmon config sa C:\Temp NetworkConnect fix-om
-├── screenshots/                    <- 5 detekcijskih screenshot-ova
+├── screenshots/                    <- 12 detekcijskih screenshot-ova (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
 └── detections/
     ├── sigma/sigma_rules.yml       <- Detection-as-Code, vendor-agnostic
     └── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
