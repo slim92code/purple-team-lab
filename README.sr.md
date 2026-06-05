@@ -67,6 +67,28 @@ potvrdi beacon interval/jitter analizom. Preimenovani implant i dalje upada. Vid
 - **AMSI blokirao Mimikatz** DCSync u memoriji — endpoint zaštita zaustavila poznat alat.
 - **AD permisije blokirale replikaciju** — `fcastle`/`SQLService` nemaju *Replicating Directory Changes*, pa je DCSync pao i tamo gde AMSI ne važi. Defense in depth, demonstriran.
 
+## Dashboard
+
+![SOC L2 Detection Dashboard](screenshots/06_dashboard.png)
+> Ceo attack chain vidljiv u jednom pogledu — 5 countera, MITRE ATT&CK bar chart i attack timeline kroz ceo period laba. Napravljen u Splunk Simple XML; izvor u [`detections/splunk/purple_lab/`](detections/splunk/purple_lab/).
+
+## Video serija
+
+Kompletan serijal (10 segmenata, ~75 min): [YouTube Playlist](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-)
+
+| Segment | Tema |
+|---|---|
+| Seg 1 | Lab Setup & Recon |
+| Seg 2 | Password Spray (T1110.003) |
+| Seg 3 | LOLBin Execution (T1218.004) |
+| Seg 4 | Kerberoasting (T1558.003) |
+| Seg 5 | Lateral Movement / Sliver C2 |
+| Seg 6 | Credential Dumping + Defender/AMSI |
+| Seg 7 | Persistence (T1053.005) |
+| Seg 8 | C2 Evasion + Sysmon Gap Fix |
+| Seg 9 | Splunk Dashboard Tour |
+| Seg 10 | Production Hardening |
+
 ## Screenshot-ovi
 
 ### 01 — Password Spray detektovan (T1110.003)

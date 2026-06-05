@@ -69,6 +69,28 @@ Splunk pack.
 - **AMSI blocked Mimikatz** DCSync in-memory — endpoint protection stopped a known tool.
 - **AD permissions blocked replication** — `fcastle`/`SQLService` lack *Replicating Directory Changes*, so DCSync failed even where AMSI didn't apply. Defense in depth, demonstrated.
 
+## Dashboard
+
+![SOC L2 Detection Dashboard](screenshots/06_dashboard.png)
+> Full attack chain visible in one view — 5 counters, MITRE ATT&CK bar chart, and attack timeline spanning the entire lab period. Built in Splunk Simple XML; source in [`detections/splunk/purple_lab/`](detections/splunk/purple_lab/).
+
+## Video walkthrough
+
+Full series (10 segments, ~75 min): [YouTube Playlist](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-)
+
+| Segment | Topic |
+|---|---|
+| Seg 1 | Lab Setup & Recon |
+| Seg 2 | Password Spray (T1110.003) |
+| Seg 3 | LOLBin Execution (T1218.004) |
+| Seg 4 | Kerberoasting (T1558.003) |
+| Seg 5 | Lateral Movement / Sliver C2 |
+| Seg 6 | Credential Dumping + Defender/AMSI |
+| Seg 7 | Persistence (T1053.005) |
+| Seg 8 | C2 Evasion + Sysmon Gap Fix |
+| Seg 9 | Splunk Dashboard Tour |
+| Seg 10 | Production Hardening |
+
 ## Screenshots
 
 ### 01 — Password Spray detected (T1110.003)
