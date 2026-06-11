@@ -66,8 +66,10 @@ Splunk pack.
 
 ## Blue-team wins (Defender on, not staged)
 
-- **AMSI blocked Mimikatz** DCSync in-memory — endpoint protection stopped a known tool.
-- **AD permissions blocked replication** — `fcastle`/`SQLService` lack *Replicating Directory Changes*, so DCSync failed even where AMSI didn't apply. Defense in depth, demonstrated.
+## Blue-team wins (Defender on, not staged)
+
+- **AMSI blocked Mimikatz DCSync** — Defender flagged the PowerShell invocation of `mimikatz.exe` as `ScriptContainedMaliciousContent` and killed it before execution. A known tool, stopped cold.
+- **But AMSI stops the tool, not the technique.** `fcastle` is a Domain Admin and inherits *Replicating Directory Changes* via `BUILTIN\Administrators`, so an AMSI-evading DCSync would have succeeded. The durable control here is least privilege — removing DCSync rights and tiering admin accounts — not AV signatures. (Addressed in Lab v2.)
 
 ## Dashboard
 
