@@ -32,7 +32,7 @@
 | frankcastle | Password1 | Domain Users | Kompromitovan kroz password spray |
 | peterparker | (unknown) | Domain Users | Nije krekovan |
 | SQLService | MYpassword123# | Group Policy Creator Owners, ima SPN | Kerberoasted |
-| tstark | (unknown) | Domain Users | Možda ne postoji |
+| tstark | (unknown) | Domain Users | Postoji — potvrđeno preko Domain Admins membershipa |
 | Guest | - | - | Disabled |
 
 ### Krekovane kredencijale (poznate)
