@@ -64,9 +64,8 @@ potvrdi beacon interval/jitter analizom. Preimenovani implant i dalje upada. Vid
 
 ## Blue-team pobede (Defender uključen, nije stejdžovano)
 
-- **AMSI blokirao Mimikatz** DCSync u memoriji — endpoint zaštita zaustavila poznat alat.
-- **AD permisije blokirale replikaciju** — `fcastle`/`SQLService` nemaju *Replicating Directory Changes*, pa je DCSync pao i tamo gde AMSI ne važi. Defense in depth, demonstriran.
-
+- **AMSI blokirao Mimikatz DCSync** — Defender je flagovao PowerShell poziv `mimikatz.exe` kao `ScriptContainedMaliciousContent` i zaustavio ga pre izvršavanja. Poznat alat, presečen na startu.
+- **Ali AMSI zaustavlja alat, ne tehniku.** `fcastle` je Domain Admin i nasleđuje *Replicating Directory Changes* preko `BUILTIN\Administrators` — DCSync koji izbegne AMSI bi prošao. Trajna kontrola ovde je least privilege — uklanjanje DCSync prava i tiering admin naloga — ne AV potpisi. (Pokriveno u Lab v2.)
 ## Dashboard
 
 ![SOC L2 Detection Dashboard](screenshots/06_dashboard.png)
