@@ -67,7 +67,7 @@ Splunk pack.
 ## Blue-team wins (Defender on, not staged)
 
 - **AMSI blocked Mimikatz DCSync** — Defender flagged the PowerShell invocation of `mimikatz.exe` as `ScriptContainedMaliciousContent` and killed it before execution. A known tool, stopped cold.
-- **But AMSI stops the tool, not the technique.** `fcastle` is a Domain Admin and inherits *Replicating Directory Changes* via `BUILTIN\Administrators`, so an AMSI-evading DCSync would have succeeded. The durable control here is least privilege — removing DCSync rights and tiering admin accounts — not AV signatures. (Addressed in Lab v2.)
+- **But AMSI stops the tool, not the technique.** `fcastle` is a Domain Admin and holds *Replicating Directory Changes* via `BUILTIN\Administrators` — privilege wasn't the barrier. AMSI blocked the Mimikatz invocation, and an AMSI-evading attempt (SharpKatz) then failed at the DRS bind, not on permissions. The durable control is least privilege — removing DCSync rights and tiering admin accounts — not AV signatures. (Addressed in Lab v2.)
 
 ## Dashboard
 
