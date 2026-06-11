@@ -20,6 +20,7 @@ dokaz, linkovani ispod.
 
 ## Lab
 
+
 ```
                  Kali (napadač) 192.168.182.133
                           │
