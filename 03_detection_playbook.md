@@ -1,3 +1,4 @@
+[03_detection_playbook.md](https://github.com/user-attachments/files/28821725/03_detection_playbook.md)
 # Purple Team Home Lab — Detection Playbook
 
 **Projekat:** Purple LAB — SOC Analyst Level 2  
@@ -1128,15 +1129,14 @@ purple-team-lab/
 ```
 Purple Team Home Lab — SOC Analyst L2 Portfolio | 2026
 
-• Designed and implemented Active Directory lab (Win Server 2022 DC, 2x Win10 endpoints, Kali, Splunk SIEM)
+• Designed and implemented Active Directory lab (Win Server 2022 DC, 2x Win10 endpoints, Kali, Splunk SIEM); enumerated AD CS attack surface with Certipy (33 templates / 1 CA)
 • Simulated 8 MITRE ATT&CK techniques: T1046, T1110.003, T1558.003, T1218.004, T1071.001, T1003.002/006, T1053.005, T1041
 • Deployed modern C2 framework (Sliver) with mTLS evasion and validated detection gaps
 • Engineered 30+ Splunk SPL detection queries with false positive tuning
 • Authored vendor-agnostic detections as code (Sigma) compiled to Splunk; CIM-normalized, version-controlled (Detection-as-Code)
 • Built MITRE-mapped detection dashboard with 6 panels for real-time monitoring
 • Documented incident response runbook per attack phase
-• Identified and documented AD CS misconfigurations (ESC1, ESC2, ESC3, ESC15)
-• Demonstrated blue team success: Defender + AMSI successfully blocked DCSync attempts
+• Validated endpoint defenses: AMSI blocked an in-PowerShell Mimikatz DCSync invocation (Defender on throughout)
 ```
 
 ---
