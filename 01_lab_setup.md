@@ -29,10 +29,10 @@
 | Username | Password | Group | Notes |
 |---|---|---|---|
 | Administrator | `P@$$w0rd!` | Domain Admins | **Lokalni** Administrator THEPUNISHER, ne domain Administrator |
-| frankcastle | Password1 | Domain Users | Kompromitovan kroz password spray |
+| frankcastle | Password1 | Domain Admins | Kompromitovan kroz password spray |
 | peterparker | (unknown) | Domain Users | Nije krekovan |
-| SQLService | MYpassword123# | Group Policy Creator Owners, ima SPN | Kerberoasted |
-| tstark | (unknown) | Domain Users | Postoji — potvrđeno preko Domain Admins membershipa |
+| SQLService | MYpassword123# | Domain Admins, ima SPN | Kerberoasted |
+| tstark | (unknown) | Domain Admins | Postoji — potvrđeno preko Domain Admins membershipa |
 | Guest | - | - | Disabled |
 
 ### Krekovane kredencijale (poznate)
