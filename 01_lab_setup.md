@@ -62,7 +62,7 @@
 ### Index strukturа
 - **`main`** — svi eventi
 
-### Source field map (kroz `source` polje, ne `sourcetype`)
+### Source field map
 
 | Source | Sadržaj |
 |---|---|
