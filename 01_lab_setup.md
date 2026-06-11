@@ -36,7 +36,7 @@
 | Guest | - | - | Disabled |
 
 ### Krekovane kredencijale (poznate)
-- **fcastle:Password1** — domain user (password spray)
+- **fcastle:Password1** — Domain Admin (kompromitovan kroz password spray)
 - **SQLService:MYpassword123#** — service account sa SPN (Kerberoasting)
 - **THEPUNISHER\Administrator NT hash:** `fbdcd5041c96ddbd82224270b57f11fc` (lokalni admin)
 - **frankcastle NT hash:** `64f12cddaa88057e06a81b54e73b949b`
