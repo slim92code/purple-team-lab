@@ -66,9 +66,7 @@ potvrdi beacon interval/jitter analizom. Preimenovani implant i dalje upada. Vid
 ## Blue-team pobede (Defender uključen, nije stejdžovano)
 
 - **AMSI blokirao Mimikatz DCSync** — Defender je flagovao PowerShell poziv `mimikatz.exe` kao `ScriptContainedMaliciousContent` i zaustavio ga pre izvršavanja. Poznat alat, presečen na startu.
-- **Ali AMSI zaustavlja alat, ne tehniku.** `fcastle` je Domain Admin i nasleđuje *Replicating Directory Changes* preko `BUILTIN\Administrators` — DCSync koji izbegne AMSI bi prošao. Trajna kontrola ovde je least privilege — uklanjanje DCSync prava i tiering admin naloga — ne AV potpisi. (Pokriveno u Lab v2.)
-## Dashboard
-
+- **Ali AMSI zaustavlja alat, ne tehniku.** `fcastle` je Domain Admin i ima *Replicating Directory Changes* preko `BUILTIN\Administrators` — privilegija nije bila prepreka. AMSI je blokirao Mimikatz poziv, a AMSI-evading pokušaj (SharpKatz) je pao na DRS bind-u, ne na permisijama. Trajna kontrola je least privilege — uklanjanje DCSync prava i tiering admin naloga — ne AV potpisi. (Pokriveno u Lab v2.)
 ![SOC L2 Detection Dashboard](screenshots/06_dashboard.png)
 > Ceo attack chain vidljiv u jednom pogledu — 5 countera, MITRE ATT&CK bar chart i attack timeline kroz ceo period laba. Napravljen u Splunk Simple XML; izvor u [`detections/splunk/purple_lab/`](detections/splunk/purple_lab/).
 
