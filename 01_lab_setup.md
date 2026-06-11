@@ -55,8 +55,9 @@
 
 ### Apps instalirani
 - ✅ Splunk_TA_windows
-- ❌ Sysmon TA (nije instaliran — Splunkbase nedostupan)
-  - **Posledica:** Koristi se `source=` umesto `sourcetype=` u SPL upitima
+- ✅ TA-microsoft-sysmon (instaliran — ekstrahuje Image, DestinationIp, GrantedAccess…)
+- ✅ Splunk_SA_CIM (za tstats CIM headlinere u Splunk pack-u)
+  - **Napomena:** SPL u dokumentaciji i screenshotovima namerno koristi `rex field=Message` (pedagoški — pokazuje strukturu eventa). Deployable pak (`detections/splunk/`) koristi TA-ekstrahovana polja bez rex-a.
 
 ### Index strukturа
 - **`main`** — svi eventi
