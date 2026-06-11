@@ -15,7 +15,6 @@ Ovo je odličan CV materijal — pokazuje troubleshooting sposobnosti u enterpri
 
 **Fix:**
 ```powershell
-# Dodaj u system\local\inputs.conf za Sysmon stanza
 $content = Get-Content "C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf"
 $content = $content -replace "\[WinEventLog://Microsoft-Windows-Sysmon/Operational\]", "[WinEventLog://Microsoft-Windows-Sysmon/Operational]`nstart_from = oldest`ncurrent_only = 0`ncheckpointInterval = 5"
 Set-Content "C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf" $content
@@ -146,14 +145,9 @@ whoami /priv | findstr SeBackupPrivilege
 
 **Fix — pokretanje sa kredencijalima:**
 ```bash
-# Kali — ubij stari share
 sudo kill -9 $(sudo lsof -t -i:445)
-
-# Kreiraj direktorijum sa permisijama
 mkdir -p /tmp/share
 chmod 777 /tmp/share
-
-# Pokreni sa autentifikacijom
 sudo impacket-smbserver share /tmp/share -smb2support -username kali -password kali
 ```
 
@@ -260,6 +254,24 @@ bloodhound-python -c All -u fcastle -p Password1 -d MARVEL.LOCAL -ns 192.168.182
 ```
 
 **Status:** Radi i pored IPv6 konekcije — enum je uspešan.
+
+---
+
+## ISSUE #12 — AppLocker EC8004 ne forwarduje u Splunk
+
+**Simptom:** EC8004 (AppLocker block event) vidljiv lokalno u Event Viewer-u ali ne stiže u Splunk.
+
+**Root cause:** `Microsoft-Windows-AppLocker/EXE and DLL` log kanal ima restriktivan `channelAccess` ACL koji blokira Splunk UF čitanje, čak i kada UF radi kao LocalSystem.
+
+**Dijagnoza:**
+```cmd
+wevtutil.exe gl "Microsoft-Windows-AppLocker/EXE and DLL"
+# channelAccess ne uključuje NS (Network Service) SID
+```
+
+**Posledica:** Seg 10 AppLocker dokaz (`10_fix3_applocker.png`) je snimljen iz lokalnog Event Viewer-a, ne iz Splunk-a. Event se stvarno desio — ograničenje je na forwarding sloju.
+
+**Workaround (Lab v2):** WEF (Windows Event Forwarding) prema dedicated collector, ili Wazuh agent koji ima privilegovaniji pristup log kanalima.
 
 ---
 
