@@ -149,4 +149,4 @@ manager evaluates.
 
 ---
 
-*Self-taught. Background: TCM Security (14 courses), TryHackMe (top 1%, 173 rooms incl. SOC-SIM).*
+*Self-taught. Background: TCM Security (completed: SOC 201, Practical Windows Forensics, Linux 100/101; in progress: SOC 101, PEH, PMAT, Detection Engineering), TryHackMe (top 1%, 173 rooms).*
