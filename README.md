@@ -149,4 +149,4 @@ manager evaluates.
 
 ---
 
-*Self-taught. Background: TCM Security (completed: SOC 201, Practical Windows Forensics, Linux 100/101; in progress: SOC 101, PEH, PMAT, Detection Engineering), TryHackMe (top 1%, 173 rooms).*
+*Self-taught. Background: TCM Security (completed: SOC 201, Practical Windows Forensics, Linux 100/101, Detection Engineering; in progress: SOC 101, PEH, PMAT), TryHackMe (top 1%, 173 rooms).*
