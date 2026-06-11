@@ -146,4 +146,5 @@ Hardening). Hiring manager ocenjuje repo, ne runtime.
 
 ---
 
-*Self-taught. Background: TCM Security (14 kurseva), TryHackMe (top 1%, 173 rooms uklj. SOC-SIM).*
+*Self-taught. Background: TCM Security (completed: SOC 201, Practical Windows Forensics, Linux 100/101; in progress: SOC 101, PEH, PMAT, Detection Engineering), TryHackMe (top 1%, 173 rooms).*
+
