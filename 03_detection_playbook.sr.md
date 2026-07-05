@@ -1,34 +1,39 @@
-**English** · **[Srpski](03_detection_playbook.sr.md)**
-
+**[English](03_detection_playbook.md)** · **Srpski**
 # Purple Team Home Lab — Detection Playbook
 
-**Project:** Purple LAB — SOC Analyst Level 2
-**Goal:** Detection engineering — SPL queries, MITRE Detection Cards, Splunk dashboard panels
+**Projekat:** Purple LAB — SOC Analyst Level 2  
+**Cilj:** Detection engineering — SPL upiti, MITRE Detection Cards, Splunk dashboard panels
 
-> **Note on query format.** The SPL queries in this document are *pedagogical* — they intentionally parse raw `Message` fields with `rex` to show event structure. **Production detections do not parse Message** — they rely on the Splunk Add-on for Windows and Sysmon Add-on, which already extract all fields (`Account_Name`, `Ticket_Encryption_Type`, `Image`, `DestinationIp`…), and high-volume detections use `tstats` over accelerated CIM data models. The deployable, CIM/TA-normalized version + vendor-agnostic Sigma rules are in `detections/` (see `detections/README.md`).
+> **Napomena o formi upita.** SPL upiti u ovom dokumentu su *pedagoški* — namerno ručno
+> parsiraju sirovi `Message` sa `rex` da bi se videla struktura eventa. **Produkcijske
+> detekcije ne parsiraju Message** — oslanjaju se na Splunk Add-on for Windows i Add-on for
+> Sysmon koji već ekstrahuju sva polja (`Account_Name`, `Ticket_Encryption_Type`, `Image`,
+> `DestinationIp`…), a high-volume detekcije idu kroz `tstats` nad akcelerovanim CIM data
+> modelima. Deployable, CIM/TA-normalizovana verzija + vendor-agnostic Sigma pravila su u
+> `detections/` (vidi `detections/README.md`).
 
 ---
 
-## TABLE OF CONTENTS
+## SADRŽAJ
 
-1. Detection Cards (8 phases in MITRE format)
-2. Splunk Dashboard structure
-3. Universal SPL queries
+1. Detection Cards (8 faza po MITRE formatu)
+2. Splunk Dashboard struktura
+3. Univerzalni SPL upiti
 4. False positive tuning
 5. Incident Response runbook
-6. Detection coverage matrix
+6. Detection coverage matrica
 7. **Production Hardening Playbook (Seg 10)**
 
 ---
 
 ## DETECTION CARD #1 — RECONNAISSANCE
 
-**MITRE Tactic:** Reconnaissance / Discovery
+**MITRE Tactic:** Reconnaissance / Discovery  
 **MITRE Technique:** T1046 (Network Service Discovery), T1087 (Account Discovery)
 
-### Attack description
+### Opis napada
 
-Attacker scans the network with nmap, enumerates users via LDAP/Kerberos, identifies services and AD CS templates.
+Napadač skenira mrežu nmap-om, enumerira korisnike kroz LDAP/Kerberos, identifikuje servise i AD CS šablone.
 
 ### Data Sources
 
@@ -36,9 +41,9 @@ Attacker scans the network with nmap, enumerates users via LDAP/Kerberos, identi
 - Windows Security EC4625 (Account Failed to Log On)
 - Windows Security EC4768 (Kerberos TGT requested)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
-**SPL 1.1 — High number of network connections from a single IP (nmap signature)**
+**SPL 1.1 — Visok broj mrežnih konekcija sa jednog IP-a (nmap signature)**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
@@ -49,7 +54,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | sort - count
 ```
 
-**SPL 1.2 — Kerberos enumeration (kerbrute userenum)**
+**SPL 1.2 — Kerberos enumeracija (kerbrute userenum)**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4768
@@ -60,7 +65,7 @@ index=main source="WinEventLog:Security" EventCode=4768
 | sort - count
 ```
 
-**SPL 1.3 — LDAP enumeration (BloodHound signature)**
+**SPL 1.3 — LDAP enumeracija (BloodHound signature)**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4662
@@ -71,58 +76,58 @@ index=main source="WinEventLog:Security" EventCode=4662
 | sort - count
 ```
 
-### Result analysis
+### Analiza rezultata
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
-| Connections per min | < 5 | > 50 |
-| Unique ports per host | 1-3 | > 20 |
-| Source IP | Internal service | Unknown workstation |
-| Time | Business hours | After hours |
+| Konekcije u 1 min | < 5 | > 50 |
+| Različiti portovi po hostu | 1-3 | > 20 |
+| Source IP | Interni servisni | Nepoznat workstation |
+| Vreme | Radno vreme | Van radnog vremena |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Vulnerability scanner (Nessus, Qualys) | Legitimate security scan — verify with security team |
-| Network monitoring (Nagios, PRTG) | Can generate similar patterns |
-| Administrator nmap scan | Verify with IT |
+| Vulnerability scanner (Nessus, Qualys) | Legitimni security scan — verifikuj sa security timom |
+| Network monitoring (Nagios, PRTG) | Mogu generisati slične patterne |
+| Administrator nmap scan | Verifikuj sa IT |
 
-### Tuning recommendations
+### Tuning preporuke
 
-- Whitelist IP addresses of legitimate scanners
-- Set thresholds based on baseline
-- Time-based alert — lower threshold to > 10 after hours
-- Correlate with other alerts from the same source IP
+- Whitelist IP adrese legitimnih skenera
+- Threshold podesiti na osnovu baseline-a
+- Time-based alert — van radnog vremena snizi threshold na > 10
+- Korelacija sa ostalim alertima istog source IP-a
 
 ### Incident Response
 
-1. Identify source IP
-2. Check if IP belongs to a known scanner (whitelist check)
-3. If unknown — escalate to P2
-4. Block IP on firewall
-5. Review all activities from the same source IP in the last 24 hours
+1. Identifikovati source IP
+2. Proveriti da li IP pripada poznatom skeneru (whitelist check)
+3. Ako nepoznat — eskalirati P2
+4. Blokirati IP na firewall-u
+5. Pregledati sve aktivnosti istog source IP-a u poslednjih 24h
 
 ---
 
 ## DETECTION CARD #2 — PASSWORD SPRAYING
 
-**MITRE Tactic:** Credential Access
+**MITRE Tactic:** Credential Access  
 **MITRE Technique:** T1110.003 (Password Spraying)
 
-### Attack description
+### Opis napada
 
-Attacker attempts the same password against multiple user accounts via Kerberos pre-auth requests. Goal — find an account with a default/weak password without triggering the lockout policy.
+Napadač pokušava istu lozinku na više korisničkih naloga kroz Kerberos pre-auth zahteve. Cilj — pronaći nalog sa default/slabom lozinkom bez aktiviranja lockout polise.
 
 ### Data Sources
 
 - Windows Security EC4771 (Kerberos pre-auth failed)
-- Windows Security EC4768 (TGT requested — success)
+- Windows Security EC4768 (TGT requested — uspeh)
 - Windows Security EC4625 (NTLM auth failed)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
-**SPL 2.1 — Password spray detection (multiple users from the same IP in a short window)**
+**SPL 2.1 — Password Spray detection (više korisnika sa istog IP-a u kratkom periodu)**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4771
@@ -145,7 +150,7 @@ index=main source="WinEventLog:Security" (EventCode=4771 OR EventCode=4768)
 | table _time, src_ip, username, EventCode
 ```
 
-**SPL 2.3 — Timeline for detection dashboard**
+**SPL 2.3 — Timeline za detection dashboard**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4771 earliest=-24h
@@ -153,47 +158,47 @@ index=main source="WinEventLog:Security" EventCode=4771 earliest=-24h
 | timechart span=5m count by src_ip
 ```
 
-### Result analysis
+### Analiza rezultata
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
-| Failed logons per user | < 3 per hour | > 5 in 5 min |
-| Unique users from same IP | 1-2 | > 3 |
-| Source IP | User's workstation | Unknown or Linux IP |
-| Pattern | Sporadic | Sequential |
+| Failed logons po useru | < 3 u sat | > 5 u 5 min |
+| Različiti useri sa istog IP | 1-2 | > 3 |
+| Source IP | Workstation usera | Nepoznat ili Linux IP |
+| Pattern | Sporadično | Sekvencijalno |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Service account with wrong password | Configuration not updated |
-| User's script (e.g., RDP retry) | Rare occurrences |
-| Mobile sync client | Outlook, ActiveSync timeout retries |
+| Servisni nalog sa pogrešnom lozinkom | Konfiguracija nije ažurirana |
+| User-ov skenarski (npr. RDP retry) | Retke pojave |
+| Mobile sync klijent | Outlook, ActiveSync timeout retries |
 
 ### Tuning
 
-- Exclude known service accounts from analysis
-- Especially monitor activities after hours
-- Correlate with EC4625 (NTLM) for a complete picture
+- Isključi poznate servisne naloge iz analize
+- Posebno pratiti aktivnosti van radnog vremena
+- Korelacija sa 4625 (NTLM) za kompletnu sliku
 
 ### Incident Response
 
-1. Identify the successfully compromised account (4771 → 4768)
-2. **Urgently:** reset the password of that account
-3. Review all activities of the account after compromise
-4. Force re-authentication for all active sessions
-5. Block source IP
+1. Identifikovati uspešno kompromitovan nalog (4771 → 4768)
+2. **Hitno:** resetovati lozinku tog naloga
+3. Pregledati sve aktivnosti naloga nakon kompromisa
+4. Force re-authentication za sve aktivne sesije
+5. Blokirati source IP
 
 ---
 
 ## DETECTION CARD #3 — EXECUTION (LOLBins / InstallUtil)
 
-**MITRE Tactic:** Defense Evasion / Execution
+**MITRE Tactic:** Defense Evasion / Execution  
 **MITRE Technique:** T1218.004 (InstallUtil)
 
-### Attack description
+### Opis napada
 
-Attacker executes a payload through a Microsoft-signed binary (`InstallUtil.exe`) instead of directly via `powershell.exe`. Bypasses application control policies that trust Microsoft binaries.
+Napadač pokreće payload kroz Microsoft signed binary `InstallUtil.exe` umesto direktno `powershell.exe`. Zaobilazi Application Control politike koje veruju Microsoft binary-jima.
 
 ### Data Sources
 
@@ -201,7 +206,7 @@ Attacker executes a payload through a Microsoft-signed binary (`InstallUtil.exe`
 - Sysmon EC1 (Process Create)
 - Sysmon EC11 (File Create)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
 **SPL 3.1 — InstallUtil execution detection**
 
@@ -227,7 +232,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | sort - _time
 ```
 
-**SPL 3.3 — Suspicious DLL files in C:\Temp**
+**SPL 3.3 — Sumnjivi DLL fajlovi u C:\Temp**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
@@ -237,52 +242,52 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, host, process, filename
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
 | InstallUtil parent | msiexec, svchost | cmd.exe, powershell.exe |
-| InstallUtil child | none | cmd.exe, whoami.exe |
+| InstallUtil child | nikakav | cmd.exe, whoami.exe |
 | DLL path | Program Files | C:\Temp, C:\Users\*\Downloads |
-| Flag `/U` (uninstall) | Rare | Frequent (LOLBin signature) |
+| Flag `/U` (uninstall) | Retko | Često (LOLBin signature) |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Visual Studio development | Build processes legitimately use InstallUtil |
-| .NET application setup | Software installation |
+| Visual Studio razvoj | Build procesi koriste InstallUtil legitimno |
+| .NET aplikacije setup | Software instalacija |
 
 ### Tuning
 
-- Whitelist InstallUtil parent processes (msiexec, setup.exe)
-- Alert only on DLL/EXE from user-writable paths
-- Correlate with Defender SmartScreen events
+- Whitelist InstallUtil parent procesi (msiexec, setup.exe)
+- Alert samo na DLL/EXE iz user-writable path-ova
+- Korelacija sa Defender SmartScreen evento
 
 ### Incident Response
 
-1. Identify which DLL/EXE was executed
+1. Identifikovati DLL/EXE koji je pokrenut
 2. Hash & VirusTotal lookup
 3. Isolate host
-4. Memory dump before attempting to stop the process
-5. Identify the delivery vector
+4. Memory dump pre nego što proces pokušaš da zaustaviš
+5. Identifikovati delivery vector
 
 ---
 
 ## DETECTION CARD #4 — KERBEROASTING
 
-**MITRE Tactic:** Credential Access
+**MITRE Tactic:** Credential Access  
 **MITRE Technique:** T1558.003 (Kerberoasting)
 
-### Attack description
+### Opis napada
 
-Attacker seeks TGS tickets for accounts with SPNs (service accounts). RC4 encryption in the TGS response is crackable offline. Goal — obtain the hash of a service account that often has privileged permissions.
+Napadač traži TGS tickete za naloge sa SPN-om (servisni nalozi). RC4 enkripcija u TGS response-u je krekibilna offline. Cilj — dobiti hash service naloga koji često ima privilegovane permisije.
 
 ### Data Sources
 
 - Windows Security EC4769 (Kerberos service ticket requested)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
 **SPL 4.1 — Kerberoasting (RC4 encryption type)**
 
@@ -298,7 +303,7 @@ index=main source="WinEventLog:Security" EventCode=4769
 | sort - _time
 ```
 
-**SPL 4.2 — Multiple TGS requests in a short period (mass kerberoasting)**
+**SPL 4.2 — Više TGS zahteva u kratkom periodu (mass kerberoasting)**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4769
@@ -311,46 +316,46 @@ index=main source="WinEventLog:Security" EventCode=4769
 | where unique_services > 3
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
 | Encryption type | 0x12 (AES256), 0x11 (AES128) | **0x17 (RC4-HMAC)** |
-| Service requests per user | 1-3 (legitimate applications) | > 5 (mass roasting) |
-| Service target | krbtgt, machine accounts | User accounts with SPN |
+| Service requests po useru | 1-3 (legitimne aplikacije) | > 5 (mass roasting) |
+| Service target | krbtgt, machine accounts | User accounts sa SPN |
 | Source | DC, application server | User workstation |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Legacy application with RC4 | Old SQL Server, custom application |
-| MS Office with SPN | Rare but possible |
+| Legacy aplikacija sa RC4 | Stari SQL Server, custom aplikacija |
+| MS Office sa SPN | Retko, ali moguće |
 
 ### Tuning
 
-- Whitelist legacy applications
-- Special attention to accounts with "admincount=1" property
-- Migrate to AES encryption (msDS-SupportedEncryptionTypes)
+- Whitelist legacy aplikacije
+- Posebna pažnja na naloge sa "admincount=1" property-jem
+- Migracija na AES enkripciju (msDS-SupportedEncryptionTypes)
 
 ### Incident Response
 
-1. Identify which service account's TGS was requested
-2. **Urgently:** rotate the password of the service account
-3. Set AES encryption for the account
-4. Review account permissions (Domain Admin? local Admin?)
-5. Consider gMSA (Group Managed Service Account) migration
+1. Identifikovati service nalog čiji TGS je traženo
+2. **Hitno:** rotirati lozinku service naloga
+3. Postaviti AES enkripciju za nalog
+4. Pregledati permisije naloga (Domain Admin? lokalni Admin?)
+5. Razmotriti gMSA (Group Managed Service Account) migraciju
 
 ---
 
 ## DETECTION CARD #5 — LATERAL MOVEMENT (C2 Implant)
 
-**MITRE Tactic:** Command and Control
+**MITRE Tactic:** Command and Control  
 **MITRE Technique:** T1071.001 (Web Protocols), T1572 (Protocol Tunneling)
 
-### Attack description
+### Opis napada
 
-Attacker launches a C2 implant (Sliver, Cobalt Strike, Metasploit) that establishes an mTLS/HTTPS connection to the attacker's server. All subsequent commands go through that channel.
+Napadač pokreće C2 implant (Sliver, Cobalt Strike, Metasploit) koji uspostavlja mTLS/HTTPS konekciju prema napadačkom serveru. Sve dalje komande idu kroz taj kanal.
 
 ### Data Sources
 
@@ -359,9 +364,9 @@ Attacker launches a C2 implant (Sliver, Cobalt Strike, Metasploit) that establis
 - Sysmon EC11 (File Create)
 - Sysmon EC22 (DNS Query)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
-**SPL 5.1 — Processes from C:\Temp making network connections**
+**SPL 5.1 — Procesi iz C:\Temp koji prave mrežne konekcije**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
@@ -373,7 +378,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | sort - count
 ```
 
-**SPL 5.2 — Beaconing pattern (regular intervals)**
+**SPL 5.2 — Beaconing pattern (regularni intervali)**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3 dst_port=443
@@ -389,7 +394,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | sort - count
 ```
 
-**SPL 5.3 — Internal IP destinations (not internet)**
+**SPL 5.3 — Interne IP destinacije (nije internet)**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
@@ -402,26 +407,26 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | sort - _time
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
 | Process path | Program Files, System32 | C:\Temp, AppData, ProgramData |
-| Destination IP | Public Microsoft/Google | Internal IP that isn't DC or a known server |
+| Destination IP | Public Microsoft/Google | Interni IP koji nije DC ili poznati server |
 | Connection interval | Random | Regular (60s + jitter) |
-| Connection duration | Short or long-lived legit | Periodic short bursts |
+| Connection duration | Kratke ili long-lived legit | Periodic short bursts |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| OneDrive sync | OneDrive goes to Microsoft IPs (52.x.x.x, 150.171.x.x) |
-| Windows Update | svchost.exe, port 443 to windowsupdate.com |
-| Browser auto-update | Chrome/Firefox update mechanisms |
+| OneDrive sync | OneDrive ide na Microsoft IP-ove (52.x.x.x, 150.171.x.x) |
+| Windows Update | svchost.exe, port 443 prema windowsupdate.com |
+| Browser auto-update | Chrome/Firefox update mehanizmi |
 
-### Tuning recommendations
+### Tuning preporuke
 
-**KEY:** Add to Sysmon NetworkConnect watchlist:
+**KLJUČNO:** Dodaj na Sysmon NetworkConnect watchlist:
 
 ```xml
 <NetworkConnect onmatch="include">
@@ -437,32 +442,32 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 
 ### Incident Response
 
-1. **Urgently:** isolate the compromised host (network)
+1. **Hitno:** isolate kompromitovani host (network)
 2. Memory dump
-3. Analyze process tree
-4. Identify the C2 server
-5. Block C2 IP on perimeter firewall
-6. Review whether C2 spread to other hosts
+3. Analiziraj process tree
+4. Identifikovati C2 server
+5. Blokirati C2 IP na perimeter firewall
+6. Pregled da li je C2 širio se na druge hostove
 
 ---
 
 ## DETECTION CARD #6 — CREDENTIAL DUMPING
 
-**MITRE Tactic:** Credential Access
+**MITRE Tactic:** Credential Access  
 **MITRE Technique:** T1003.002 (SAM), T1003.005 (Cached Credentials), T1003.006 (DCSync)
 
-### Attack description
+### Opis napada
 
-Attacker extracts local and cached domain credentials via `reg save` of SAM/SYSTEM/SECURITY hives, or attempts DCSync against the DC.
+Napadač izvlači lokalne i cached domain kredencijale kroz `reg save` SAM/SYSTEM/SECURITY hive-ova, ili pokušava DCSync prema DC-u.
 
 ### Data Sources
 
 - Windows Security EC4688 (Process Created)
 - Sysmon EC1 (Process Create)
-- Sysmon EC11 (File Create — hive files)
+- Sysmon EC11 (File Create — hive fajlovi)
 - Windows Defender Operational log
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
 **SPL 6.1 — Registry hive dump detection**
 
@@ -486,7 +491,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, host, process, filename
 ```
 
-**SPL 6.3 — Mimikatz / SharpKatz detection (Defender blocks)**
+**SPL 6.3 — Mimikatz / SharpKatz detection (Defender blokade)**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Windows Defender/Operational" 
@@ -507,7 +512,7 @@ index=main source="WinEventLog:Security" EventCode=4662
 | table _time, host, username, properties
 ```
 
-GUIDs are:
+GUIDs su:
 - `1131f6aa-9c07-11d1-f79f-00c04fc2dcd2` = DS-Replication-Get-Changes
 - `1131f6ad-9c07-11d1-f79f-00c04fc2dcd2` = DS-Replication-Get-Changes-All
 - `89e95b76-444d-4c62-991a-0facbeda640c` = DS-Replication-Get-Changes-In-Filtered-Set
@@ -524,59 +529,59 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, host, source, target, access
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
-| reg.exe save | Backup tools | Combination SAM+SYSTEM+SECURITY |
+| reg.exe save | Backup tools | Kombinacija SAM+SYSTEM+SECURITY |
 | Hive file location | C:\Windows\System32\config | C:\Temp, C:\Users\Public |
-| LSASS access | csrss.exe, wininit.exe | Processes from user space |
+| LSASS access | csrss.exe, wininit.exe | Procesi iz user space |
 | DCSync source | DC machine account | User account |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Backup software | Veeam, BackupExec legitimately use reg save |
-| System administrator | Manual backup before upgrade |
-| Forensics tools | Versioned evidence collection |
+| Backup software | Veeam, BackupExec rade reg save legitimno |
+| System administrator | Manuelni backup pre upgrade-a |
+| Forensics tools | Verzionirana evidencija |
 
 ### Tuning
 
 - Whitelist backup software service accounts
-- Alert only on SAM + SYSTEM + SECURITY combination in a short timeframe
-- DCSync alert is high-fidelity — always investigate
+- Alert samo na kombinaciju SAM + SYSTEM + SECURITY u kratkom periodu
+- DCSync alert je high-fidelity — uvek istraži
 
 ### Incident Response
 
-1. **Critical alert** — DCSync or Mimikatz signature = potential Domain Admin compromise
-2. Host isolation immediately
-3. Force krbtgt password reset (TWICE, not once)
-4. Reset all privileged accounts
-5. Forensic memory analysis
-6. Threat hunt — other hosts with the same IOCs
+1. **Kritičan alert** — DCSync ili Mimikatz signature = potencijalni Domain Admin kompromis
+2. Hitno isolation host-a
+3. Force krbtgt password reset (DVAPUT, ne jednom)
+4. Reset svih privilegovanih naloga
+5. Forensic memory analiza
+6. Threat hunt — drugi hostovi sa istim IOC-ima
 
 ---
 
 ## DETECTION CARD #7 — PERSISTENCE (Scheduled Task)
 
-**MITRE Tactic:** Persistence
+**MITRE Tactic:** Persistence  
 **MITRE Technique:** T1053.005 (Scheduled Task/Job)
 
-### Attack description
+### Opis napada
 
-Attacker creates a scheduled task that executes malware at logon or on a schedule, running as SYSTEM. The implant remains active after reboot.
+Napadač kreira scheduled task koji pokreće malware pri logon-u ili po rasporedu, kao SYSTEM. Implant ostaje aktivan posle reboot-a.
 
 ### Data Sources
 
 - Windows Security EC4698 (Scheduled Task Created)
 - Windows Security EC4702 (Scheduled Task Updated)
 - Windows TaskScheduler EC106 (Task registered)
-- Sysmon EC11 (File Create in C:\Windows\System32\Tasks)
+- Sysmon EC11 (File Create u C:\Windows\System32\Tasks)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
-**SPL 7.1 — Scheduled task creation (master query)**
+**SPL 7.1 — Scheduled task creation (master upit)**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4698
@@ -613,7 +618,7 @@ index=main source="WinEventLog:Security" EventCode=4698
 | sort - _time
 ```
 
-**SPL 7.4 — Sysmon FileCreate in Tasks folder**
+**SPL 7.4 — Sysmon FileCreate u Tasks folderu**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=11
@@ -624,49 +629,49 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, host, process, filename
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
 | Task creator | SYSTEM, Administrator | User account |
 | Task command path | Program Files, System32 | C:\Temp, AppData |
-| Run As | The user who created it | SYSTEM (escalation) |
+| Run As | User koji ga je napravio | SYSTEM (escalation) |
 | Trigger | Scheduled time | LogonTrigger, BootTrigger |
 | Task name | Descriptive | Mimicry of legitimate (WindowsUpdate*, Adobe*) |
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
-| Software installation | Many installers create tasks |
+| Software instalacija | Mnogi installer kreiraju tasks |
 | Group Policy preference | Domain policy task deployment |
 | Backup software | Schedule jobs |
 
 ### Tuning
 
-- Whitelist known enterprise software task names
-- Alert on combination user creator + SYSTEM runas + suspicious path
-- Correlate with file create events (Sysmon EC11)
+- Whitelist poznate enterprise software task names
+- Alert na kombinaciju user creator + SYSTEM runas + suspicious path
+- Korelacija sa file create eventima (Sysmon EC11)
 
 ### Incident Response
 
-1. Identify task command and runas
-2. Disable task (don't delete — preserve evidence)
+1. Identifikovati task command i runas
+2. Disable task (ne delete — preserve evidence)
 3. Hash check command binary
-4. Identify creator account
-5. Review other tasks created by the same account
-6. Sweep for the same task name on other hosts
+4. Identifikovati creator account
+5. Pregled drugih taskova kreiranih od istog accounta
+6. Sweep za isti task name na drugim hostovima
 
 ---
 
 ## DETECTION CARD #8 — C2 + EXFILTRATION
 
-**MITRE Tactic:** Command and Control / Exfiltration
+**MITRE Tactic:** Command and Control / Exfiltration  
 **MITRE Technique:** T1071.001 (Web Protocols), T1041 (Exfiltration Over C2 Channel)
 
-### Attack description
+### Opis napada
 
-Persistent C2 channel via HTTPS/mTLS (Sliver, Cobalt Strike). All commands, file uploads, and exfiltration go through the same encrypted channel.
+Persistent C2 kanal kroz HTTPS/mTLS (Sliver, Cobalt Strike). Sve komande, file uploads, i exfiltration idu kroz isti enkriptovani kanal.
 
 ### Data Sources
 
@@ -674,7 +679,7 @@ Persistent C2 channel via HTTPS/mTLS (Sliver, Cobalt Strike). All commands, file
 - Sysmon EC22 (DNS Query)
 - Firewall logs (perimeter)
 
-### Primary SPL Queries
+### Primarni SPL Upiti
 
 **SPL 8.1 — C2 beaconing pattern detection**
 
@@ -729,9 +734,9 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational"
 | table _time, host, process, activity, filename, dst_ip
 ```
 
-### Analysis
+### Analiza
 
-| Indicator | Normal | Suspicious |
+| Pokazatelj | Normalno | Sumnjivo |
 |---|---|---|
 | Connection interval | Random | Regular (heartbeat) |
 | Destination | CDN, public services | Single IP held over time |
@@ -740,31 +745,31 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational"
 
 ### False Positives
 
-| Scenario | Explanation |
+| Scenario | Objašnjenje |
 |---|---|
 | OneDrive sync (Microsoft IPs) | 52.x.x.x, 150.171.x.x |
 | Windows Update | windowsupdate.microsoft.com |
-| Antivirus updates | Defender update channels |
+| Antivirus updates | Defender update kanali |
 | Telemetry (Microsoft, Adobe, browser) | Regular small requests |
 
 ### Tuning
 
-- Maintain allowlist of legitimate cloud services (Microsoft, Google, Adobe IP ranges)
+- Maintain allowlist legitimnih cloud servisa (Microsoft, Google, Adobe IP ranges)
 - Threshold based on baseline traffic patterns
-- Investigate based on **combination** of indicators, not individual ones
+- Investigate na osnovu **kombinacije** indikatora, ne pojedinačnog
 
 ### Incident Response
 
-1. **Urgently isolate** the compromised host
+1. **Hitno isolate** kompromitovani host
 2. Capture network traffic (PCAP)
-3. Identify the C2 destination
-4. Block on perimeter firewall and DNS
-5. Threat intel lookup for the destination
-6. Sweep the network for the same IOC
+3. Identifikovati C2 destinaciju
+4. Block na perimeter firewall i DNS
+5. Threat intel lookup za destinaciju
+6. Sweep mreže za isti IOC
 
 ---
 
-## SPLUNK DASHBOARD STRUCTURE
+## SPLUNK DASHBOARD STRUKTURA
 
 ### Dashboard 1 — "Purple Lab — Attack Overview"
 
@@ -802,9 +807,96 @@ index=main source="WinEventLog:Security" EventCode=4688
 | head 10
 ```
 
+### Dashboard 2 — "Phase 2 — Password Spray Detection"
+
+**Panel 2.1 — Single Value: Spray Count**
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4771 earliest=-24h
+| stats count
+```
+
+**Panel 2.2 — Timeline**
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4771 earliest=-24h
+| rex field=Message "Client Address:\s*::ffff:(?<src_ip>[^\r\n]+)"
+| timechart span=5m count by src_ip
+```
+
+**Panel 2.3 — Target Users (Bar Chart)**
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4771
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| stats count by username
+| sort - count
+```
+
+**Panel 2.4 — Source IP Table**
+
+```spl
+index=main source="WinEventLog:Security" (EventCode=4771 OR EventCode=4768)
+| rex field=Message "Client Address:\s*::ffff:(?<src_ip>[^\r\n]+)"
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| stats count by src_ip, username, EventCode
+| sort - count
+```
+
+### Dashboard 3 — "Phase 4 — Kerberoasting Detection"
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4769
+| rex field=Message "Service Name:\s*(?<service>[^\r\n]+)"
+| rex field=Message "Ticket Encryption Type:\s*(?<enc_type>[^\r\n]+)"
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| where enc_type="0x17"
+| search NOT service="krbtgt"
+| timechart span=10m count by service
+```
+
+### Dashboard 4 — "Phase 6 — Credential Dumping"
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4688
+| rex field=Message "Process Command Line:\s*(?<cmdline>[^\r\n]+)"
+| search (cmdline="*reg*save*SAM*" OR cmdline="*reg*save*SYSTEM*" OR cmdline="*reg*save*SECURITY*")
+| table _time, host, cmdline
+| sort - _time
+```
+
+### Dashboard 5 — "Phase 7 — Persistence Detection"
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4698
+| rex field=Message "Task Name:\s*(?<taskname>[^\r\n]+)"
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| rex field=Message "<Command>(?<command>[^<]+)</Command>"
+| table _time, host, username, taskname, command
+| sort - _time
+```
+
+### Dashboard 6 — "MITRE ATT&CK Mapping"
+
+Heat map koji prikazuje aktivnost po MITRE tehnikama:
+
+```spl
+index=main source="WinEventLog:Security" earliest=-24h
+| eval mitre=case(
+    EventCode=4771, "T1110.003",
+    EventCode=4769, "T1558.003",
+    EventCode=4698, "T1053.005",
+    match('Process Command Line', "InstallUtil"), "T1218.004",
+    match('Process Command Line', "reg.*save"), "T1003.002",
+    true(), "Other"
+)
+| where mitre != "Other"
+| stats count by mitre
+```
+
 ---
 
-## UNIVERSAL SPL QUERIES (CHEAT SHEET)
+## UNIVERZALNI SPL UPITI (CHEAT SHEET)
 
 ### Top Failed Logons
 
@@ -815,7 +907,7 @@ index=main source="WinEventLog:Security" EventCode=4625
 | sort - count
 ```
 
-### LOLBins across all machines
+### LOLBins na sve mašine
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4688
@@ -847,20 +939,37 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, host, process, filename
 ```
 
+### PowerShell Script Block
+
+```spl
+index=main source="WinEventLog:PowerShell" EventCode=4104
+| rex field=Message "ScriptBlockText=(?<script>[^\r\n]+)"
+| search (script="*Invoke-Mimikatz*" OR script="*AMSI*" OR script="*DownloadString*" OR script="*IEX*" OR script="*EncodedCommand*")
+| table _time, host, script
+```
+
+### WMI Activity
+
+```spl
+index=main source="WinEventLog:WMI" EventCode=5861
+| rex field=Message "Operation:\s*(?<operation>[^\r\n]+)"
+| table _time, host, operation
+```
+
 ---
 
 ## INCIDENT RESPONSE RUNBOOK
 
 ### Priority levels
 
-| Level | Definition | Response time |
+| Level | Definicija | Response time |
 |---|---|---|
 | **P1 — Critical** | Domain compromise potential, active C2, credential theft | < 15 min |
-| **P2 — High** | Privilege escalation, lateral movement, persistence | < 1 hour |
-| **P3 — Medium** | Suspicious activity, recon, failed exploitation | < 4 hours |
-| **P4 — Low** | Anomalies without clear malicious intent | < 24 hours |
+| **P2 — High** | Privilege escalation, lateral movement, persistence | < 1 sat |
+| **P3 — Medium** | Suspicious activity, recon, failed exploitation | < 4 sata |
+| **P4 — Low** | Anomalije bez clear malicious intent | < 24 sata |
 
-### Generic IR process
+### Generic IR proces
 
 **1. Detect & Triage (0-15 min)**
 - Alert assessment
@@ -868,14 +977,14 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 - Notify on-call team
 - Document timeline start
 
-**2. Investigate (15 min - 4 hours)**
+**2. Investigate (15 min - 4 sata)**
 - Correlate alerts
 - Pull related logs (Splunk searches)
-- Identify scope (which hosts, which accounts)
+- Identifikuj scope (kojeg hostova, kojeg naloga)
 - Memory dump if possible
 
-**3. Contain (parallel with investigate)**
-- Network isolation of compromised host
+**3. Contain (paralelno sa investigate)**
+- Network isolation kompromitovanog hosta
 - Disable affected accounts
 - Block C2 IP/domain
 - Preserve evidence
@@ -897,9 +1006,22 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 - Train team
 - Update runbook
 
+### Per-phase IR actions
+
+| Phase | First action | Containment | Eradication |
+|---|---|---|---|
+| 1 — Recon | Identify source IP | Block firewall | N/A (no compromise yet) |
+| 2 — Spray | Reset spray-target accounts | Block source IP | Force MFA where possible |
+| 3 — Execution | Isolate host | Kill process | Remove dropper, scan disk |
+| 4 — Kerberoast | Rotate service account password | Enable AES encryption | Migrate to gMSA |
+| 5 — Lateral | Isolate all hosts in path | Block C2 | Remove implant from all hosts |
+| 6 — Cred Dump | Reset ALL affected credentials | Force password rotation | Reset krbtgt 2x if domain compromise |
+| 7 — Persistence | Disable scheduled task/run key | Remove persistence | Sweep all hosts for same IOC |
+| 8 — C2 | Block C2 destination | Network isolation | Memory analysis, sandbox malware |
+
 ---
 
-## DETECTION COVERAGE MATRIX
+## DETECTION COVERAGE MATRICA
 
 | MITRE Technique | Detection Source | SPL Status | False Positive Risk |
 |---|---|---|---|
@@ -916,15 +1038,131 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 
 ---
 
-## PRODUCTION HARDENING PLAYBOOK (Segment 10)
+## THREAT HUNTING HYPOTHESES
 
-**Goal:** "Before/After Detection Engineering" — for each attack from Phases 1-8, define a hardening fix + re-run SPL query that proves the attack now fails or is detected at a new layer.
+Tipični SOC L2 threat hunting "stories":
 
-**Central point:** Hardening ≠ Detection. Prevention reduces the attack surface, but the surface never reaches zero. Detection remains the *safety net* for everything that slips through the prevention layer.
+### Hypothesis 1: "Suspicious LOLBin abuse"
+
+**Hypothesis:** Napadač koristi InstallUtil/MSBuild za code execution bez powershell.exe
+
+**Hunt query:**
+```spl
+index=main source="WinEventLog:Security" EventCode=4688
+| rex field=Message "New Process Name:\s*(?<process>[^\r\n]+)"
+| rex field=Message "Process Command Line:\s*(?<cmdline>[^\r\n]+)"
+| rex field=Message "Creator Process Name:\s*(?<parent>[^\r\n]+)"
+| search (process="*InstallUtil*" OR process="*msbuild*" OR process="*regasm*" OR process="*regsvcs*")
+| stats count values(parent) as parents values(cmdline) as cmds by host, process
+| where count > 0
+```
+
+### Hypothesis 2: "C2 beaconing from unusual binaries"
+
+**Hypothesis:** Implant beaconing iz user-writable path-a
+
+**Hunt query:**
+```spl
+index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
+| rex field=Message "Image:\s*(?<process>[^\r\n]+)"
+| rex field=Message "DestinationIp:\s*(?<dst_ip>[^\r\n]+)"
+| search process="C:\\Users\\*" OR process="C:\\Temp\\*"
+| stats dc(dst_ip) as unique_dests count by host, process
+| where count > 20
+```
+
+### Hypothesis 3: "Service account abuse"
+
+**Hypothesis:** Service nalog (sa SPN) loguje se interaktivno (Type 2 / 10) — netipično za servisne naloge
+
+**Hunt query:**
+```spl
+index=main source="WinEventLog:Security" EventCode=4624
+| rex field=Message "Logon Type:\s*(?<logon_type>[^\r\n]+)"
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| where logon_type=2 OR logon_type=10
+| search username="*Service*" OR username="*svc*"
+| stats count by username, host, logon_type
+```
+
+### Hypothesis 4: "Off-hours activity from privileged accounts"
+
+```spl
+index=main source="WinEventLog:Security" EventCode=4624
+| rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
+| eval hour=strftime(_time, "%H")
+| where (hour < "07" OR hour > "19")
+| search username="Administrator" OR username="*Admin*"
+| stats count by username, host, hour
+```
 
 ---
 
-### Hardening Fix #1 — Phase 2 Password Spray
+## ZA CV / PORTFOLIO
+
+### Linkovi za GitHub repo struktura
+
+```
+purple-team-lab/
+├── README.md                              # Overview & screenshots
+├── 01_LAB_SETUP.md                        # Lab arhitektura
+├── 02_ATTACK_PLAYBOOK.md                  # 8 faza napada
+├── 03_DETECTION_PLAYBOOK.md               # SPL upiti
+├── detection-cards/
+│   ├── 01_reconnaissance.md
+│   ├── 02_password_spray.md
+│   ├── 03_execution_lolbins.md
+│   ├── 04_kerberoasting.md
+│   ├── 05_lateral_movement.md
+│   ├── 06_credential_dumping.md
+│   ├── 07_persistence.md
+│   └── 08_c2_exfiltration.md
+├── splunk/
+│   ├── dashboards/
+│   │   ├── overview.xml
+│   │   ├── password_spray.xml
+│   │   └── ...
+│   ├── savedsearches/
+│   │   └── all_detections.conf
+│   └── props.conf
+├── sysmon/
+│   └── sysmonconfig.xml
+├── scripts/
+│   ├── lab_validation.ps1
+│   └── audit_policy.cmd
+└── screenshots/
+    ├── splunk_dashboard.png
+    ├── bloodhound_graph.png
+    └── attack_chain.png
+```
+
+### CV bullet points
+
+```
+Purple Team Home Lab — SOC Analyst L2 Portfolio | 2026
+
+• Designed and implemented Active Directory lab (Win Server 2022 DC, 2x Win10 endpoints, Kali, Splunk SIEM)
+• Simulated 8 MITRE ATT&CK techniques: T1046, T1110.003, T1558.003, T1218.004, T1071.001, T1003.002/006, T1053.005, T1041
+• Deployed modern C2 framework (Sliver) with mTLS evasion and validated detection gaps
+• Engineered 30+ Splunk SPL detection queries with false positive tuning
+• Authored vendor-agnostic detections as code (Sigma) compiled to Splunk; CIM-normalized, version-controlled (Detection-as-Code)
+• Built MITRE-mapped detection dashboard with 6 panels for real-time monitoring
+• Documented incident response runbook per attack phase
+• Identified and documented AD CS misconfigurations (ESC1, ESC2, ESC3, ESC15)
+• Demonstrated blue team success: Defender + AMSI successfully blocked DCSync attempts
+```
+
+---
+
+## PRODUCTION HARDENING PLAYBOOK (Segment 10)
+
+**Cilj:** "Before/After Detection Engineering" — za svaki napad iz Faza 1-8 definisati hardening fix + re-run SPL upit koji potvrđuje da napad sad fail-uje ili je detektovan na novom sloju.
+
+**Centralna poenta:** Hardening ≠ Detection. Prevention smanjuje napadački surface, ali surface nikad nije nula. Detection ostaje *safety net* za sve što prođe kroz prevention layer.
+
+---
+
+### Hardening Fix #1 — Faza 2 Password Spray
 
 **Prevention controls:**
 - Fine-Grained Password Policy (min 14 chars, complexity enabled)
@@ -932,7 +1170,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 - Lockout Duration = 30 minutes
 - Lockout Observation Window = 30 minutes
 
-**Re-run SPL — verify lockout:**
+**Re-run SPL — verifikacija lockout-a:**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4740
@@ -942,7 +1180,7 @@ index=main source="WinEventLog:Security" EventCode=4740
 | sort - _time
 ```
 
-**SPL for low-and-slow detection (bypass attempt):**
+**SPL za low-and-slow detection (bypass attempt):**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4771 earliest=-7d
@@ -954,19 +1192,19 @@ index=main source="WinEventLog:Security" EventCode=4771 earliest=-7d
 | sort - _time
 ```
 
-> An attacker who waits 35 minutes between attempts per user bypasses lockout, but creates a distinct multi-user pattern over longer time.
+> Napadač koji čeka 35 min između pokušaja po useru prolazi lockout, ali pravi distinct multi-user pattern preko dužeg vremena.
 
 ---
 
-### Hardening Fix #2 — Phase 4 Kerberoasting
+### Hardening Fix #2 — Faza 4 Kerberoasting
 
 **Prevention controls:**
-- `msDS-SupportedEncryptionTypes` = 24 (AES128 + AES256) for all service accounts
+- `msDS-SupportedEncryptionTypes` = 24 (AES128 + AES256) za sve service account-e
 - Service account password ≥ 20 chars random
-- Description, info, comment fields cleaned of password leaks
-- gMSA migration (long-term recommendation)
+- Description, info, comment polja očišćena od password leak-a
+- gMSA migracija (preporuka za long-term)
 
-**Re-run SPL — RC4 now an anomaly:**
+**Re-run SPL — RC4 sad anomalija:**
 
 ```spl
 index=main source="WinEventLog:Security" EventCode=4769
@@ -976,17 +1214,26 @@ index=main source="WinEventLog:Security" EventCode=4769
 | stats count by service, enc_type
 ```
 
-> After AES enforcement, every 0x17 (RC4) event is an anomaly. The alert threshold flips — RC4 now *must* alert because it shouldn't exist.
+> Posle AES enforcement, svaki 0x17 (RC4) event je anomalija. Threshold za alert se okreće — RC4 sad mora da alertuje upravo zato što ne bi trebalo da postoji.
+
+**SPL za password leak audit:**
+
+```spl
+| inputlookup ad_users.csv
+| eval has_leak=if(match(description, "(?i)pass|pwd|cred"), 1, 0)
+| where has_leak=1
+| table samAccountName, description
+```
 
 ---
 
-### Hardening Fix #3 — Phase 5 Sliver Execution
+### Hardening Fix #3 — Faza 5 Sliver Execution
 
 **Prevention controls:**
-- AppLocker Deny rules for C:\Temp, C:\Users\*\AppData\Local\Temp, C:\Users\Public
-- AppLocker service (AppIDSvc) on Automatic + Started
-- GPO deployment via central policy
-- WDAC as next step for high-security tier
+- AppLocker Deny rules za C:\Temp, C:\Users\*\AppData\Local\Temp, C:\Users\Public
+- AppLocker service (AppIDSvc) na Automatic + Started
+- GPO deployment kroz centralnu polisu
+- WDAC kao sledeći korak za visok security tier
 
 **Re-run SPL — AppLocker Block events:**
 
@@ -998,7 +1245,7 @@ index=main source="WinEventLog:Microsoft-Windows-AppLocker/EXE and DLL" EventCod
 | sort - _time
 ```
 
-**SPL for bypass attempts (signed LOLBin abuse):**
+**SPL za bypass attempts (signed LOLBin abuse):**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
@@ -1010,17 +1257,17 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 | table _time, parent, process, cmdline
 ```
 
-> AppLocker blocks direct execution from user paths, but signed LOLBin can load payloads from those paths. Detection layer catches the combination.
+> AppLocker blokira direktnu execution iz user path-ova, ali signed LOLBin može da load-uje payload iz tih path-ova. Detection layer hvata kombinaciju.
 
 ---
 
-### Hardening Fix #4 — Phase 8 mTLS C2 Beacon
+### Hardening Fix #4 — Faza 8 mTLS C2 Beacon
 
 **Prevention controls:**
-- Sysmon NetworkConnect include rule for C:\Temp, C:\Users, C:\ProgramData
-- Sysmon include rule for LOLBin binaries
-- Sysmon config deploy via GPO startup script (NETLOGON share)
-- Version control in Git with tags (v2.1-purple)
+- Sysmon NetworkConnect include rule za C:\Temp, C:\Users, C:\ProgramData
+- Sysmon include rule za LOLBin binary-je
+- Sysmon config deploy kroz GPO startup script (NETLOGON share)
+- Version control u Git-u sa tagovima (v2.1-purple)
 
 **Re-run SPL — beaconing detection:**
 
@@ -1035,7 +1282,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | sort - count
 ```
 
-**SPL for beacon interval anomaly (jitter analysis):**
+**SPL za beacon interval anomaly (jitter analysis):**
 
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
@@ -1048,13 +1295,13 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | where avg_interval > 30 AND avg_interval < 300 AND jitter < 10
 ```
 
-> Regular intervals with small jitter = beaconing signature. Sliver default is 60s ± 30%.
+> Pravilni intervali sa malim jitter-om = beaconing signature. Sliver default je 60s ± 30%.
 
 ---
 
-### Hardening Coverage Matrix
+### Hardening Coverage Matrica
 
-| Phase | Attack | Prevention Layer | Detection Layer | Status |
+| Faza | Napad | Prevention Layer | Detection Layer | Status |
 |---|---|---|---|---|
 | 1 | Recon (nmap, kerbrute) | Network segmentation | EC4768 fail code 0x6 alert | Detection only |
 | 2 | Password Spray | FGPP + lockout | EC4740 + multi-user 4771 | Both |
@@ -1069,28 +1316,37 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 
 ### Closing Insight — Mature SOC Mindset
 
-**L1 thinking:** "We have Splunk and Defender, we're covered."
+**L1 thinking:** "Imamo Splunk i Defender, pokriveni smo."
 
 **L2 thinking:** "Prevention + Detection layer + Detection-as-Code + MITRE ATT&CK coverage + false positive tuning."
 
-**L3 thinking:** "Threat model → attack paths → which attacks are realistic → prevention investment vs detection investment optimization."
+**L3 thinking:** "Threat model → attack paths → koji su realistic napadi → prevention investment vs detection investment optimization."
 
-**Main point for a hiring manager:** Defense in Depth means an attacker must bypass multiple layers. But no single layer is bulletproof. Detection remains the *safety net* for everything prevention lets through. That is the difference between an SOC analyst who thinks about tools and one who thinks about methodology.
-
----
-
-**End of Document 3**
+**Glavna poenta za hiring manager-a:** Defense in Depth znači da napadač mora da zaobiđe više slojeva. Ali nijedan sloj nije bulletproof. Detection ostaje *safety net* za sve što prevention propušta. To je razlika između SOC analitičara koji misli alate i onog koji misli metodologiju.
 
 ---
 
-## NEXT STEPS
-
-1. **Complete Sysmon config** — include NetworkConnect for user-writable paths (`\Temp\`, `\AppData\`, `\ProgramData\`), NOT by filename (covered in Seg 10)
-2. **Record 10 segments** (8 attack + Splunk Dashboard Tour + Production Hardening bonus). For CV minimum version record Seg 4, 6, 8, 9, 10.
-3. **Deploy GitHub repo** with structure above (README + `detections/sigma/` + `detections/splunk/savedsearches.conf` already there)
-4. **Add screenshots** from the Splunk dashboard
-5. **Write a blog post** that follows the video — SEO and sharing
+**Kraj Dokumenta 3**
 
 ---
 
-**This document + repo (README, Sigma, Splunk pack) = solid SOC L2 portfolio. Next level toward L3: NDR/EDR layer (Lab v2) and detection coverage measurement via emulation (Atomic Red Team).**
+## ZAVRŠNE NAPOMENE
+
+### Šta dalje raditi (next steps)
+
+1. **Recompletraj Sysmon config** — uključi NetworkConnect za user-writable putanje (`\Temp\`, `\AppData\`, `\ProgramData\`), NE za ime fajla (pokriveno u Seg 10)
+2. **Snimi video u 10 segmenata** (8 napadačkih + Splunk Dashboard Tour + Production Hardening bonus). Za CV minimum verziju snimi Seg 4, 6, 8, 9, 10.
+3. **Postavi GitHub repo** sa strukturom iznad (README + `detections/sigma/` + `detections/splunk/savedsearches.conf` su već tu)
+4. **Dodaj screenshote** sa Splunk dashboard-a
+5. **Napiši blog post** koji prati video — SEO i sharing
+
+### Za fresh Claude projekat
+
+Kad pokreneš novi Claude projekat:
+- Upload ova 3 dokumenta odmah
+- U system prompt-u dodaj: "Ovo je nastavak Purple Team Lab projekta. Svi setup, attack i detection detalji su u priloženim dokumentima."
+- Claude će imati kompletan kontekst bez recap-a
+
+---
+
+**Sa ovim dokumentima + repo-om (README, Sigma, Splunk pack) lab je solidan SOC L2 portfolio. Sledeći skok ka L3: NDR/EDR sloj (Lab v2) i merenje detection coverage-a kroz emulaciju (Atomic Red Team).**

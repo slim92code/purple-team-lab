@@ -1,46 +1,46 @@
-**English** · **[Srpski](01_lab_setup.sr.md)**
+**[English](01_lab_setup.md)** · **Srpski**
 
-# Purple Team Home Lab — Lab Setup
+# Purple Team Home Lab — Lab Setup Complete
 
-**Project:** Purple LAB — SOC Analyst Level 2
-**Domain:** MARVEL.LOCAL
-**Goal:** SOC L2 portfolio + CV demonstration + YouTube series
+**Projekat:** Purple LAB — SOC Analyst Level 2  
+**Domain:** MARVEL.LOCAL  
+**Cilj:** SOC L2 portfolio + CV demonstracija + YouTube serija
 
 ---
 
-## 1. INFRASTRUCTURE
+## 1. INFRASTRUKTURA
 
-### Network
+### Mreža
 - **Subnet:** 192.168.182.0/24
-- **VMware NAT network** (host can ping all, internet via NAT)
+- **VMware NAT network** (host može pinguje sve, internet preko NAT-a)
 
 ### VM Inventory
 
-| Machine | IP | Role | RAM | CPU |
+| Mašina | IP | Uloga | RAM | CPU |
 |---|---|---|---|---|
 | **HYDRA-DC** (Windows Server 2022) | 192.168.182.135 | Domain Controller, AD CS, DNS | 2GB | 2 |
-| **THEPUNISHER** (Windows 10) | 192.168.182.137 | Endpoint, domain joined | 2GB | 2 |
-| **SPIDERMAN** (Windows 10) | 192.168.182.138 | Endpoint, domain joined | 2GB | 2 |
-| **Kali Linux** | 192.168.182.133 | Attacker | 2GB | 2 |
+| **THEPUNISHER** (Windows 10) | 192.168.182.137 | Endpoint domain joined | 2GB | 2 |
+| **SPIDERMAN** (Windows 10) | 192.168.182.138 | Endpoint domain joined | 2GB | 2 |
+| **Kali Linux** | 192.168.182.133 | Napadač | 2GB | 2 |
 | **Splunk Linux** | 192.168.182.131 | SIEM | 4GB | 2 |
 
-**Total: 12GB RAM, 10 CPU**
+**Ukupno: 12GB RAM, 10 CPU**
 
-### Active Directory Users
+### Active Directory korisnici
 
 | Username | Password | Group | Notes |
 |---|---|---|---|
-| Administrator | `P@$$w0rd!` | Domain Admins | **Local** Administrator on THEPUNISHER, not domain Administrator |
-| frankcastle | Password1 | Domain Users | Compromised via password spray |
-| peterparker | (unknown) | Domain Users | Not cracked |
-| SQLService | MYpassword123# | Group Policy Creator Owners, has SPN | Kerberoasted |
-| tstark | (unknown) | Domain Users | — |
+| Administrator | `P@$$w0rd!` | Domain Admins | **Lokalni** Administrator THEPUNISHER, ne domain Administrator |
+| frankcastle | Password1 | Domain Users | Kompromitovan kroz password spray |
+| peterparker | (unknown) | Domain Users | Nije krekovan |
+| SQLService | MYpassword123# | Group Policy Creator Owners, ima SPN | Kerberoasted |
+| tstark | (unknown) | Domain Users | Možda ne postoji |
 | Guest | - | - | Disabled |
 
-### Cracked credentials (known)
+### Krekovane kredencijale (poznate)
 - **fcastle:Password1** — domain user (password spray)
-- **SQLService:MYpassword123#** — service account with SPN (Kerberoasting)
-- **THEPUNISHER\Administrator NT hash:** `fbdcd5041c96ddbd82224270b57f11fc` (local admin)
+- **SQLService:MYpassword123#** — service account sa SPN (Kerberoasting)
+- **THEPUNISHER\Administrator NT hash:** `fbdcd5041c96ddbd82224270b57f11fc` (lokalni admin)
 - **frankcastle NT hash:** `64f12cddaa88057e06a81b54e73b949b`
 - **SUPERMAN NT hash:** `2b576acbe6bcfda7294d6bd18041b8fe`
 - **Cached MARVEL\Administrator:** `$DCC2$10240#Administrator#c7154f935b7d1ace4c1d72bd4fb7889c`
@@ -49,37 +49,37 @@
 
 ---
 
-## 2. SPLUNK CONFIGURATION
+## 2. SPLUNK KONFIGURACIJA
 
-### Version
-- **Splunk Enterprise 10.2.0 Free** (500MB/day limit)
-- **Location:** `/opt/splunk/`
+### Verzija
+- **Splunk Enterprise 10.2.0 Free** (500MB/dan limit)
+- **Lokacija:** `/opt/splunk/`
 
-### Installed Apps
+### Apps instalirani
 - ✅ Splunk_TA_windows
-- ✅ TA-microsoft-sysmon 10.6.2
-- ✅ Splunk_SA_CIM 8.5.0
+- ❌ Sysmon TA (nije instaliran — Splunkbase nedostupan)
+  - **Posledica:** Koristi se `source=` umesto `sourcetype=` u SPL upitima
 
-### Index structure
-- **`main`** — all events
+### Index strukturа
+- **`main`** — svi eventi
 
-### Source field map (via `source` field, not `sourcetype`)
+### Source field map (kroz `source` polje, ne `sourcetype`)
 
-| Source | Content |
+| Source | Sadržaj |
 |---|---|
 | `WinEventLog:Security` | Authentication, Process Creation (EC4624, 4625, 4688, 4698, 4768, 4769, 4771, 4776) |
 | `WinEventLog:Microsoft-Windows-Sysmon/Operational` | Sysmon EC1, 3, 5, 8, 11, 12, 13, 22 |
 | `WinEventLog:Microsoft-Windows-PowerShell/Operational` | PowerShell Script Block (EC4103, 4104) |
-| `WinEventLog:Microsoft-Windows-WMI-Activity/Operational` | WMI events |
-| `WinEventLog:Microsoft-Windows-TaskScheduler/Operational` | Task Scheduler events |
+| `WinEventLog:Microsoft-Windows-WMI-Activity/Operational` | WMI eventi |
+| `WinEventLog:Microsoft-Windows-TaskScheduler/Operational` | Task Scheduler eventi |
 
 ---
 
-## 3. ISSUES RESOLVED DURING SETUP (key for CV)
+## 3. PROBLEMI REŠENI TOKOM SETUPA (kritično za CV)
 
 ### 3.1 Timestamp problem (VM pause/resume)
 
-**Symptom:** Events arrive with shifted timestamps (hours/days off) after VM pause/resume
+**Simptom:** Eventi stižu sa pomerenim timestamp-om (sat-dana razlike) nakon pause/resume VM-a
 
 **Fix:** `/opt/splunk/etc/apps/Splunk_TA_windows/local/props.conf`
 ```ini
@@ -90,9 +90,9 @@ KV_MODE = auto
 SHOULD_LINEMERGE = false
 ```
 
-### 3.2 Forwarder connection drops on VM resume
+### 3.2 Forwarder konekcija puca pri VM resume
 
-**Fix:** Auto-restart task on all Windows machines:
+**Fix:** Auto-restart task na svim Windows mašinama:
 ```powershell
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-Command Restart-Service SplunkForwarder"
 $trigger = New-ScheduledTaskTrigger -AtStartup
@@ -101,7 +101,7 @@ Register-ScheduledTask -TaskName "RestartSplunkOnBoot" -Action $action -Trigger 
 
 ### 3.3 Sysmon errorCode=5 (Access Denied)
 
-**Symptom:** Forwarder cannot read Sysmon log on SPIDERMAN
+**Simptom:** Forwarder ne može da čita Sysmon log na SPIDERMAN
 
 **Fix:**
 ```powershell
@@ -111,7 +111,7 @@ Restart-Service SplunkForwarder
 
 ### 3.4 Timezone offset (DST off)
 
-**Symptom:** SPIDERMAN events one hour ahead
+**Simptom:** SPIDERMAN eventi sat vremena unapred
 
 **Fix:**
 ```powershell
@@ -119,7 +119,7 @@ Set-TimeZone -Id "Central European Standard Time"
 w32tm /resync /force
 ```
 
-### 3.5 DC NTP configuration
+### 3.5 DC NTP konfiguracija
 
 ```cmd
 w32tm /config /syncfromflags:manual /manualpeerlist:"pool.ntp.org,0.pool.ntp.org" /reliable:YES /update
@@ -130,20 +130,20 @@ w32tm /resync /force
 
 ### 3.6 Audit Policy "Other Object Access Events" disabled by default
 
-**Symptom:** EC4698 (Scheduled Task Created) not logging
+**Simptom:** EC4698 (Scheduled Task Created) ne loguje se
 
-**Fix (with elevated privileges):**
+**Fix (sa elevated privilegijama):**
 ```cmd
 auditpol /set /subcategory:"Other Object Access Events" /success:enable /failure:enable
 ```
 
-### 3.7 Forwarder on clients not sending Sysmon logs
+### 3.7 Forwarder na klijentima ne šalje Sysmon logove
 
-**Fix:** Explicit inputs.conf — do not rely on defaults
+**Fix:** Eksplicitan inputs.conf — ne oslanjaj se na default
 
-### 3.8 SMB port 445 occupied by old Python process
+### 3.8 SMB port 445 zauzet od starog Python procesa
 
-**Symptom:** `OSError: [Errno 98] Address already in use` when starting impacket-smbserver
+**Simptom:** `OSError: [Errno 98] Address already in use` pri pokretanju impacket-smbserver
 
 **Fix:**
 ```bash
@@ -153,40 +153,40 @@ sudo kill -9 <PID>
 
 ---
 
-## 4. SYSMON CONFIGURATION
+## 4. SYSMON KONFIGURACIJA
 
-**Version:** Sysmon v15.15
-**Config:** `C:\Users\frankcastle\Desktop\UF_Sysmon\sysmon-config-master\sysmonconfig-export.xml` (SwiftOnSecurity/Olaf config)
+**Verzija:** Sysmon v15.15  
+**Config:** `C:\Users\frankcastle\Desktop\UF_Sysmon\sysmon-config-master\sysmonconfig-export.xml` (SwiftOnSecurity/Olafr config)  
 **SHA256:** `055FEBC600E6D7448CDF3812307275912927A62B1F94D0D933B64B294BC87162`
 
-### EventCodes arriving in Splunk
+### EventCode-ovi koji stižu u Splunk
 
-| EventCode | Name | Status |
+| EventCode | Naziv | Status |
 |---|---|---|
 | 1 | ProcessCreate | ✅ |
-| 3 | NetworkConnect (filtered) | ✅ |
+| 3 | NetworkConnect (filtrirano) | ✅ |
 | 5 | ProcessTerminate | ✅ |
-| 7 | ImageLoad | ❌ Disabled in config |
+| 7 | ImageLoad | ❌ Disabled u config-u |
 | 8 | CreateRemoteThread | ✅ |
-| 10 | ProcessAccess | ❌ Needs enabling for Mimikatz detection |
+| 10 | ProcessAccess | ❌ Treba uključiti za Mimikatz detect |
 | 11 | FileCreate | ✅ |
 | 12/13 | RegistryEvent | ✅ |
 | 22 | DnsQuery | ✅ |
 
-### Sysmon EC3 watchlist (critical for C2 detection)
+### Sysmon EC3 watchlist (bitno za C2 detekciju)
 
-Sysmon config filters network connections only for processes in the watchlist:
+Sysmon config filtrira mrežne konekcije samo sa procesima iz watchlist-e:
 - `powershell.exe` ✅
 - `cmd.exe` ✅
 - `mshta.exe` ✅
 - `certutil.exe` ✅
 - `regsvr32.exe` ✅
 - `rundll32.exe` ✅
-- **`GlobalProtect_Update.exe`** ❌ — **NEEDS TO BE ADDED** as part of detection engineering iteration (Seg 8)
+- **`GlobalProtect_Update.exe`** ❌ — **TREBA DODATI** kao deo detection engineering iteracije
 
 ---
 
-## 5. AUDIT POLICY COMMANDS
+## 5. AUDIT POLICY KOMANDE
 
 ### HYDRA-DC (Domain Controller)
 
@@ -228,7 +228,7 @@ auditpol /set /subcategory:"Other Object Access Events" /success:enable /failure
 auditpol /set /subcategory:"Detailed File Share" /success:enable /failure:enable
 ```
 
-### Command Line + PowerShell logging (all machines)
+### Command Line + PowerShell logging (sve mašine)
 
 ```cmd
 reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f
@@ -241,9 +241,9 @@ reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription" /v O
 
 ---
 
-## 6. FORWARDER INPUTS.CONF (all Windows machines)
+## 6. FORWARDER INPUTS.CONF (sve Windows mašine)
 
-**Location:** `C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf`
+**Lokacija:** `C:\Program Files\SplunkUniversalForwarder\etc\system\local\inputs.conf`
 
 ```ini
 [default]
@@ -286,66 +286,66 @@ index = main
 sourcetype = WinEventLog:TaskScheduler
 ```
 
-**Restart command:**
+**Restart komanda:**
 ```powershell
 Restart-Service SplunkForwarder
 ```
 
 ---
 
-## 7. DEFENDER EXCLUSIONS (deployed via GPO)
+## 7. DEFENDER EXCLUSIONS (GPO postavljeno)
 
-Paths excluded from scanning (set via GPO on DC):
+Putanje izuzete od skeniranja (postavljeno preko GPO na DC):
 - `C:\Temp`
-- `C:\Windows\` (entire Windows folder)
+- `C:\Windows\` (ceo Windows folder)
 - `C:\Windows\Tasks`
 
-**Narrative note:** Defender stays **enabled** throughout attacks. Goal is realistic detection, not disabling AV.
+**Bitno za narativ:** Defender ostaje **uključen** tokom napada. Cilj je realna detekcija, ne disabling.
 
-### Defender behavior during testing
+### Defender ponašanje tokom testiranja
 
-| Tool | Defender triggered? | Result |
+| Alat | Defender reagovao? | Rezultat |
 |---|---|---|
-| Sliver implant (`GlobalProtect_Update.exe` in C:\Temp) | ❌ | Passes — in exclusion path |
-| Mimikatz (`mimikatz.exe`) | ✅ Blocked | "Trojan:Win32/HackTool" |
-| Mimikatz renamed (`m64.exe`) | ✅ Blocked | AMSI catches string `lsadump::dcsync` |
-| SharpKatz | ❌ | Passes AV but fails with RPC error 1825 |
-| Rubeus | ❌ | Passes |
-| InstallUtil .NET payload | ❌ | Passes (LOLBin) |
-| certutil download | ✅ Blocked | "Trojan:Win32/Ceprolad.A" on nc.exe |
-| reg save SAM/SYSTEM | ❌ | Passes (legitimate Windows tool) |
+| Sliver implant (`GlobalProtect_Update.exe` u C:\Temp) | ❌ | Prolazi jer je u exclusion path-u |
+| Mimikatz (`mimikatz.exe`) | ✅ Blokirao | "Trojan:Win32/HackTool" |
+| Mimikatz preimenovan (`m64.exe`) | ✅ Blokirao | AMSI hvata string `lsadump::dcsync` |
+| SharpKatz | ❌ | Prolazi (manje signature) ali RPC error 1825 |
+| Rubeus | ❌ | Prolazi |
+| InstallUtil .NET payload | ❌ | Prolazi (LOLBin) |
+| certutil download | ✅ Blokirao | "Trojan:Win32/Ceprolad.A" na nc.exe |
+| reg save SAM/SYSTEM | ❌ | Prolazi (legitimni Windows alat) |
 
 ---
 
-## 8. NETWORK CONNECTIVITY MATRIX
+## 8. NETWORK CONNECTIVITY MATRICA
 
-### From Kali (192.168.182.133) to other machines
+### Iz Kali (192.168.182.133) prema ostalim
 
-| Destination | Port 445 (SMB) | Port 135 (RPC) | Port 443 (HTTPS) | Port 88 (Kerberos) | Port 389 (LDAP) |
+| Destinacija | Port 445 (SMB) | Port 135 (RPC) | Port 443 (HTTPS) | Port 88 (Kerberos) | Port 389 (LDAP) |
 |---|---|---|---|---|---|
-| HYDRA-DC (.135) | ❌ Blocked | ❌ Blocked | - | ✅ | ✅ |
-| THEPUNISHER (.137) | ❌ Blocked | ❌ Blocked | - | - | - |
-| SPIDERMAN (.138) | ❌ Blocked | ❌ Blocked | - | - | - |
+| HYDRA-DC (.135) | ❌ Blokiran | ❌ Blokiran | - | ✅ | ✅ |
+| THEPUNISHER (.137) | ❌ Blokiran | ❌ Blokiran | - | - | - |
+| SPIDERMAN (.138) | ❌ Blokiran | ❌ Blokiran | - | - | - |
 
-### From THEPUNISHER (192.168.182.137) to DC
+### Iz THEPUNISHER (192.168.182.137) prema DC
 
-| Destination | Port 445 | Port 135 | Port 88 | Port 389 |
+| Destinacija | Port 445 | Port 135 | Port 88 | Port 389 |
 |---|---|---|---|---|
 | HYDRA-DC | ✅ | ✅ | ✅ | ✅ |
 
-**Consequence:** All impacket attacks against the DC must be executed **through Sliver shell on THEPUNISHER**, not directly from Kali.
+**Posledica:** Sve impacket napade prema DC-u moramo da pokrenemo **kroz Sliver shell na THEPUNISHER**, ne direktno sa Kali-ja.
 
-### From Windows machines to Kali
+### Iz Windows mašina prema Kali
 
-| Destination | Port 443 (Sliver mTLS) | Port 445 (SMB share) | Port 8080 (HTTP) |
+| Destinacija | Port 443 (Sliver mTLS) | Port 445 (SMB share) | Port 8080 (HTTP) |
 |---|---|---|---|
-| Kali (192.168.182.133) | ✅ | ✅ (when smbserver is up) | ✅ (when python -m http.server is up) |
+| Kali (192.168.182.133) | ✅ | ✅ (kad je smbserver up) | ✅ (kad je python -m http.server up) |
 
 ---
 
-## 9. TOOLS USED IN THE LAB
+## 9. ALATI KORIŠĆENI U LABU
 
-### On Kali
+### Na Kali
 
 ```bash
 # Recon & enumeration
@@ -360,68 +360,68 @@ impacket-* (GetUserSPNs, GetNPUsers, secretsdump, smbserver, smbclient)
 sliver (v1.7.1-0kali4) — C2 framework
 rubeus (apt package)
 mimikatz (/usr/share/windows-resources/mimikatz/x64/)
-SharpKatz (downloaded from GitHub Flangvik/SharpCollection)
+SharpKatz (preuzet sa GitHub Flangvik/SharpCollection)
 hashcat
 
-# Paths
+# Putanje
 /usr/share/windows-resources/rubeus/Rubeus.exe
 /usr/share/windows-resources/mimikatz/x64/mimikatz.exe
 /usr/share/doc/python3-impacket/examples/
 ```
 
-### Wordlists
+### Lozinka liste
 
 ```bash
 /usr/share/wordlists/rockyou.txt
-/tmp/users_clean.txt  # custom user list
+/tmp/users_clean.txt  # custom lista korisnika
 ```
 
 ---
 
-## 10. PRE-FLIGHT CHECKLIST (before recording video)
+## 10. PRE-FLIGHT CHECKLIST (pre snimanja videa)
 
-### Start all VMs in order:
-1. ✅ HYDRA-DC (DC must be first — DNS dependency)
+### Sve VM-ove upaliti redosledom:
+1. ✅ HYDRA-DC (DC mora da bude prvi zbog DNS-a)
 2. ✅ Splunk Linux
 3. ✅ THEPUNISHER
-4. ✅ SPIDERMAN (as needed)
+4. ✅ SPIDERMAN (po potrebi)
 5. ✅ Kali
 
-### After startup, verify:
+### Posle uključivanja proveriti:
 
 ```bash
-# On Kali:
-ping -c 2 192.168.182.135  # DC reachable
-ping -c 2 192.168.182.131  # Splunk reachable
-ping -c 2 192.168.182.137  # THEPUNISHER reachable
+# Na Kali:
+ping -c 2 192.168.182.135  # DC dostupan
+ping -c 2 192.168.182.131  # Splunk dostupan
+ping -c 2 192.168.182.137  # THEPUNISHER dostupan
 ```
 
 ```powershell
-# On Windows machines:
-Get-Service SplunkForwarder  # Must be Running
-Get-Service Sysmon64         # Must be Running
+# Na Windows mašinama:
+Get-Service SplunkForwarder  # Mora da bude Running
+Get-Service Sysmon64         # Mora da bude Running
 ```
 
-### Check in Splunk (Last 5 minutes):
+### Provera u Splunk-u (Last 5 minutes):
 
 ```spl
 | metadata type=hosts
 | table host, recentTime
 ```
 
-Must show all 3 Windows hosts with recent `recentTime`.
+Mora da pokazuje sve 3 Windows hosta sa svežim `recentTime`.
 
 ```spl
 index=main host=THEPUNISHER 
 | stats count by sourcetype
 ```
 
-Must show all sourcetypes (Security, Sysmon, PowerShell).
+Mora da pokazuje sve sourcetype-ove (Security, Sysmon, PowerShell).
 
-### Time synchronization
+### Sat sinhronizacija
 
 ```powershell
-# On all Windows machines:
+# Na svim Windows mašinama:
 w32tm /resync /force
 ```
 
@@ -429,14 +429,14 @@ w32tm /resync /force
 
 ```powershell
 Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled
-# Must be True/True
+# Mora da bude True/True
 ```
 
 ---
 
-## 11. VALIDATION SCRIPT
+## 11. VALIDATION SKRIPTA
 
-PowerShell script for quick lab readiness check:
+PowerShell skripta za brzu proveru lab spremnosti:
 
 ```powershell
 Write-Host "--- SOC LEVEL 2 LAB VALIDATION ---" -ForegroundColor Cyan
@@ -467,7 +467,7 @@ if ($defender) {
     $rt = if ($defender.DisableRealtimeMonitoring) { "OFF" } else { "ON" }
     Write-Host "[*] Defender Real-Time: $rt" -ForegroundColor Yellow
     if ($defender.ExclusionPath -contains "C:\Temp") {
-        Write-Host "[+] Exclusion C:\Temp: PRESENT" -ForegroundColor Green
+        Write-Host "[+] Exclusion C:\Temp: PRISUTAN" -ForegroundColor Green
     }
 }
 
@@ -492,5 +492,5 @@ Write-Host "--- VALIDATION COMPLETE ---" -ForegroundColor Cyan
 
 ---
 
-**End of Document 1**
-**Next:** `02_attack_playbook.md` — all attack phases with exact commands
+**Kraj Dokumenta 1**  
+**Sledeći:** `02_ATTACK_PLAYBOOK.md` — sve napadačke faze sa tačnim komandama

