@@ -135,7 +135,7 @@
     EventCode=4769, "T1558.003 Kerberoasting",
     EventCode=4688 AND match(Message,"InstallUtil"), "T1218.004 LOLBin",
     EventCode=3    AND match(Message,"\\\\Temp\\\\"), "T1071.001 C2 Beacon",
-    EventCode=4624 AND match(Message,"Logon Type:\s+3"), "T1550 Lateral Move",
+    EventCode=4624 AND match(Message,"Logon Type:\s+3"), "T1021.002 Lateral Move",
     EventCode=4688 AND match(Message,"reg.*save"), "T1003.002 SAM Dump",
     EventCode=4662 AND match(Message,"1131f6aa"), "T1003.006 DCSync",
     EventCode=4698, "T1053.005 Persistence",
@@ -268,7 +268,7 @@ EventCode IN (4768, 4771, 4769, 4624, 4688, 4698, 4662, 3, 10)
     </panel>
 
     <panel>
-      <title>Lateral Movement — Network Logon from Kali (T1550)</title>
+      <title>Lateral Movement — Network Logon from Kali (T1021.002)</title>
       <table>
         <search>
           <query>source="WinEventLog:Security" EventCode=4624
