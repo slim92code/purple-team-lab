@@ -66,8 +66,8 @@ Splunk pack.
 
 ## Blue-team wins (Defender on, not staged)
 
-- **AMSI blocked Mimikatz** DCSync in-memory — endpoint protection stopped a known tool.
-- **AD permissions blocked replication** — `fcastle`/`SQLService` lack *Replicating Directory Changes*, so DCSync failed even where AMSI didn't apply. Defense in depth, demonstrated.
+- **AMSI blocked Mimikatz** — PowerShell invocation stopped at scan time; the tool never executed.
+- **SharpKatz (AMSI-evading) passed Defender** but failed at DRS bind — RPC 1825 (Kerberos auth failure at transport layer). `fcastle` *is* Domain Admin and *does* hold DS-Replication-Get-Changes via `BUILTIN\Administrators` — permissions were never the blocker. Two independent layers stopped DCSync: AMSI on the tool, Kerberos transport on the protocol.
 
 ## Dashboard
 
@@ -117,18 +117,17 @@ Full series (10 segments, ~75 min): [YouTube Playlist](https://www.youtube.com/p
 
 ```
 .
-├── README.md / README.sr.md        <- you are here (the 2-min scan)
-├── 01_lab_setup.md                 <- AD lab build (DC, endpoints, Sysmon, Splunk)
-├── 02_attack_playbook.md           <- 8 phases, commands, MITRE mapping
-├── 03_detection_playbook.md        <- detection cards, SPL, IR runbook, hardening
-├── 04_video_narrative.md           <- video narration script (optional deep-dive)
-├── lab_issues.md                   <- real build/debug log (GPO/auditpol, ACLs, forwarder)
-├── commands.md                     <- command quick-reference
-├── config/sysmonconfig.xml         <- Sysmon config incl. the C:\Temp NetworkConnect fix
-├── screenshots/                    <- 12 detection screenshots (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
+├── README.md / README.sr.md                    <- you are here (the 2-min scan)
+├── 01_lab_setup.md / 01_lab_setup.sr.md       <- AD lab build (DC, endpoints, Sysmon, Splunk)
+├── 02_attack_playbook.md / 02_attack_playbook.sr.md  <- 8 phases, commands, MITRE mapping
+├── 03_detection_playbook.md / 03_detection_playbook.sr.md  <- detection cards, SPL, IR runbook, hardening
+├── lab_issues.md / lab_issues.sr.md           <- real build/debug log (GPO/auditpol, ACLs, forwarder)
+├── COMMAND_REFERENCE.md                       <- command quick-reference
+├── config/sysmonconfig.xml                    <- Sysmon config incl. the C:\Temp NetworkConnect fix
+├── screenshots/                               <- 12 detection screenshots (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
 └── detections/
-    ├── sigma/sigma_rules.yml       <- Detection-as-Code, vendor-agnostic
-    └── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
+    ├── sigma/sigma_rules.yml                  <- Detection-as-Code, vendor-agnostic
+    └── splunk/purple_lab/                     <- deployable Splunk app (+ cim-acceleration/)
 ```
 
 ## Format note
@@ -149,4 +148,4 @@ manager evaluates.
 
 ---
 
-*Self-taught. Background: TCM Security (14 courses), TryHackMe (top 1%, 173 rooms incl. SOC-SIM).*
+*Self-taught. Background: TCM Security (SOC 201, Practical Windows Forensics, Detection Engineering for Beginners, Linux 100/101; SOC 101 · PEH · PMAT in progress), TryHackMe (top 1%, 173 rooms).*

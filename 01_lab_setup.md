@@ -30,11 +30,11 @@
 
 | Username | Password | Group | Notes |
 |---|---|---|---|
-| Administrator | `P@$$w0rd!` | Domain Admins | **Local** Administrator on THEPUNISHER, not domain Administrator |
-| frankcastle | Password1 | Domain Users | Compromised via password spray |
-| peterparker | (unknown) | Domain Users | Not cracked |
-| SQLService | MYpassword123# | Group Policy Creator Owners, has SPN | Kerberoasted |
-| tstark | (unknown) | Domain Users | — |
+| Administrator | `P@$$w0rd!` | Domain Admins | Built-in DA |
+| frankcastle (fcastle) | Password1 | **Domain Admins** | Compromised via password spray |
+| peterparker (pparker) | (unknown) | Domain Users | Not cracked — Domain User only |
+| SQLService | MYpassword123# | **Domain Admins**, has SPN | Kerberoasted |
+| tstark | (unknown) | **Domain Admins** | — |
 | Guest | - | - | Disabled |
 
 ### Cracked credentials (known)

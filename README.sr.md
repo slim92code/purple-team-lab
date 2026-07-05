@@ -64,8 +64,8 @@ potvrdi beacon interval/jitter analizom. Preimenovani implant i dalje upada. Vid
 
 ## Blue-team pobede (Defender uključen, nije stejdžovano)
 
-- **AMSI blokirao Mimikatz** DCSync u memoriji — endpoint zaštita zaustavila poznat alat.
-- **AD permisije blokirale replikaciju** — `fcastle`/`SQLService` nemaju *Replicating Directory Changes*, pa je DCSync pao i tamo gde AMSI ne važi. Defense in depth, demonstriran.
+- **AMSI blokirao Mimikatz** — PowerShell invokacija zaustavljena pri skeniranju; alat nikad nije izvršen.
+- **SharpKatz (AMSI-evading) prošao Defender** ali pao na DRS bind-u — RPC 1825 (Kerberos auth greška na transport sloju). `fcastle` JE Domain Admin i IMA DS-Replication-Get-Changes kroz `BUILTIN\Administrators` — permisije nikad nisu bile prepreka. Dva nezavisna sloja zaustavila su DCSync: AMSI na alatu, Kerberos transport na protokolu.
 
 ## Dashboard
 
@@ -115,18 +115,17 @@ Kompletan serijal (10 segmenata, ~75 min): [YouTube Playlist](https://www.youtub
 
 ```
 .
-├── README.md / README.sr.md        <- ulazna tačka (skeniranje za 2 min)
-├── 01_lab_setup.md                 <- build AD laba (DC, endpointi, Sysmon, Splunk)
-├── 02_attack_playbook.md           <- 8 faza, komande, MITRE mapping
-├── 03_detection_playbook.md        <- detection cards, SPL, IR runbook, hardening
-├── 04_video_narrative.md           <- video narativ (opcioni deep-dive)
-├── lab_issues.md                   <- realni build/debug log (GPO/auditpol, ACL, forwarder)
-├── commands.md                     <- brza referenca komandi
-├── config/sysmonconfig.xml         <- Sysmon config sa C:\Temp NetworkConnect fix-om
-├── screenshots/                    <- 12 detekcijskih screenshot-ova (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
+├── README.md / README.sr.md                    <- ulazna tačka (skeniranje za 2 min)
+├── 01_lab_setup.md / 01_lab_setup.sr.md       <- build AD laba (DC, endpointi, Sysmon, Splunk)
+├── 02_attack_playbook.md / 02_attack_playbook.sr.md  <- 8 faza, komande, MITRE mapping
+├── 03_detection_playbook.md / 03_detection_playbook.sr.md  <- detection cards, SPL, IR runbook, hardening
+├── lab_issues.md / lab_issues.sr.md           <- realni build/debug log (GPO/auditpol, ACL, forwarder)
+├── COMMAND_REFERENCE.md                       <- brza referenca komandi
+├── config/sysmonconfig.xml                    <- Sysmon config sa C:\Temp NetworkConnect fix-om
+├── screenshots/                               <- 12 detekcijskih screenshot-ova (spray, kerb, lateral, amsi, c2, dashboard, persistence, gap demo, hardening)
 └── detections/
-    ├── sigma/sigma_rules.yml       <- Detection-as-Code, vendor-agnostic
-    └── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
+    ├── sigma/sigma_rules.yml                  <- Detection-as-Code, vendor-agnostic
+    └── splunk/purple_lab/                     <- deployable Splunk app (+ cim-acceleration/)
 ```
 
 ## Napomena o formatu
@@ -146,4 +145,4 @@ Hardening). Hiring manager ocenjuje repo, ne runtime.
 
 ---
 
-*Self-taught. Background: TCM Security (14 kurseva), TryHackMe (top 1%, 173 rooms uklj. SOC-SIM).*
+*Self-taught. Background: TCM Security (SOC 201, Practical Windows Forensics, Detection Engineering for Beginners, Linux 100/101; SOC 101 · PEH · PMAT u toku), TryHackMe (top 1%, 173 rooms).*
