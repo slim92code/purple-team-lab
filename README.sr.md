@@ -51,6 +51,10 @@ Windows hostu; audit polisa nametnuta kroz GPO.
 
 Puna coverage matrica i detection cards po tehnici: [`03_detection_playbook.md`](03_detection_playbook.md).
 
+[![ATT&CK Coverage](screenshots/09_attack_navigator.svg)](detections/attack_navigator_layer.json)
+
+Interactive layer: open in [ATT&CK Navigator](https://mitre-attack.github.io/attack-navigator/) — `detections/attack_navigator_layer.json`
+
 ## Centralni nalaz — C2 detection gap (climax)
 
 Moderan C2 (Sliver, mTLS/443) beaconao je sa domain endpoint-a, a **default Sysmon nije
