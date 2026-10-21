@@ -1,0 +1,374 @@
+# Purple Team Home Lab — Sigma Detection Pack
+# Detection-as-Code. Vendor-agnostic. Compile to Splunk SPL with:
+#   pip install sigma-cli pysigma-backend-splunk
+#   sigma convert -t splunk -p sysmon -p windows-audit sigma_rules.yml
+#
+# Field-mapping note: rules use the Sysmon-native taxonomy (Image, CommandLine,
+# DestinationIp ...) and Windows-Security taxonomy (EventID + extracted fields).
+# Sigma processing pipelines (-p sysmon / -p windows-audit) map these to the
+# field names your Splunk TAs already extract, so the generated SPL needs no
+# manual `rex field=Message`.
+#
+# Each rule is a separate YAML document (--- separated). Split into per-rule
+# files for a SigmaHQ-style repo if you prefer.
+
+title: InstallUtil LOLBin Execution From User-Writable Path
+id: 69f1d09a-e2da-4528-ae1c-521cf0d46f0d
+status: experimental
+description: >
+    Detects InstallUtil.exe invoked with the /U (uninstall) flag against a DLL/EXE
+    located in a user-writable directory. InstallUtil is a Microsoft-signed binary
+    abused to execute .NET payloads without spawning powershell.exe, bypassing
+    AppLocker policies that trust signed Microsoft binaries.
+references:
+    - https://attack.mitre.org/techniques/T1218/004/
+    - https://lolbas-project.github.io/lolbas/Binaries/Installutil/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.defense-evasion
+    - attack.execution
+    - attack.t1218.004
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_img:
+        Image|endswith: '\InstallUtil.exe'
+    selection_flags:
+        CommandLine|contains|all:
+            - '/U'
+            - '/logfile='
+    selection_path:
+        CommandLine|contains:
+            - '\Temp\'
+            - '\AppData\'
+            - '\Users\Public\'
+            - '\ProgramData\'
+    condition: selection_img and selection_flags and selection_path
+fields:
+    - ParentImage
+    - Image
+    - CommandLine
+falsepositives:
+    - Legitimate .NET application (un)install run from a staging directory
+    - Visual Studio build/deploy tooling
+level: high
+
+---
+
+title: Kerberoasting via RC4 Service Ticket Request
+id: 6e713f07-d2a3-4116-bd3c-0ed7cec91746
+status: stable
+description: >
+    Detects a Kerberos TGS-REQ (4769) for a user service account (SPN) issued with
+    RC4-HMAC encryption (0x17). On a modern domain enforcing AES, RC4 service tickets
+    for SPN-bearing user accounts are a strong Kerberoasting indicator.
+references:
+    - https://attack.mitre.org/techniques/T1558/003/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.credential-access
+    - attack.t1558.003
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4769
+        TicketEncryptionType: '0x17'
+    filter_machine:
+        ServiceName|endswith: '$'
+    filter_krbtgt:
+        ServiceName: 'krbtgt'
+    condition: selection and not 1 of filter_*
+fields:
+    - IpAddress
+    - ServiceName
+    - TargetUserName
+    - TicketEncryptionType
+falsepositives:
+    - Legacy application or appliance that only supports RC4
+    - Misconfigured service account left at RC4 (fix with msDS-SupportedEncryptionTypes)
+level: high
+
+---
+
+title: Password Spray via Kerberos Pre-Auth Failures
+id: c8968f4b-b038-418a-ad42-2cd0b0e79ae4
+status: experimental
+description: >
+    Detects a single source attempting Kerberos pre-authentication (4771) against
+    many distinct accounts in a short window — the spray signature. Lockout is
+    avoided because each account receives only one bad attempt; correlation on the
+    source address, not per-account counts, is what surfaces it.
+references:
+    - https://attack.mitre.org/techniques/T1110/003/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.credential-access
+    - attack.t1110.003
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4771
+        Status: '0x18'   # pre-auth failed (bad password)
+    timeframe: 5m
+    condition: selection | count(TargetUserName) by IpAddress >= 5
+fields:
+    - IpAddress
+    - TargetUserName
+falsepositives:
+    - Service account with stale credentials hammering the KDC
+    - Mobile/sync client (ActiveSync) retry storms
+level: medium
+
+---
+
+title: SAM/SYSTEM/SECURITY Hive Dump via reg.exe save
+id: 3a39b9eb-fe64-4f3a-96e4-bf4e128547bf
+status: stable
+description: >
+    Detects reg.exe used to save the SAM, SYSTEM, or SECURITY registry hives — the
+    offline-credential-extraction precursor (feed to secretsdump). reg.exe is a
+    legitimate binary; the save verb combined with these hives is the signal.
+references:
+    - https://attack.mitre.org/techniques/T1003/002/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.credential-access
+    - attack.t1003.002
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_img:
+        - Image|endswith: '\reg.exe'
+        - OriginalFileName: 'reg.exe'
+    selection_cmd:
+        CommandLine|contains: 'save'
+    selection_hive:
+        CommandLine|contains:
+            - 'HKLM\SAM'
+            - 'HKLM\SYSTEM'
+            - 'HKLM\SECURITY'
+            - '\SAM '
+    condition: selection_img and selection_cmd and selection_hive
+fields:
+    - ParentImage
+    - CommandLine
+    - User
+falsepositives:
+    - Backup software (Veeam, BackupExec) performing legitimate hive exports
+    - Administrator manual backup prior to an upgrade
+level: high
+
+---
+
+title: Active Directory Replication (DCSync) From Non-Machine Account
+id: 8b9e89b8-53af-428e-89c0-f492bbb7d306
+status: stable
+description: >
+    Detects a directory access (4662) requesting the DS-Replication-Get-Changes
+    control-access rights from a non-machine account. Only Domain Controllers and
+    explicitly delegated principals should request replication; a user account doing
+    so indicates DCSync.
+references:
+    - https://attack.mitre.org/techniques/T1003/006/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.credential-access
+    - attack.t1003.006
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4662
+        Properties|contains:
+            - '1131f6aa-9c07-11d1-f79f-00c04fc2dcd2'   # DS-Replication-Get-Changes
+            - '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2'   # DS-Replication-Get-Changes-All
+            - '89e95b76-444d-4c62-991a-0facbeda640c'   # Get-Changes-In-Filtered-Set
+    filter_machine:
+        SubjectUserName|endswith: '$'
+    filter_dcs:
+        SubjectUserName: 'MSOL_*'
+    condition: selection and not 1 of filter_*
+fields:
+    - SubjectUserName
+    - Properties
+falsepositives:
+    - Azure AD Connect / DirSync service accounts (whitelist by name)
+    - Authorized read-only DC or backup solution with delegated replication
+level: critical
+
+---
+
+title: Scheduled Task Persistence Running as SYSTEM From User Path
+id: 6c89b239-440b-40e7-b46b-672469730c84
+status: stable
+description: >
+    Detects a scheduled task (4698) created by a non-system principal whose action
+    points to a binary in a user-writable path and/or runs as SYSTEM. Common
+    persistence pattern; masquerading task names (WindowsUpdate*, Adobe*) raise
+    confidence.
+references:
+    - https://attack.mitre.org/techniques/T1053/005/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.persistence
+    - attack.privilege-escalation
+    - attack.t1053.005
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4698
+    suspect_path:
+        TaskContent|contains:
+            - '\Temp\'
+            - '\AppData\'
+            - '\Users\Public\'
+            - '\ProgramData\'
+    suspect_priv:
+        TaskContent|contains: 'S-1-5-18'   # runs as SYSTEM
+    filter_machine:
+        SubjectUserName|endswith: '$'
+    condition: selection and (suspect_path or suspect_priv) and not filter_machine
+fields:
+    - SubjectUserName
+    - TaskName
+    - TaskContent
+falsepositives:
+    - Software installers creating tasks under ProgramData
+    - GPO preference task deployment (filter by known author)
+level: high
+
+---
+
+title: C2 Beacon — Network Connection From User-Writable Path Binary
+id: fcde59d1-a7c4-43a7-962c-b578bebbff29
+status: experimental
+description: >
+    Behavioral C2 detection. Flags any executable running from a user-writable
+    directory that initiates network connections, independent of the file name.
+    Deliberately NOT keyed on a specific implant name (e.g. a renamed binary) — an
+    attacker renames the file trivially; the location + egress behavior is the
+    durable signal. Pair with beacon-interval/jitter analysis for fidelity.
+references:
+    - https://attack.mitre.org/techniques/T1071/001/
+    - https://attack.mitre.org/techniques/T1572/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.command-and-control
+    - attack.t1071.001
+    - attack.t1572
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    selection:
+        Initiated: 'true'
+        Image|contains:
+            - '\Temp\'
+            - '\AppData\Local\Temp\'
+            - '\Users\Public\'
+            - '\ProgramData\'
+    filter_known:
+        Image|contains:
+            - '\Microsoft\Teams\'
+            - '\Microsoft\EdgeUpdate\'
+    condition: selection and not filter_known
+fields:
+    - Image
+    - DestinationIp
+    - DestinationPort
+falsepositives:
+    - Legitimate apps that legitimately install into ProgramData and call home
+    - Update agents staged in user-writable paths (allowlist by signed publisher)
+level: high
+
+---
+
+title: LSASS Process Access With Credential-Theft Access Mask
+id: 691ee169-5050-4f4a-89be-69eeb0beac1d
+status: stable
+description: >
+    Detects a process opening a handle to lsass.exe with an access mask consistent
+    with memory reading (Mimikatz/comsvcs/procdump style credential theft).
+references:
+    - https://attack.mitre.org/techniques/T1003/001/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.credential-access
+    - attack.t1003.001
+logsource:
+    category: process_access
+    product: windows
+detection:
+    selection:
+        TargetImage|endswith: '\lsass.exe'
+        GrantedAccess:
+            - '0x1010'
+            - '0x1410'
+            - '0x1438'
+            - '0x143a'
+            - '0x1fffff'
+    filter_system:
+        SourceImage|endswith:
+            - '\wininit.exe'
+            - '\csrss.exe'
+            - '\MsMpEng.exe'
+    condition: selection and not filter_system
+fields:
+    - SourceImage
+    - TargetImage
+    - GrantedAccess
+falsepositives:
+    - EDR/AV agents reading lsass for inspection (allowlist by signed path)
+level: high
+
+---
+
+title: Kerbrute User Enumeration via Kerberos Error 0x6
+id: 7e9af1b4-b721-4f1f-98b7-1aa47fa97fb3
+status: experimental
+description: >
+    Detects a single source generating many KDC_ERR_C_PRINCIPAL_UNKNOWN (0x6)
+    responses (4768) in a short window — the kerbrute userenum signature, where
+    non-existent principals return 0x6 and existing ones return a pre-auth error.
+    Most SIEMs alert only on 4625 and miss this; 4768 with result 0x6 is the tell.
+references:
+    - https://attack.mitre.org/techniques/T1087/002/
+    - https://github.com/ropnop/kerbrute
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/01/15
+tags:
+    - attack.reconnaissance
+    - attack.discovery
+    - attack.t1087.002
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4768
+        Status: '0x6'
+    timeframe: 1m
+    condition: selection | count() by IpAddress > 50
+fields:
+    - IpAddress
+    - TargetUserName
+falsepositives:
+    - Misconfigured client repeatedly requesting a deleted/renamed principal
+level: medium

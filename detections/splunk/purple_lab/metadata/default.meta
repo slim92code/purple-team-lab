@@ -1,0 +1,9 @@
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system
+
+[savedsearches]
+export = system
+
+[props]
+export = system

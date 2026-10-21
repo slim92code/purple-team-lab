@@ -1,0 +1,280 @@
+{
+	"name": "Purple Team Home Lab — Detection Coverage",
+	"versions": {
+		"attack": "19",
+		"navigator": "5.3.2",
+		"layer": "4.5"
+	},
+	"domain": "enterprise-attack",
+	"description": "Detection coverage for the Purple Team Home Lab (MARVEL.LOCAL AD). 13 techniques across an 8-phase kill chain, each paired with a Splunk detection and Sigma rule. Green = detected with production-grade rule. Yellow = attack attempted but blocked/failed — documented in lab_issues.md. Repo: github.com/slim92code/purple-team-lab",
+	"filters": {
+		"platforms": ["Windows"]
+	},
+	"sorting": 0,
+	"layout": {
+		"layout": "side",
+		"aggregateFunction": "average",
+		"showID": true,
+		"showName": true,
+		"showAggregateScores": false,
+		"countUnscored": false,
+		"expandedSubtechniques": "annotated"
+	},
+	"hideDisabled": false,
+	"techniques": [
+		{
+			"techniqueID": "T1046",
+			"tactic": "discovery",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — nmap network sweep + LDAP/Kerberos user enumeration. Sysmon EC3 + Security EC4625. Detection Card #1.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: high-count DestinationPort per SourceIp"},
+				{"name": "Data Source", "value": "Sysmon EC3, Security EC4625"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1087",
+			"tactic": "discovery",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — AD account enumeration via kerbrute. Detection Card #1.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Data Source", "value": "Security EC4625, Sysmon EC3"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1110",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Password spraying detected. See sub-technique T1110.003.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1110.003",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — kerbrute password spray. EC4625 across many accounts from single source + EC4740 lockout on pparker. Detection Card #2.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: distinct target accounts per source IP over time window"},
+				{"name": "Data Source", "value": "Security EC4625, EC4740"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1218",
+			"tactic": "defense-evasion",
+			"score": 100,
+			"color": "",
+			"comment": "LOLBin execution detected. See sub-technique T1218.004.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1218.004",
+			"tactic": "defense-evasion",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — InstallUtil.exe LOLBin execution from non-standard path. Sysmon EC1 process creation. Detection Card #3.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: InstallUtil.exe spawning from non-standard path"},
+				{"name": "Data Source", "value": "Sysmon EC1"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1558",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Kerberoasting detected. See sub-technique T1558.003.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1558.003",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — Kerberoasting via GetUserSPNs. Security EC4769 with RC4 (0x17) ticket encryption for SQLService SPN. Central segment (Seg 4). Detection Card #4.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: EC4769 Ticket_Encryption_Type=0x17 (RC4 downgrade)"},
+				{"name": "Data Source", "value": "Security EC4769"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1003",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Credential dumping — multiple sub-techniques exercised. See sub-techniques.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1003.002",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — SAM dump via Impacket secretsdump through Sliver shell using RemoteRegistry. Detection Card #6.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: RemoteRegistry access + secretsdump behavioral pattern"},
+				{"name": "Data Source", "value": "Sysmon EC1, Security EC4624 (Type 3)"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1003.005",
+			"tactic": "credential-access",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — cached domain credentials (SECURITY hive). Detection Card #6.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Data Source", "value": "Sysmon EC1, Security EC4624"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1003.006",
+			"tactic": "credential-access",
+			"score": 50,
+			"color": "",
+			"comment": "GAP — DCSync attempt via SharpKatz FAILED. AMSI blocked Mimikatz; SharpKatz hit RPC error 1825 (Kerberos auth failure at DRS bind transport layer). Attempt telemetry captured by Sysmon EC1 but no successful replication. Blue-team win. See lab_issues.md.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Outcome", "value": "Attack failed — AMSI + RPC 1825 (transport-layer auth failure, not permissions)"},
+				{"name": "Data Source", "value": "Sysmon EC1, AMSI"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1053",
+			"tactic": "persistence",
+			"score": 100,
+			"color": "",
+			"comment": "Scheduled task persistence. See sub-technique T1053.005.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1053.005",
+			"tactic": "persistence",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — Scheduled Task creation. Security EC4698 + Sysmon EC1. Detection Card #7.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: EC4698 task creation with suspicious action path"},
+				{"name": "Data Source", "value": "Security EC4698, Sysmon EC1"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1071",
+			"tactic": "command-and-control",
+			"score": 100,
+			"color": "",
+			"comment": "C2 communication over web protocols. See sub-technique T1071.001 — the showcase detection.",
+			"enabled": true,
+			"metadata": [],
+			"links": [],
+			"showSubtechniques": true
+		},
+		{
+			"techniqueID": "T1071.001",
+			"tactic": "command-and-control",
+			"score": 100,
+			"color": "",
+			"comment": "SHOWCASE — Sliver C2 beacon over mTLS (port 443) from C:\\Temp. Default SwiftOnSecurity Sysmon config MISSED the NetworkConnect from C:\\Temp; closed with a single behavioral rule (location-based, not filename-based). Detection Cards #5 and #8. Climax finding (Seg 8).",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: Sysmon EC3 NetworkConnect from C:\\Temp watchlist path"},
+				{"name": "Gap to Fix", "value": "Default config blind to C:\\Temp beacon — fixed with behavioral rule on process location"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1572",
+			"tactic": "command-and-control",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — protocol tunneling via Sliver mTLS listener. Detection Card #5.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Data Source", "value": "Sysmon EC3"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		},
+		{
+			"techniqueID": "T1041",
+			"tactic": "exfiltration",
+			"score": 100,
+			"color": "",
+			"comment": "Detected — exfiltration over the established Sliver C2 channel. Detection Card #8.",
+			"enabled": true,
+			"metadata": [
+				{"name": "Detection", "value": "Splunk: outbound data over established C2 beacon"},
+				{"name": "Data Source", "value": "Sysmon EC3"}
+			],
+			"links": [],
+			"showSubtechniques": false
+		}
+	],
+	"gradient": {
+		"colors": ["#ff6666ff", "#ffe766ff", "#8ec843ff"],
+		"minValue": 0,
+		"maxValue": 100
+	},
+	"legendItems": [
+		{"color": "#8ec843ff", "label": "Detected — production-grade Splunk/Sigma rule (score 100)"},
+		{"color": "#ffe766ff", "label": "Attempted but blocked/failed — documented in lab_issues.md (score 50)"}
+	],
+	"metadata": [
+		{"name": "Repo", "value": "github.com/slim92code/purple-team-lab"},
+		{"name": "SIEM", "value": "Splunk + Sysmon (TA-microsoft-sysmon, Splunk_TA_windows, Splunk_SA_CIM)"},
+		{"name": "Detections", "value": "9 production Sigma/Splunk saved searches; 30+ total SPL queries"},
+		{"name": "Blue-team wins", "value": "AMSI blocked Mimikatz DCSync; AppLocker blocked C2 implant from C:\\Temp"}
+	],
+	"links": [
+		{"label": "GitHub repo", "url": "https://github.com/slim92code/purple-team-lab"}
+	],
+	"showTacticRowBackground": true,
+	"tacticRowBackground": "#205b8f",
+	"selectTechniquesAcrossTactics": true,
+	"selectSubtechniquesWithParent": true,
+	"selectVisibleTechniques": true
+}
