@@ -37,10 +37,10 @@ closed with a behavioral detection keyed on process location rather than filenam
 ### v3 — network and host detection layers
 Added Zeek + Suricata for network detection and Wazuh for host EDR on top of the v2
 Splunk/Sysmon stack, taking the lab to five detection layers. The full kill chain was
-re-run and each phase evaluated against all five. Findings include JA4 TLS fingerprinting
-of C2 beacons across two endpoints, and two Wazuh coverage gaps — alerts not reaching
-Splunk, and scheduled-task creation firing at the same severity for malicious and benign
-tasks alike.
+re-run and each phase evaluated against all five. Findings include a spray attempt the
+network layer caught that the endpoint log never recorded, JA4 TLS fingerprinting linking
+C2 beacons across two endpoints, and a Wazuh coverage gap — scheduled-task creation firing
+at the same severity for a malicious task and a benign one alike.
 
 ### v4 — in progress
 Rebuild of the v3 stack on a hardened baseline: advanced audit policy, credential

@@ -177,6 +177,17 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > IEX download cradle inside `\Updater` (visible in screenshot 08) is treated no differently
 > from a routine update. A tuned rule keying on the command would separate the two.
 
+## Alert triage — case files
+
+Detections are only half the job; the other half is what an analyst does when one fires.
+[`investigations/`](investigations/) holds the triage write-ups for this run — alert,
+questions asked, queries run, verdict, and the tuning and hardening recommendations.
+
+- [**CASE-01 — Password spray**](investigations/CASE-01-password-spray.md) — true positive:
+  seven accounts tried in 0.6 s from a non-domain host, one succeeded, and the compromised
+  account was used to Kerberoast a Domain Admin SPN 98 seconds later. Account lockout was
+  configured and never fired — the spray was built to stay under it.
+
 ## Shipped as detection-as-code
 
 The v3 findings are not just screenshots — they are committed as deployable rules in
