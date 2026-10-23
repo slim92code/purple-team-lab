@@ -32,6 +32,14 @@ request for it is malicious by definition.
 Each control is recorded with what it was before, what it is now, and which detection it
 enables or which attack phase it blocks.
 
+## Logging improvement over v3
+
+Zeek is switched to JSON output and ingested through the Splunk Add-on for Zeek, so fields
+(`id.orig_h`, `request_type`, `client`, JA4, …) are extracted by the TA instead of parsed
+positionally from `_raw`. v3 queries parse the raw TSV with `rex` to show log structure;
+v4 queries run against TA-extracted fields, which is the production form and survives empty
+or shifted columns.
+
 ## Deliberate residual gaps
 
 Real environments are hardened unevenly. These gaps are chosen, documented as a risk

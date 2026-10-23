@@ -54,6 +54,63 @@ persistence task created on THEPUNISHER fired rule `60228` at level 4 — the sa
 the same severity as a legitimate OneDrive update task created on the same host earlier
 that day. Task creation is alerted on; task *content* is not evaluated.
 
+## Detection screenshots
+
+All times are from the 20 Oct 2026 run. Zeek queries parse the raw TSV with `rex` to show
+log structure; in production the Zeek TA extracts these fields (see v4).
+
+### 01 — Password spray, network view (T1110.003)
+[![Spray Zeek](screenshots/01_spray_zeek_kerberos.png)](screenshots/01_spray_zeek_kerberos.png)
+> Zeek `kerberos.log`: seven accounts from `192.168.182.133` in 0.6 s — `pparker` succeeds,
+> `jsmith` fails as unknown principal (no Windows `4771` for that one, so the network layer
+> sees an attempt the endpoint log misses).
+
+### 02 — Password spray, endpoint view (T1110.003)
+[![Spray 4771](screenshots/02_spray_windows_4771.png)](screenshots/02_spray_windows_4771.png)
+> Windows `4771` correlation: single source `192.168.182.133`, five distinct accounts failing
+> pre-authentication.
+
+### 03 — Kerberoasting, AES service ticket (T1558.003)
+[![Kerberoasting 4769](screenshots/03_kerberoasting_4769.png)](screenshots/03_kerberoasting_4769.png)
+> `4769` for `SQLService`, `Ticket_Encryption_Type=0x12` (AES-256) requested by `pparker`
+> from `192.168.182.133`. v3 uses AES, not the RC4 (0x17) of v2.
+
+### 04 — Kerberoasting, TGT request from endpoint (T1558.003)
+[![TGT 4768](screenshots/04_kerberoasting_tgt_4768.png)](screenshots/04_kerberoasting_tgt_4768.png)
+> `4768` TGT for `SQLService` sourced from `192.168.182.138` (SPIDERMAN), `0x17` — the ticket
+> request that precedes the roast.
+
+### 05 — Lateral movement over WinRM (T1021.006)
+[![WinRM Zeek](screenshots/05_lateral_winrm_zeek.png)](screenshots/05_lateral_winrm_zeek.png)
+> Zeek `conn.log`: three connections `192.168.182.138 → 192.168.182.137` on port `5985`
+> (WinRM) — SPIDERMAN pivoting to THEPUNISHER.
+
+### 06 — Suricata application-layer anomalies
+[![Suricata anomaly](screenshots/06_suricata_anomaly.png)](screenshots/06_suricata_anomaly.png)
+> `weak_encryption` on the Kerberos exchanges and `REQUEST_AUTH_UNRECOGNIZED` during the
+> 12:42–12:43 WinRM pivot.
+
+### 07 — LSASS access, the real credential theft (T1003.001)
+[![LSASS EID10](screenshots/07_lsass_sysmon_ec10.png)](screenshots/07_lsass_sysmon_ec10.png)
+> Sysmon EID 10 on THEPUNISHER: `notepad.exe` accessing `lsass.exe` with `GrantedAccess
+> 0x1F3FFF` (CRITICAL). The query excludes `MsMpEng.exe`/Defender, so Defender's own routine
+> LSASS access is filtered out and the injected `notepad.exe` is what surfaces.
+
+### 08 — Persistence, scheduled task (T1053.005)
+[![Persistence 4698](screenshots/08_persistence_updater_4698.png)](screenshots/08_persistence_updater_4698.png)
+> `4698` on THEPUNISHER: task `\Updater`, `powershell.exe -WindowStyle Hidden -c IEX(...
+> update.ps1)` — the download cradle visible in the command fields.
+
+### 09 — C2 beaconing, JA4 fingerprint (T1071.001)
+[![JA4](screenshots/09_c2_ja4_fingerprint.png)](screenshots/09_c2_ja4_fingerprint.png)
+> Zeek `ssl.log` filtered on the Sliver JA4 `t13i131000_f57a46bbacb6_e5728521abd4`:
+> 69 beacons from SPIDERMAN and 27 from THEPUNISHER to the C2 at `192.168.182.133`.
+
+### 10 — Detection content shipped as alerts
+[![V3 Alerts](screenshots/10_v3_alerts_enabled.png)](screenshots/10_v3_alerts_enabled.png)
+> Six v3 saved alerts, all enabled: spray, Kerberoasting, LSASS, persistence, JA4 C2, and
+> large outbound transfer.
+
 ## Known gaps carried into v4
 
 - The lab runs on a default-ish Windows baseline, so no attack had to work through
