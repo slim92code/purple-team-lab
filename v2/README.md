@@ -47,7 +47,7 @@ Windows host; audit policy enforced via GPO.
 | Lateral / C2   | T1071.001         | Sliver mTLS             | behavioral beacon       | AppLocker + egress filter   |
 | Cred Access    | T1003.002 / .006  | reg save, DCSync        | reg-save combo / 4662   | Defender + Credential Guard |
 | Persistence    | T1053.005         | schtasks                | 4698 SYSTEM + user path | Restricted local admin      |
-| C2 / Exfil     | T1071.001 / T1041 | Sliver beacon           | Sysmon EID3 + JA3 (NDR) | TLS inspection              |
+| C2 / Exfil     | T1071.001 / T1041 | Sliver beacon           | Sysmon EID3 (C:\Temp fix) | TLS inspection              |
 
 Full coverage matrix and per-technique detection cards: [`03_detection_playbook.md`](03_detection_playbook.md).
 
@@ -93,10 +93,13 @@ durable fix is tiering (Tier 0 isolation), not relying on AV signatures.
 [![Kerberoasting](screenshots/02_kerberoasting.png)](screenshots/02_kerberoasting.png)
 > 4769 with Ticket_Encryption_Type=0x17 (RC4-HMAC) for `SQLService`. On a modern AES domain, RC4 service tickets for user-SPNs are anomalous by definition.
 
-### 03 — Lateral Movement via secretsdump (T1021.002)
+### 03 — Authenticated network logons from the attacker (T1021.002)
 
-[![Lateral Movement](screenshots/03_lateral_movement.png)](screenshots/03_lateral_movement.png)
-> 4624 Logon Type 3 (network logon) from Kali (.133) to THEPUNISHER (.137) and HYDRA-DC — network-logon pivot after credential reuse, detected in Splunk.
+[![Network logons](screenshots/03_lateral_movement.png)](screenshots/03_lateral_movement.png)
+> 4624 Logon Type 3 (network logon) from Kali (.133) to THEPUNISHER (.137) and the DC — the
+> authenticated-access footprint of the post-compromise tooling (credential reuse), detected
+> in Splunk. The lateral movement itself ran over Sliver C2 (screenshot 05); `secretsdump`
+> against the DC was blocked at SMB and failed locally (see the Blue-team win above).
 
 ### 04 — Defender + AMSI blocks Mimikatz (T1003.001)
 
