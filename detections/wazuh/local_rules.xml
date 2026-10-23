@@ -1,0 +1,38 @@
+<!--
+  Purple Team Home Lab — Wazuh custom rules (v3)
+
+  Fix for the v3 scheduled-task rule gap: Wazuh's built-in rule 60228
+  ("A scheduled task was created") fires at level 4 for every 4698, so the
+  malicious \Updater task and a benign OneDrive update task are scored the
+  same. These rules read the task's own command out of the 4698 body and
+  elevate the ones that carry a PowerShell download cradle or an obfuscated
+  / hidden-window launcher.
+
+  Deploy to:  /var/ossec/etc/rules/local_rules.xml  (then restart wazuh-manager)
+  Verify:     the \Updater event re-scores to level 12 while OneDrive stays 4.
+-->
+<group name="windows,windows_security,persistence,">
+
+  <rule id="100210" level="12">
+    <if_sid>60228</if_sid>
+    <field name="win.eventdata.taskContent" type="pcre2">(?i)(IEX|Invoke-Expression|DownloadString|DownloadFile|Net\.WebClient|FromBase64String)</field>
+    <description>Scheduled task created with a PowerShell download cradle — likely persistence (\Updater pattern)</description>
+    <mitre>
+      <id>T1053.005</id>
+      <id>T1059.001</id>
+    </mitre>
+    <group>persistence,pci_dss_10.6.1,</group>
+  </rule>
+
+  <rule id="100211" level="10">
+    <if_sid>60228</if_sid>
+    <field name="win.eventdata.taskContent" type="pcre2">(?i)(-enc\s|-EncodedCommand|-w\s+hidden|-WindowStyle\s+Hidden|-nop\b|-NoProfile)</field>
+    <description>Scheduled task created with an obfuscated or hidden-window PowerShell launcher</description>
+    <mitre>
+      <id>T1053.005</id>
+      <id>T1027</id>
+    </mitre>
+    <group>persistence,</group>
+  </rule>
+
+</group>

@@ -1,0 +1,114 @@
+# Purple Team Home Lab — Sigma Detection Pack, v3 NDR additions
+# Network-side detections (Zeek) added in lab v3, alongside the v2 host rules in
+# sigma_rules.yml. Compile with the Zeek pipeline:
+#   pip install sigma-cli pysigma-backend-splunk pysigma-pipeline-zeek
+#   sigma convert -t splunk -p zeek detections/sigma/v3_ndr.yml
+#
+# These key on network evidence, so they fire even on a host whose endpoint
+# telemetry is blind (see the SPIDERMAN EID10 blind spot in v3).
+
+title: Kerberoasting — Service Ticket for a User SPN (network, etype-agnostic)
+id: 3b8f0c21-6a4e-4d9b-9f2a-1c7e5d0a4411
+status: experimental
+description: >
+    Detects a Kerberos service-ticket request seen on the wire whose service principal
+    is neither krbtgt nor a machine account ($). It keys on the SPN pattern rather than
+    the ticket encryption type, so it catches AES (0x12) Kerberoasting that an RC4-only
+    (0x17) rule misses — the v3 roast used AES. Complements the host-side 4769 rule.
+references:
+    - https://attack.mitre.org/techniques/T1558/003/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/10/23
+tags:
+    - attack.credential-access
+    - attack.t1558.003
+logsource:
+    product: zeek
+    service: kerberos
+detection:
+    selection:
+        request_type: 'TGS'
+    filter_krbtgt:
+        service|startswith: 'krbtgt'
+    filter_machine:
+        client|endswith: '$'
+    condition: selection and not (filter_krbtgt or filter_machine)
+fields:
+    - id.orig_h
+    - client
+    - service
+falsepositives:
+    - A service account legitimately requesting another service's ticket
+level: medium
+
+---
+
+title: WinRM Lateral Movement — East-West 5985
+id: a7d41e92-0b53-4c86-8e1f-2f9b6c3d7a08
+status: experimental
+description: >
+    Detects a completed connection to WinRM (TCP 5985) sourced from another workstation
+    in the estate. Administrative WinRM normally originates from a management/jump host;
+    workstation-to-workstation WinRM is the lateral-movement pattern the v3 chain used
+    (SPIDERMAN -> THEPUNISHER) after the host-firewall mesh blocked SMB east-west.
+references:
+    - https://attack.mitre.org/techniques/T1021/006/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/10/23
+tags:
+    - attack.lateral-movement
+    - attack.t1021.006
+logsource:
+    product: zeek
+    service: conn
+detection:
+    selection:
+        id.resp_p: 5985
+        conn_state:
+            - 'SF'
+            - 'S1'
+            - 'OTH'
+    condition: selection
+fields:
+    - id.orig_h
+    - id.resp_h
+    - id.resp_p
+falsepositives:
+    - WinRM from an approved management/jump host (allowlist its source IP)
+    - Configuration-management tooling (DSC, Ansible winrm) from a known controller
+level: medium
+
+---
+
+title: Sliver C2 Beacon — JA4 TLS Client Fingerprint
+id: c0e9b7a4-5d12-4f3a-b6c8-9a0e1f2d3b45
+status: experimental
+description: >
+    Detects the Sliver C2 TLS client by its JA4 fingerprint in ssl.log. JA4 hashes the
+    TLS ClientHello (the implant's TLS stack), so it survives a binary rename or
+    recompile — it identifies the C2 framework, not a filename or payload hash. Treat
+    the literal fingerprint as a starting IOC; the durable detection is "this JA4
+    beaconing on an interval to an external host."
+references:
+    - https://attack.mitre.org/techniques/T1071/001/
+    - https://github.com/FoxIO-LLC/ja4
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/10/23
+tags:
+    - attack.command-and-control
+    - attack.t1071.001
+logsource:
+    product: zeek
+    service: ssl
+detection:
+    selection:
+        ja4: 't13i131000_f57a46bbacb6_e5728521abd4'
+    condition: selection
+fields:
+    - id.orig_h
+    - id.resp_h
+    - ja4
+falsepositives:
+    - A benign client that happens to share this exact TLS stack fingerprint (rare;
+      confirm with beacon interval/jitter analysis before escalating)
+level: high

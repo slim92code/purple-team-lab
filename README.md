@@ -13,7 +13,8 @@
 
 | Asset | What it is |
 | ----- | ---------- |
-| [`detections/sigma/sigma_rules.yml`](detections/sigma/sigma_rules.yml) | 9 vendor-agnostic Sigma rules |
+| [`detections/sigma/`](detections/sigma) | 12 vendor-agnostic Sigma rules — 9 host (v2) + 3 network/Zeek (v3) |
+| [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | Wazuh custom rules fixing the v3 scheduled-task rule gap |
 | [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app — 12 saved searches, CIM/TA-normalized |
 | [`detections/attack_navigator_layer.json`](detections/attack_navigator_layer.json) | MITRE ATT&CK Navigator coverage layer |
 | [`config/sysmonconfig.xml`](config/sysmonconfig.xml) | Sysmon config including the `NetworkConnect` gap fix |
