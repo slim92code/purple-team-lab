@@ -54,6 +54,12 @@ persistence task created on THEPUNISHER fired rule `60228` at level 4 — the sa
 the same severity as a legitimate OneDrive update task created on the same host earlier
 that day. Task creation is alerted on; task *content* is not evaluated.
 
+## Attack chain
+
+The red-team side of the run — spray, Kerberoasting, C2, Pass-the-Ticket, with Defender
+enabled throughout — is documented with screenshots in [`attack/`](attack/). Each attack
+step maps to the detection screenshots below.
+
 ## Detection screenshots
 
 All times are from the 20 Oct 2026 run. Zeek queries parse the raw TSV with `rex` to show
