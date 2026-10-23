@@ -22,7 +22,7 @@ Applied as five GPO bundles across one domain controller and two endpoints.
 | ------ | -------- |
 | Audit policy | Advanced audit policy across all categories, process creation with command line, SACLs on AdminSDHolder / GPO / OU |
 | Credential protection | `WDigest=0`, LSA Protection (`RunAsPPL`), NTLMv2-only, LM hash disabled, Protected Users group, anonymous SAM enumeration restricted |
-| Network protocols | LLMNR / NBT-NS / mDNS / WPAD disabled, SMB signing required, SMBv1 removed, LDAP signing and channel binding, east-west SMB/WMI/WinRM blocked between endpoints |
+| Network protocols | LLMNR / NBT-NS / mDNS / WPAD disabled, SMB signing required, SMBv1 removed, LDAP signing and channel binding; host firewall replaced by one GPO (see Firewall baseline) |
 | Account and Kerberos | Account lockout, 14-character minimum with complexity and history, AES-only Kerberos, `ms-DS-MachineAccountQuota=0`, LAPS, gMSA for service accounts (one legacy account excepted — see residual gaps) |
 | Execution controls | PowerShell script-block / module / transcription logging, Defender ASR rules, tamper protection, Print Spooler disabled on the DC |
 
@@ -31,6 +31,28 @@ request for it is malicious by definition.
 
 Each control is recorded with what it was before, what it is now, and which detection it
 enables or which attack phase it blocks.
+
+## Firewall baseline (GPO)
+
+v3 blocked the attacker and east-west SMB with six per-host rules added by hand — accurate
+in effect, but inconsistent: the DC defaulted inbound to `Allow` while the endpoints were
+`NotConfigured`, and only the DC blocked Kali on SMB (the endpoints blocked it on WMI only).
+v4 replaces the six rules with one GPO, `MARVEL-Firewall-Baseline`, on all three hosts:
+
+- **Default inbound = Block** on every profile — removes the DC's `Allow` gap.
+- **Non-domain hosts denied inbound 445 / 135 everywhere.** The gate is domain membership,
+  not an IP: Kali is blocked because it has no domain Kerberos ticket, so a new non-domain
+  host is denied on its first connection instead of waiting for someone to add its address.
+- **Static SMB/WMI block between the two workstations** (THEPUNISHER ↔ SPIDERMAN), kept even
+  though both are domain-joined — deliberate workstation isolation.
+- **WinRM (5985) left reachable east-west on purpose** — the monitored pivot the
+  lateral-movement case needs (Zeek `conn.log`, Sigma rule 11). Prevention narrows the lateral
+  path to the one lane the detection already watches.
+
+**Caveat — this is a real project, not one switch.** The non-domain gate is Windows *domain
+isolation*: IPsec Connection Security Rules authenticated with Kerberos, plus firewall rules
+set to "allow the connection if it is secure." v4 documents the CSR configuration as part of
+the baseline rather than pretending it is a checkbox.
 
 ## Logging improvement over v3
 
@@ -49,7 +71,7 @@ register, and are what the kill chain works through:
 | --- | ------------------- | ----------------------------- |
 | One legacy service account stays human-managed with an SPN | Applications that cannot use gMSA are the most common real exception | Kerberoasting |
 | Lockout enforced, but spray stays under the threshold | One password per account per window is what real spray does | Password spray |
-| WinRM reachable from one administrative host | Every environment keeps an admin path | Lateral movement |
+| WinRM left reachable east-west between workstations | the deliberate, monitored pivot the lateral-movement detection watches | Lateral movement |
 | Credential Guard on one endpoint, not both | Uneven rollout is the norm | LSASS access |
 | PowerShell logging on, application allowlisting off | Extremely common combination | PowerShell execution |
 
