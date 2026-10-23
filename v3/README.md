@@ -49,8 +49,8 @@ caught what came through. That is the lab's thesis in a single move: hardening �
 
 **Residual gaps — deliberate, and the v4 before-state:**
 
-| Gap | Consequence | Closed in |
-| --- | ----------- | --------- |
+| Gap | Consequence | In v4 |
+| --- | ----------- | ----- |
 | WinRM open east-west | the lateral-movement path | kept by design — v4 tightens SMB/WMI around it, the pivot stays open and monitored |
 | SMB signing only on the DC | endpoints accept unsigned SMB | v4 |
 | Kali → SMB blocked only on the DC | endpoints reachable over SMB from the attacker | v4 |
