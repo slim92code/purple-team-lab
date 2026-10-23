@@ -24,7 +24,7 @@
 | ------- | --------------- | ------ |
 | [**v2**](v2/) | Sysmon + Splunk SIEM | Documented — [playbooks and screenshots](v2/README.md) |
 | [**v3**](v3/) | + Zeek/Suricata NDR, Wazuh EDR — 5 layers | [Technical report (SR)](v3/Purple_Team_izvestaj_v3_SR.pdf) |
-| **v4** | v3 stack on a hardened CIS baseline | In progress |
+| **v4** | v3 stack on a hardened, CIS-aligned baseline | In progress |
 
 ### v2 — baseline
 Domain controller plus two domain-joined Windows 10 endpoints, Sysmon and a Splunk

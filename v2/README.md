@@ -93,7 +93,7 @@ durable fix is tiering (Tier 0 isolation), not relying on AV signatures.
 [![Kerberoasting](screenshots/02_kerberoasting.png)](screenshots/02_kerberoasting.png)
 > 4769 with Ticket_Encryption_Type=0x17 (RC4-HMAC) for `SQLService`. On a modern AES domain, RC4 service tickets for user-SPNs are anomalous by definition.
 
-### 03 — Lateral Movement via secretsdump (T1003.002)
+### 03 — Lateral Movement via secretsdump (T1021.002)
 
 [![Lateral Movement](screenshots/03_lateral_movement.png)](screenshots/03_lateral_movement.png)
 > 4624 Logon Type 3 (network logon) from Kali (.133) to THEPUNISHER (.137) and HYDRA-DC — network-logon pivot after credential reuse, detected in Splunk.
@@ -123,7 +123,7 @@ purple-team-lab/
     ├── 03_detection_playbook.md    <- detection cards, SPL, IR runbook, hardening
     ├── lab_issues.md               <- real build/debug log (GPO/auditpol, ACLs, forwarder)
     ├── COMMAND_REFERENCE.md        <- command quick-reference
-    └── screenshots/                <- 13 detection screenshots
+    └── screenshots/                <- 12 detection screenshots + ATT&CK Navigator layer (SVG)
 ```
 
 ## Scope / honest caveats (lab, not production)

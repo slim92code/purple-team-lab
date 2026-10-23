@@ -18,7 +18,7 @@ against all five layers.
 | SPIDERMAN | `.138` | Windows 10 endpoint |
 | THEPUNISHER | `.137` | Windows 10 endpoint |
 | Splunk | `.131` | Splunk 10.2 SIEM |
-| Wazuh | `.150` | Wazuh 4.12 manager — 3 agents |
+| Wazuh | `.150` | Wazuh 4.12 manager — 3 Windows agents |
 | security-vm | `.151` | Zeek + Suricata |
 | Kali | `.133` | Attacker |
 
@@ -36,37 +36,32 @@ against all five layers.
 
 ## Findings
 
-**Network layer caught the spray with no endpoint telemetry.** Zeek `kerberos.log` recorded
-seven distinct accounts attempted from a single non-domain source inside one second, six
-failing pre-authentication and one succeeding. The successful account is visible in the
-network data alone, before any host log is consulted.
+**Network layer caught a spray attempt the endpoint log missed.** Zeek `kerberos.log`
+recorded seven accounts tried from a single non-domain source inside 0.6 seconds: one
+succeeded (`pparker`), four were rejected at pre-authentication, and two failed otherwise —
+one unsupported encryption type (`Guest`), one unknown principal (`jsmith`). Windows `4771`
+logged only five of the six failures: an unknown-principal attempt produces no `4771`, so
+the network layer saw one spray attempt that never reached the endpoint log.
 
 **One JA4 fingerprint linked two compromised endpoints.** Both endpoints beaconed to the
-attacker host over TLS — 43 sessions from SPIDERMAN, 22 from THEPUNISHER — sharing an
-identical JA4 client fingerprint. The fingerprint survives a binary rename, so the
-detection does not depend on a filename or hash.
+attacker host over TLS sharing an identical Sliver JA4 client fingerprint
+(`t13i131000_f57a46bbacb6_e5728521abd4`) — 69 sessions from SPIDERMAN, 27 from THEPUNISHER.
+The fingerprint survives a binary rename, so the detection does not depend on a filename or
+hash.
 
 **Wazuh scheduled-task alerting does not separate malicious from benign.** The `\Updater`
 persistence task created on THEPUNISHER fired rule `60228` at level 4 — the same rule and
 the same severity as a legitimate OneDrive update task created on the same host earlier
 that day. Task creation is alerted on; task *content* is not evaluated.
 
-**An LSASS alert that looks like credential theft is Windows Defender.** Wazuh rule `92900`
-fired six times for `MsMpEng.exe` accessing `lsass.exe` with `GrantedAccess 0x101000` —
-synchronize plus query-limited-information, the access an anti-malware engine uses to
-inspect a process, not the access a credential dump requires. Triaged as a false positive;
-the rule needs a source-image exclusion and an access-mask condition.
-
-**Wazuh alerts did not reach Splunk.** Agent data was present in the Wazuh manager's own
-archives for all three agents while the corresponding Splunk search returned nothing,
-placing the gap in the Wazuh-to-Splunk forwarding path rather than in agent collection.
-
 ## Known gaps carried into v4
 
 - The lab runs on a default-ish Windows baseline, so no attack had to work through
   hardening. v4 rebuilds on a CIS baseline and re-runs the chain for a before/after
   coverage matrix.
-- No account lockout policy, which is why the spray ran uninterrupted.
+- Account lockout is enforced (5 failures), but the spray sent a single attempt per
+  account and so never reached the threshold — the standard way password spraying evades
+  lockout. The weaker control is the 7-character minimum password length; v4 raises it.
 - `SQLService` is a human-managed account with an SPN, which is what made Kerberoasting
   possible.
-- Wazuh-to-Splunk forwarding and the two Wazuh rule gaps above are unfixed here.
+- The Wazuh scheduled-task rule gap above is unfixed here.

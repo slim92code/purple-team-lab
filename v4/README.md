@@ -4,7 +4,7 @@
 > Repo entry point: [root README](../README.md).
 
 v4 keeps the [v3](../v3/) five-layer detection stack and changes two things: the Windows
-estate is hardened to a production-style baseline before the kill chain runs, and the
+estate is hardened to a CIS-aligned baseline before the kill chain runs, and the
 output is a set of alert-triage case files rather than an attack narrative.
 
 ## Why
@@ -23,7 +23,7 @@ Applied as five GPO bundles across one domain controller and two endpoints.
 | Audit policy | Advanced audit policy across all categories, process creation with command line, SACLs on AdminSDHolder / GPO / OU |
 | Credential protection | `WDigest=0`, LSA Protection (`RunAsPPL`), NTLMv2-only, LM hash disabled, Protected Users group, anonymous SAM enumeration restricted |
 | Network protocols | LLMNR / NBT-NS / mDNS / WPAD disabled, SMB signing required, SMBv1 removed, LDAP signing and channel binding, east-west SMB/WMI/WinRM blocked between endpoints |
-| Account and Kerberos | Account lockout, 14-character minimum with complexity and history, AES-only Kerberos, `ms-DS-MachineAccountQuota=0`, LAPS, gMSA for service accounts |
+| Account and Kerberos | Account lockout, 14-character minimum with complexity and history, AES-only Kerberos, `ms-DS-MachineAccountQuota=0`, LAPS, gMSA for service accounts (one legacy account excepted — see residual gaps) |
 | Execution controls | PowerShell script-block / module / transcription logging, Defender ASR rules, tamper protection, Print Spooler disabled on the DC |
 
 Plus a honeypot service account with an SPN that is never legitimately used — any Kerberos
