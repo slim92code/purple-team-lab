@@ -12,6 +12,8 @@ against all five layers.
 
 ## Infrastructure
 
+![Topology and detection flow](topology.svg)
+
 | Host | Address | Role |
 | ---- | ------- | ---- |
 | HYDRA-DC | `.135` | Windows Server 2022 — AD DS, `MARVEL.LOCAL` |
@@ -21,6 +23,39 @@ against all five layers.
 | Wazuh | `.150` | Wazuh 4.12 manager — 3 Windows agents |
 | security-vm | `.151` | Zeek + Suricata |
 | Kali | `.133` | Attacker |
+
+## Hardening baseline (as-built)
+
+Not a default install. The Windows estate carries a host-firewall segmentation mesh and SMB
+hardening applied before the run, so the kill chain had to work through it.
+
+**Host-firewall segmentation** — inbound block rules, one set per host:
+
+| Host | Blocks inbound |
+| ---- | -------------- |
+| HYDRA-DC | Kali → SMB, Kali → WMI |
+| THEPUNISHER | SPIDERMAN → SMB, Kali → WMI |
+| SPIDERMAN | THEPUNISHER → SMB, Kali → WMI |
+
+The attacker is denied WMI on every host and SMB to the DC; the two endpoints cannot reach
+each other over SMB. On top of that: SMBv1 removed on all three hosts (signing required on
+the DC), account lockout at 5 attempts, and RemoteRegistry plus a set of discovery/legacy
+services disabled on the endpoints.
+
+**Where it held, where it leaked.** The mesh forced the attack off SMB and WMI — but WinRM
+(5985) was left open, and that is the path the lateral movement took (detection screenshot
+05). Prevention narrowed the attack surface without closing it, and the detection layer
+caught what came through. That is the lab's thesis in a single move: hardening ≠ detection.
+
+**Residual gaps — deliberate, and the v4 before-state:**
+
+| Gap | Consequence | Closed in |
+| --- | ----------- | --------- |
+| WinRM open east-west | the lateral-movement path | v4 |
+| SMB signing only on the DC | endpoints accept unsigned SMB | v4 |
+| Kali → SMB blocked only on the DC | endpoints reachable over SMB from the attacker | v4 |
+| No LSA Protection (`RunAsPPL`) | LSASS dump succeeds — by design here, it is what screenshot 07 detects | v4 |
+| WDigest / LLMNR not hardened | credential-exposure and name-poisoning surface | v4 |
 
 ## Kill chain and detection coverage
 
@@ -136,9 +171,10 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 
 ## Known gaps carried into v4
 
-- The lab runs on a default-ish Windows baseline, so no attack had to work through
-  hardening. v4 rebuilds on a CIS baseline and re-runs the chain for a before/after
-  coverage matrix.
+- The hardening baseline above is partial and inconsistent by design — a realistic
+  starting point, not a finished one. v4 rebuilds it to a CIS-aligned standard (consistent
+  SMB signing, LSA Protection, WDigest/LLMNR off, east-west WinRM filtering) and re-runs the
+  chain for a before/after coverage matrix.
 - Account lockout is enforced (5 failures), but the spray sent a single attempt per
   account and so never reached the threshold — the standard way password spraying evades
   lockout. The weaker control is the 7-character minimum password length; v4 raises it.
