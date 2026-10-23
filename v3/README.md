@@ -28,9 +28,9 @@ against all five layers.
 | ----- | --------- | ----------- |
 | Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log`, Suricata `krb5` |
 | Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5`, Suricata `weak_encryption` |
-| Pass-the-Ticket | T1550.003 | Windows `4624` type 3, Zeek `kerberos.log` |
+| Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log` |
 | Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` |
-| LSASS access | T1003.001 | Sysmon EID 10 (THEPUNISHER only — SPIDERMAN is a deliberate blind spot) |
+| LSASS access | T1003.001 | Sysmon EID 10 (THEPUNISHER only — SPIDERMAN is a deliberate blind spot, screenshot 12) |
 | Scheduled task persistence | T1053.005 | Windows `4698`, Wazuh rule `60228` |
 | C2 beaconing | T1071.001 | Zeek `ssl.log` — JA4 TLS fingerprinting |
 
@@ -81,10 +81,11 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > `4769` for `SQLService`, `Ticket_Encryption_Type=0x12` (AES-256) requested by `pparker`
 > from `192.168.182.133`. v3 uses AES, not the RC4 (0x17) of v2.
 
-### 04 — Kerberoasting, TGT request from endpoint (T1558.003)
-[![TGT 4768](screenshots/04_kerberoasting_tgt_4768.png)](screenshots/04_kerberoasting_tgt_4768.png)
-> `4768` TGT for `SQLService` sourced from `192.168.182.138` (SPIDERMAN), `0x17` — the ticket
-> request that precedes the roast.
+### 04 — Pass-the-Ticket, TGT for the cracked account (T1550.003)
+[![TGT 4768](screenshots/04_pass_the_ticket_4768.png)](screenshots/04_pass_the_ticket_4768.png)
+> `4768` TGT requested **for** `SQLService` from `192.168.182.138` (SPIDERMAN) at 12:38, RC4
+> (`0x17`). This is after the roast and the offline crack — Rubeus `asktgt /user:SQLService`
+> using the recovered credential, i.e. Pass-the-Ticket, not the roast itself.
 
 ### 05 — Lateral movement over WinRM (T1021.006)
 [![WinRM Zeek](screenshots/05_lateral_winrm_zeek.png)](screenshots/05_lateral_winrm_zeek.png)
@@ -112,10 +113,26 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > Zeek `ssl.log` filtered on the Sliver JA4 `t13i131000_f57a46bbacb6_e5728521abd4`:
 > 69 beacons from SPIDERMAN and 27 from THEPUNISHER to the C2 at `192.168.182.133`.
 
-### 10 — Detection content shipped as alerts
-[![V3 Alerts](screenshots/10_v3_alerts_enabled.png)](screenshots/10_v3_alerts_enabled.png)
+### 10 — Kerberoasting via Suricata krb5, by signature not IP (T1558.003)
+[![Suricata krb5](screenshots/10_suricata_krb5_kerberoasting.png)](screenshots/10_suricata_krb5_kerberoasting.png)
+> Suricata `krb5` filtered on the Kerberoasting signature — service tickets whose SPN is
+> neither `krbtgt` nor a machine account (`$`), so the filter keys on the attack pattern
+> rather than the attacker's address. Three anomalous service tickets surface the whole
+> credential-abuse chain: `pparker → SQLService` (the roast), `SQLService → HTTP/THEPUNISHER`
+> (the cracked account reused), and `Administrator → cifs/HYDRA-DC`.
+
+### 11 — Detection content shipped as alerts
+[![V3 Alerts](screenshots/11_v3_alerts_enabled.png)](screenshots/11_v3_alerts_enabled.png)
 > Six v3 saved alerts, all enabled: spray, Kerberoasting, LSASS, persistence, JA4 C2, and
 > large outbound transfer.
+
+### 12 — The SPIDERMAN LSASS blind spot, proven
+[![Blind spot](screenshots/12_spiderman_lsass_blindspot.png)](screenshots/12_spiderman_lsass_blindspot.png)
+> SPIDERMAN forwarded 1,191 Sysmon process-create events (EID 1) but **zero** ProcessAccess
+> events (EID 10), while THEPUNISHER logged 629 EID 10. SPIDERMAN's Sysmon is alive and
+> forwarding — its ProcessAccess layer is simply dark (`include` with no rule), so an LSASS
+> dump on that host would not be seen. This is the deliberate blind spot from the coverage
+> table, shown as an absence rather than asserted.
 
 ## Known gaps carried into v4
 
