@@ -61,12 +61,12 @@ caught what came through. That is the lab's thesis in a single move: hardening �
 
 | Phase | Technique | Detected by |
 | ----- | --------- | ----------- |
-| Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log`, Suricata `krb5` |
+| Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log` |
 | Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5`, Suricata `weak_encryption` |
 | Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log` |
 | Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` |
 | LSASS access | T1003.001 | Sysmon EID 10 (THEPUNISHER only — SPIDERMAN is a deliberate blind spot, screenshot 12) |
-| Scheduled task persistence | T1053.005 | Windows `4698`, Wazuh rule `60228` |
+| Scheduled task persistence | T1053.005 | Windows `4698`, Wazuh rule `60228` (screenshot 13) |
 | C2 beaconing | T1071.001 | Zeek `ssl.log` — JA4 TLS fingerprinting |
 
 ## Findings
@@ -86,8 +86,8 @@ hash.
 
 **Wazuh scheduled-task alerting does not separate malicious from benign.** The `\Updater`
 persistence task created on THEPUNISHER fired rule `60228` at level 4 — the same rule and
-the same severity as a legitimate OneDrive update task created on the same host earlier
-that day. Task creation is alerted on; task *content* is not evaluated.
+the same severity as a benign `\OneDrive Standalone Update Task` on the same host
+(screenshot 13). Task creation is alerted on; task *content* is not evaluated.
 
 ## Attack chain
 
@@ -168,6 +168,14 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > forwarding — its ProcessAccess layer is simply dark (`include` with no rule), so an LSASS
 > dump on that host would not be seen. This is the deliberate blind spot from the coverage
 > table, shown as an absence rather than asserted.
+
+### 13 — Wazuh EDR: the scheduled-task rule gap (T1053.005)
+[![Wazuh rule gap](screenshots/13_wazuh_rule_gap_60228.png)](screenshots/13_wazuh_rule_gap_60228.png)
+> On THEPUNISHER, Wazuh's built-in rule `60228` fired at level 4 for both the malicious
+> `\Updater` task and a benign `\OneDrive Standalone Update Task` — same rule, same severity.
+> Wazuh alerts on task *creation* but does not score task *content*, so the hidden PowerShell
+> IEX download cradle inside `\Updater` (visible in screenshot 08) is treated no differently
+> from a routine update. A tuned rule keying on the command would separate the two.
 
 ## Known gaps carried into v4
 
