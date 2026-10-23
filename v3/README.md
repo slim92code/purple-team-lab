@@ -5,10 +5,10 @@
 > This page is the English summary.
 > Repo entry point: [root README](../README.md).
 
-v3 adds two detection layers on top of the [v2](../v2/) Sysmon + Splunk baseline, taking
-the lab to five: Windows Security log, Sysmon, Splunk SIEM, Wazuh EDR, and Zeek + Suricata
-network detection. The same Active Directory kill chain was re-run and each phase evaluated
-against all five layers.
+v3 adds two detection layers on top of the [v2](../v2/) Sysmon + Splunk baseline: network
+detection (Zeek + Suricata) and host EDR (Wazuh). Five telemetry sources now feed one SIEM —
+Windows Security log, Sysmon, Wazuh, Zeek, and Suricata, all into Splunk. The same Active
+Directory kill chain was re-run and each phase evaluated against every source.
 
 ## Infrastructure
 
@@ -51,7 +51,7 @@ caught what came through. That is the lab's thesis in a single move: hardening �
 
 | Gap | Consequence | Closed in |
 | --- | ----------- | --------- |
-| WinRM open east-west | the lateral-movement path | v4 |
+| WinRM open east-west | the lateral-movement path | kept by design — v4 tightens SMB/WMI around it, the pivot stays open and monitored |
 | SMB signing only on the DC | endpoints accept unsigned SMB | v4 |
 | Kali → SMB blocked only on the DC | endpoints reachable over SMB from the attacker | v4 |
 | No LSA Protection (`RunAsPPL`) | LSASS dump succeeds — by design here, it is what screenshot 07 detects | v4 |
@@ -177,15 +177,30 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > IEX download cradle inside `\Updater` (visible in screenshot 08) is treated no differently
 > from a routine update. A tuned rule keying on the command would separate the two.
 
+## Shipped as detection-as-code
+
+The v3 findings are not just screenshots — they are committed as deployable rules in
+[`detections/`](../detections):
+
+- [`sigma/v3_ndr.yml`](../detections/sigma/v3_ndr.yml) — Kerberoasting keyed on the user-SPN
+  pattern (etype-agnostic, catches the AES roast an RC4-only rule misses), WinRM east-west
+  lateral movement, and the Sliver C2 JA4 fingerprint.
+- [`wazuh/local_rules.xml`](../detections/wazuh/local_rules.xml) — the fix for the rule-gap
+  in screenshot 13: it reads the scheduled task's command and re-scores a PowerShell download
+  cradle to level 12, so `\Updater` no longer looks like a benign OneDrive task.
+
 ## Known gaps carried into v4
 
 - The hardening baseline above is partial and inconsistent by design — a realistic
   starting point, not a finished one. v4 rebuilds it to a CIS-aligned standard (consistent
-  SMB signing, LSA Protection, WDigest/LLMNR off, east-west WinRM filtering) and re-runs the
-  chain for a before/after coverage matrix.
+  SMB signing, LSA Protection, WDigest/LLMNR off, and a GPO firewall baseline with a
+  domain-isolation gate — WinRM east-west stays open on purpose as the monitored pivot) and
+  re-runs the chain for a before/after coverage matrix.
 - Account lockout is enforced (5 failures), but the spray sent a single attempt per
   account and so never reached the threshold — the standard way password spraying evades
   lockout. The weaker control is the 7-character minimum password length; v4 raises it.
-- `SQLService` is a human-managed account with an SPN, which is what made Kerberoasting
-  possible.
+- `SQLService` is a human-managed **Domain Admin** with an SPN, so the Kerberoasting roast
+  cracks straight to Domain Admin — not a low-privilege service account. Its password was
+  also stored in the account's AD `Description` field (T1552.001), a second, independent
+  exposure. v4 moves it to a gMSA and clears the description.
 - The Wazuh scheduled-task rule gap above is unfixed here.
