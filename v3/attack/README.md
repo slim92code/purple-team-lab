@@ -42,8 +42,34 @@ Lab credentials and a deliberately weak password are shown as captured; this is 
 > The imported ticket for `SQLService` with its flags and lifetime — the credential now
 > usable without the account password.
 
-### 08 — Defender enabled throughout (control state)
-[![Defender](08_defender_enabled_proof.png)](08_defender_enabled_proof.png)
+### 08 — Lateral movement over WinRM (T1021.006)
+[![WinRM](08_lateral_winrm_invoke_command.png)](08_lateral_winrm_invoke_command.png)
+> `Invoke-Command -ComputerName THEPUNISHER -Authentication Kerberos` runs a remote job on
+> THEPUNISHER using the injected ticket — WinRM plus Pass-the-Ticket. This is the port-5985
+> traffic in detection screenshot 05.
+
+### 09 — Lateral movement, pivot confirmed (T1021.006)
+[![Pivot](09_lateral_second_session.png)](09_lateral_second_session.png)
+> A second C2 session on THEPUNISHER (`192.168.182.137`, `frankcastle`) alongside the
+> SPIDERMAN session — the pivot is complete.
+
+### 10 — LSASS dump via SharpKatz (T1003.001)
+[![SharpKatz](10_lsass_dump_sharpkatz.png)](10_lsass_dump_sharpkatz.png)
+> SharpKatz run in-memory via Sliver `execute-assembly` on THEPUNISHER, dumping logon
+> credentials — the LSASS access caught by Sysmon EID 10 in detection screenshot 07.
+
+### 11 — Credentials recovered (T1003.001)
+[![Creds](11_lsass_credentials_recovered.png)](11_lsass_credentials_recovered.png)
+> The dump output: NTLM/SHA1 material and a cleartext Domain Admin credential
+> (`MARVEL\administrator`), plus the `THEPUNISHER$` machine account.
+
+### 12 — Persistence, scheduled task created (T1053.005)
+[![Persistence](12_persistence_updater_task.png)](12_persistence_updater_task.png)
+> `Register-ScheduledTask -TaskName "Updater"` running `powershell.exe` as SYSTEM at logon —
+> the task whose `4698` creation event is detection screenshot 08.
+
+### 13 — Defender enabled throughout (control state)
+[![Defender](13_defender_enabled_proof.png)](13_defender_enabled_proof.png)
 > `Get-MpComputerStatus` shows real-time protection and all engines on, and
 > `Get-MpPreference` shows no exclusion paths — the attack ran against a live Defender, not a
 > disabled one.
