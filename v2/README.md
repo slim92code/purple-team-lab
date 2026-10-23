@@ -161,8 +161,9 @@ purple-team-lab/
 
 - `C:\Temp` is a Defender exclusion so payload delivery is reproducible on camera; in
 production it would not be, and the AppLocker fix in Segment 10 addresses exactly that path.
-- DC SMB/RPC is firewall-filtered from Kali, so privileged attacks pivot through an
-endpoint — which is the realistic path anyway.
+- Kali's SMB/RPC (445/135) is firewall-filtered from all three Windows hosts (see the
+connectivity matrix in `01_lab_setup.md`), so impacket attacks cannot run directly from the
+attacker and pivot through an endpoint's authenticated session — the realistic path anyway.
 - Single domain, single forest. At v2 there is no NDR or EDR layer — network detection
 (Zeek + Suricata, JA4 fingerprinting) and host EDR (Wazuh) arrive in [v3](../v3/).
 
