@@ -12,7 +12,7 @@ against all five layers.
 
 ## Infrastructure
 
-![Topology and detection flow](topology.svg)
+![Topology and detection flow]
 
 | Host | Address | Role |
 | ---- | ------- | ---- |
