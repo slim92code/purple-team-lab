@@ -1063,7 +1063,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | 5 | Sliver Execution | AppLocker Deny C:\Temp | EC8004 + Sysmon EC1 | Both |
 | 6 | Credential Dumping | Defender + Credential Guard | Sysmon EC11 SAM dump | Both |
 | 7 | Persistence | Restricted local admin | EC4698 + Sysmon EC11 Tasks | Detection primary |
-| 8 | mTLS C2 Beacon | Egress filter + TLS inspection (NDR) | Sysmon EC3 + JA3 fingerprint | Detection primary |
+| 8 | mTLS C2 Beacon | Egress filter + TLS inspection (NDR, added in v3) | Sysmon EC3 (C:\Temp NetworkConnect fix) | Detection primary |
 
 ---
 

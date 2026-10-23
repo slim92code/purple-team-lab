@@ -50,6 +50,7 @@ Windows host; audit policy enforced via GPO.
 | C2 / Exfil     | T1071.001 / T1041 | Sliver beacon           | Sysmon EID3 (C:\Temp fix) | TLS inspection              |
 
 Full coverage matrix and per-technique detection cards: [`03_detection_playbook.md`](03_detection_playbook.md).
+Rendered as an [ATT&CK Navigator layer](screenshots/09_attack_navigator.svg) (JSON source in [`detections/`](../detections/attack_navigator_layer.json)).
 
 ## Headline finding — the C2 detection gap
 
@@ -83,6 +84,11 @@ durable fix is tiering (Tier 0 isolation), not relying on AV signatures.
 
 ## Screenshots
 
+### 00 — SOC detection dashboard (overview)
+
+[![SOC Dashboard](screenshots/06_dashboard.png)](screenshots/06_dashboard.png)
+> A Splunk SOC dashboard summarizing the run: KPI tiles (password-spray events, Kerberoasting RC4 tickets, C2 beacon connections, Defender/AMSI blocks, attacker network logons), a MITRE ATT&CK coverage bar chart by technique, and an attack timeline across all phases.
+
 ### 01 — Password Spray detected (T1110.003)
 
 [![Password Spray](screenshots/01_password_spray.png)](screenshots/01_password_spray.png)
@@ -110,6 +116,28 @@ durable fix is tiering (Tier 0 isolation), not relying on AV signatures.
 
 [![C2 Beacon](screenshots/05_c2_beacon.png)](screenshots/05_c2_beacon.png)
 > Sysmon EID3: `C:\Temp\GlobalProtect_Update.exe` → 192.168.182.133:443 (Sliver mTLS). Default Sysmon missed this — the SwiftOnSecurity baseline covers `C:\Users` and `C:\ProgramData` but not a bare `C:\Temp`. One line closes the gap. Detection keys on location, not filename — a renamed binary still trips it.
+
+### 06 — Persistence: scheduled task as SYSTEM (T1053.005)
+
+[![Persistence](screenshots/07_persistence.png)](screenshots/07_persistence.png)
+> `4698` on THEPUNISHER: task `\WindowsUpdateService` running `C:\Temp\GlobalProtect_Update.exe` as `S-1-5-18` (SYSTEM), created by `frankcastle`. A SYSTEM task launching a binary from a user-writable path is the persistence signature.
+
+## Gap → fix → re-prove
+
+Every gap is closed and the fix re-proven — the payoff the headline promises, not just "detect."
+
+**The `C:\Temp` NetworkConnect gap, closed:**
+
+| Before the fix | After the fix |
+| -------------- | ------------- |
+| [![Gap](screenshots/08a_gap_demo.png)](screenshots/08a_gap_demo.png) | [![Fix](screenshots/08b_fix_demo.png)](screenshots/08b_fix_demo.png) |
+| Sysmon EID 3 for `C:\Temp` → **0 events** (default config does not log NetworkConnect there) | Same search → **1 event**: `C:\Temp\GlobalProtect_Update.exe` → `192.168.182.133:443`, the C2 beacon |
+
+**The prevention fixes, re-proven:**
+
+- [Account lockout](screenshots/10_fix1_lockout.png) — with lockout enabled, the spray trips `4740` (fcastle locked out) instead of running free.
+- [AES-only Kerberos](screenshots/10_fix2_aes.png) — `4769` for `SQLService` flips from `0x17` (RC4) to `0x12` (AES-256) across the timeline, so the RC4 roast is no longer possible.
+- [AppLocker deny `C:\Temp`](screenshots/10_fix3_applocker.png) — AppLocker `8004`: `GLOBALPROTECT_UPDATE.EXE was prevented from running`.
 
 ## Repo map
 
