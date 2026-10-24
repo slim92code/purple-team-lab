@@ -15,7 +15,7 @@ Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 | ----- | ---------- |
 | [`detections/sigma/`](detections/sigma) | 13 vendor-agnostic Sigma rules: 10 host, 3 network/Zeek |
 | [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | 5 Wazuh rules: LSASS detection, built-in false-positive tuning, scheduled-task gap |
-| [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app, 13 saved searches, CIM/TA-normalized |
+| [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app, 13 saved searches; 11 run on raw sourcetypes, 2 on CIM data models ([one of which this lab's forwarder cannot populate](detections/README.md)) |
 | [`detections/attack_navigator_layer.json`](detections/attack_navigator_layer.json) | MITRE ATT&CK Navigator coverage layer |
 | [`config/`](config/) | Sysmon config including the `NetworkConnect` gap fix, and what the hosts actually run |
 

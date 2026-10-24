@@ -15,7 +15,7 @@ detections/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
     │   │   ├── app.conf
-    │   │   ├── savedsearches.conf   # 13 detections (CIM/TA-normalized, macro-free)
+    │   │   ├── savedsearches.conf   # 13 detections, macro-free (2 via CIM, 11 raw)
     │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10)
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
@@ -57,8 +57,36 @@ search time:
 | Windows Security | Splunk Add-on for Microsoft Windows | `Account_Name`, `Service_Name`, `Ticket_Encryption_Type`, `Client_Address`, `Logon_Type`, `Process_Command_Line`, `New_Process_Name`, `Creator_Process_Name`, … |
 | Sysmon | Splunk Add-on for Sysmon | `Image`, `ParentImage`, `CommandLine`, `TargetFilename`, `DestinationIp`, `DestinationPort`, `GrantedAccess`, `SourceImage`, `TargetImage`, `Initiated`, … |
 
-The main detections run via `tstats` against the accelerated Endpoint and Network_Traffic
-CIM data models, so they search millions of events in milliseconds.
+Two detections run via `tstats` against CIM data models rather than raw events. How well
+that works in this lab was measured rather than assumed, and the answer is mixed.
+
+| | State in this lab |
+| --- | --- |
+| `Endpoint.Processes` | populated; the LOLBin detection works against it |
+| `Network_Traffic.All_Traffic` | **empty**; the C2 beacon detection cannot return anything |
+| Acceleration | **off** on both models, so `tstats` here is a raw scan |
+
+The cause is the forwarder's sourcetype. Every Windows channel arrives as a bare
+`WinEventLog`, with the channel name only in `source`:
+
+```
+sourcetype = WinEventLog
+source     = WinEventLog:Microsoft-Windows-Sysmon/Operational
+```
+
+The Splunk Add-on for Sysmon keys its CIM field aliases and eventtypes on the per-channel
+sourcetype (`XmlWinEventLog:Microsoft-Windows-Sysmon/Operational`). Under a bare
+`WinEventLog` none of that applies, so Sysmon EID 3 events carry no `app`, `src`, `dest` or
+`dest_port`, nothing tags them into `Network_Traffic`, and the model stays at zero. The
+events themselves are there: 444 EID 3 events across the three hosts in seven days.
+
+The other eleven detections filter on `source=` rather than `sourcetype=`, which is why they
+work on this configuration. That was not a deliberate choice at the time; it is the reason
+the pack mostly survives a forwarder setup the add-ons were not expecting.
+
+Fixing it is a forwarder change, not a rule change: set per-channel sourcetypes with
+`renderXml = 1` in `inputs.conf`, then enable acceleration with the shipped
+`cim-acceleration/datamodels.conf`. Scoped into [v4](../v4/README.md).
 
 The one remaining `rex` is in the scheduled-task rule, which parses the task XML embedded in
 the `4698` event body. That XML is data inside the event rather than the event wrapper, so a

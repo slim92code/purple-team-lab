@@ -69,6 +69,31 @@ isolation*: IPsec Connection Security Rules authenticated with Kerberos, plus fi
 set to "allow the connection if it is secure." v4 documents the CSR configuration as part of
 the baseline rather than pretending it is a checkbox.
 
+## Forwarder sourcetypes and CIM
+
+Measured on the v3 lab, so this is a known defect rather than a planned nicety. Every
+Windows channel arrives as a bare `WinEventLog` sourcetype, with the channel name only in
+`source`:
+
+```
+sourcetype = WinEventLog
+source     = WinEventLog:Microsoft-Windows-Sysmon/Operational
+```
+
+The Splunk add-ons key their CIM field aliases and eventtypes on the per-channel sourcetype,
+so under a bare `WinEventLog` the Sysmon mappings never apply. `Network_Traffic.All_Traffic`
+holds 0 events while 444 Sysmon EID 3 events sit in the index with no `app`, `src`, `dest`
+or `dest_port`. The C2 beacon detection, which is the showcase finding of v2, cannot return
+a row. Acceleration is also off on both data models, so the `tstats` detections are raw
+scans rather than the millisecond lookups the pack describes.
+
+v4 fixes it at the forwarder rather than in the rules:
+
+- Per-channel sourcetypes in `inputs.conf` with `renderXml = 1`, so the add-ons apply.
+- Acceleration enabled with the shipped `detections/splunk/cim-acceleration/datamodels.conf`.
+- Re-run both `tstats` detections and record before and after, since "the data model is
+  empty" and "the rule is wrong" look identical from the alert list.
+
 ## Logging improvement over v3
 
 Zeek is switched to JSON output and ingested through the Splunk Add-on for Zeek, so fields
