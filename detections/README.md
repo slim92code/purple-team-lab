@@ -139,14 +139,19 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 | 10 | Kerberoasting by user-SPN, etype-agnostic | T1558.003 | 4769 |
 
 Rule 10 was added after the v3 run. Rule 2 keys on RC4, which is the canonical
-Kerberoasting signal, and on this domain it cannot fire at all: 30 days of `4769` traffic
-here is 1,649 tickets, every one of them `0x12` (AES-256), zero RC4. Rule 10 keys on the SPN
+Kerberoasting signal, and here it has never had an event to match: 30 days of `4769` traffic
+is 1,649 tickets, every one of them `0x12` (AES-256), zero RC4. Rule 10 keys on the SPN
 owner instead of the encryption type, which is what survives a domain on AES. It is noisier
 and ships unscheduled in the Splunk pack until a per-environment SPN allowlist exists.
 
-Rule 2 is kept rather than deleted, because it is correct for a domain that still permits
-RC4. It is worth knowing which of the two your environment can actually use before trusting
-either.
+Rule 2 is kept rather than deleted, and not only as a reference for older domains. RC4 is
+not blocked on `MARVEL.LOCAL` — the service account still holds an RC4 key, and the
+Pass-the-Ticket step of the v3 run obtained a `4768` TGT for it at `0x17`. The roast came
+back AES because `GetUserSPNs` requested no specific etype and the KDC issued the strongest
+one both sides shared. Rule 2 therefore still covers the explicit downgrade, which this
+domain would honour; what it cannot see is the default-etype roast, which is what a current
+toolchain produces. The two rules cover different halves of the same technique, so it is
+worth knowing which half your environment exposes before trusting either alone.
 
 **Network rules (Zeek), `sigma/v3_ndr.yml`**
 

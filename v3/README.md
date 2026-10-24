@@ -65,15 +65,41 @@ Residual gaps, deliberate, and the v4 before-state:
 
 ## Kill chain and detection coverage
 
-| Phase | Technique | Detected by |
+| Phase | Technique | Recorded by |
 | ----- | --------- | ----------- |
 | Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log` |
-| Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5`, Suricata `weak_encryption` |
-| Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log` |
-| Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` |
+| Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5` |
+| Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log`, Suricata `weak_encryption` |
+| Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` (corroborating only — see [CASE-04](investigations/CASE-04-lateral-movement-winrm.md)) |
 | LSASS access | T1003.001 | Sysmon EID 10, THEPUNISHER only (SPIDERMAN is a deliberate blind spot, screenshot 12) |
 | Scheduled task persistence | T1053.005 | Windows `4698`, Wazuh rule `60228` (screenshot 13) |
 | C2 beaconing | T1071.001 | Zeek `ssl.log`, JA4 TLS fingerprinting |
+
+The column is what *recorded* each phase, not what alerted on it. The distinction matters,
+because the two are not the same here:
+
+- **Windows, Sysmon and Wazuh rows are rule coverage.** The content is in
+  [`detections/`](../detections/) — Sigma, the Splunk app, `local_rules.xml`.
+- **Zeek rows are rule coverage too**, via the three Zeek Sigma rules in
+  [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml), but the Zeek deployment itself is stock:
+  default scripts, default logs, no `local.zeek` customisation, so there is nothing sensor-side
+  to ship.
+- **Suricata rows are not rule coverage at all.** `krb5` is Suricata's protocol logging and
+  `weak_encryption` / `REQUEST_AUTH_UNRECOGNIZED` are its built-in app-layer anomaly events.
+  No signature was written or tuned for them, and this repo therefore ships no Suricata
+  ruleset. They are a second, independent source agreeing with the Windows and Zeek evidence,
+  which is worth having and is not the same as a detection.
+
+One placement in that table is reasoned rather than measured. `weak_encryption` keys on the
+Kerberos encryption type, and the roast against `SQLService` was issued as `0x12` (AES-256),
+so it cannot be what that event fired on. The only RC4 exchange in the run is the
+Pass-the-Ticket `4768` at 12:38, which is where the row now sits. Confirming it means reading
+the timestamps out of Suricata directly:
+
+```
+jq -r 'select(.event_type=="anomaly" and (.anomaly.event|test("WEAK_ENCRYPTION")))
+       | [.timestamp, .src_ip, .dest_ip, .anomaly.event] | @tsv' /var/log/suricata/eve.json
+```
 
 ## Findings
 
@@ -152,7 +178,7 @@ second one is answered here. `alerts.json` holds events that matched a rule, so 
 show whether an unmatched event arrived. Checking that needs the archives, which are not
 enabled in this lab.
 
-### 5. The canonical Kerberoasting detection cannot fire on this domain
+### 5. The canonical Kerberoasting detection never saw its input
 
 The RC4 rule is the one every guide teaches: alert on `4769` with
 `Ticket_Encryption_Type = 0x17`, because RC4 service tickets are what the classic roast
@@ -163,15 +189,33 @@ produces. Counted over 30 days of this lab's `4769` traffic:
 | `0x12` (AES-256) | 1,649 |
 | `0x17` (RC4) | 0 |
 
-Not one RC4 ticket. The rule is scheduled, it appears in the coverage table, and it has
-never had anything to match. The v3 roast against `SQLService` was issued as `0x12` and
+Not one RC4 service ticket. The rule is scheduled, it appears in the coverage table, and it
+has never had anything to match. The v3 roast against `SQLService` was issued as `0x12` and
 walked past it.
 
-This is the same failure as the Wazuh rule above, reached from the other direction: there
-the rule could not load, here it loads and the environment never produces its input. Both
-report as coverage. The repo ships an etype-agnostic companion keyed on the SPN owner
-instead, which is noisier and needs a per-environment allowlist, and that is the honest
-trade: on an AES domain there is no cheap high-confidence Kerberoasting signal.
+**The reason is not that the domain refuses RC4.** `SQLService` still holds an RC4 key, and
+the KDC will hand one out — the Pass-the-Ticket step in this same run got a `4768` TGT for
+that account at `0x17` (screenshot 04). What happened is narrower: `GetUserSPNs` asked for
+no particular encryption type, the account has AES keys, and the KDC issues the strongest
+etype both sides share, so the roast came back AES-256 on its own.
+
+That changes what the rule is worth rather than retiring it. It covers the downgrade
+variant — an attacker who requests RC4 explicitly (`Rubeus kerberoast /rc4opsec`, or an
+etype-restricted `TGS-REQ`) gets it on this domain, and that request is exactly what the
+rule is good at catching. What it cannot see is the roast that asks for nothing special,
+which is the one a modern toolchain produces by default and the one this lab ran.
+
+So two rules are needed, not one. The repo ships the etype-agnostic companion keyed on the
+SPN owner, which is noisier and needs a per-environment allowlist, and that is the honest
+trade: against a default-etype roast there is no cheap high-confidence Kerberoasting signal.
+Removing RC4 keys from the account would close the downgrade path as well, and the fact that
+the TGT above came back `0x17` says that has not been done here — AES is being *preferred*,
+not *enforced*, which is a different security posture than the AES-only ticket counts above
+suggest on their own.
+
+This sits alongside the Wazuh failure above as the other way a rule reports coverage without
+delivering it: there the rule could not load, here it loads and nothing in the run produces
+its input.
 
 ### 6. The replacement rule was tuned against the baseline, not the attack
 
@@ -231,8 +275,11 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 
 ### 06 — Suricata application-layer anomalies
 [![Suricata anomaly](screenshots/06_suricata_anomaly.png)](screenshots/06_suricata_anomaly.png)
-> `weak_encryption` on the Kerberos exchanges, `REQUEST_AUTH_UNRECOGNIZED` during the
-> 12:42–12:43 WinRM pivot.
+> Suricata's built-in app-layer anomaly events, not written signatures: `weak_encryption` on
+> the RC4 Kerberos exchange, `REQUEST_AUTH_UNRECOGNIZED` during the 12:42–12:43 WinRM pivot.
+> Both corroborate the Windows and Zeek evidence rather than standing on their own — the
+> second one also fires on legitimate WinRM, since `Negotiate` is an `Authorization` header
+> Suricata's HTTP parser does not recognise.
 
 ### 07 — LSASS access (T1003.001)
 [![LSASS EID10](screenshots/07_lsass_sysmon_ec10.png)](screenshots/07_lsass_sysmon_ec10.png)
@@ -297,8 +344,8 @@ follows. They chain in the order the attack ran.
 | [CASE-06](investigations/CASE-06-persistence-scheduled-task.md) | Persistence | T1053.005 | True positive delivered at level 4 |
 | [CASE-07](investigations/CASE-07-c2-beaconing.md) | C2 beaconing | T1071.001 | True positive, two endpoints linked by one fingerprint |
 
-Three of them are about detections that did not work. CASE-02 covers a canonical rule that
-cannot fire on an AES domain, CASE-05 covers four separate reasons an EDR stayed silent on
+Three of them are about detections that did not work. CASE-02 covers a canonical rule the
+roast walked past because the KDC chose AES, CASE-05 covers four separate reasons an EDR stayed silent on
 a credential dump, and CASE-06 covers an alert that arrived correctly and still told the
 analyst nothing.
 

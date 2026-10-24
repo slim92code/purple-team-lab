@@ -95,51 +95,6 @@ level: high
 
 ---
 
-title: Kerberoasting via Service Ticket for a User SPN (etype-agnostic)
-id: f632bffa-c65c-43e5-b02b-39fbc66732bd
-status: experimental
-description: >
-    Detects a Kerberos TGS-REQ (4769) for an SPN held by a user account, regardless of the
-    ticket encryption type. The RC4 rule above is higher confidence but misses an AES roast:
-    in the v3 run the service ticket for SQLService was issued as 0x12 (AES-256) and the
-    RC4-only rule did not fire. Keying on the SPN owner rather than the encryption type is
-    what survives a domain that has moved to AES. Noisier by design, so tune the account
-    exclusions to the environment before alerting on it.
-references:
-    - https://attack.mitre.org/techniques/T1558/003/
-author: Purple Lab (MARVEL.LOCAL)
-date: 2026/10/24
-tags:
-    - attack.credential-access
-    - attack.t1558.003
-logsource:
-    product: windows
-    service: security
-detection:
-    selection:
-        EventID: 4769
-    filter_machine:
-        ServiceName|endswith: '$'
-    filter_krbtgt:
-        ServiceName|startswith: 'krbtgt'
-    filter_self:
-        TargetUserName|endswith: '$'
-    condition: selection and not 1 of filter_*
-fields:
-    - IpAddress
-    - ServiceName
-    - TargetUserName
-    - TicketEncryptionType
-falsepositives:
-    - >-
-      Normal service-ticket traffic for applications whose SPN sits on a user account.
-      This fires on every such request, so it needs a per-environment allowlist of the
-      SPNs that are requested routinely. Treat a request for an SPN that is never used
-      legitimately, or one from an unexpected source address, as the signal.
-level: medium
-
----
-
 title: Password Spray via Kerberos Pre-Auth Failures
 id: c8968f4b-b038-418a-ad42-2cd0b0e79ae4
 status: experimental
@@ -432,4 +387,53 @@ fields:
     - TargetUserName
 falsepositives:
     - Misconfigured client repeatedly requesting a deleted/renamed principal
+level: medium
+
+---
+
+title: Kerberoasting via Service Ticket for a User SPN (etype-agnostic)
+id: f632bffa-c65c-43e5-b02b-39fbc66732bd
+status: experimental
+description: >
+    Detects a Kerberos TGS-REQ (4769) for an SPN held by a user account, regardless of the
+    ticket encryption type. The RC4 rule above is higher confidence but misses an AES roast:
+    in the v3 run the service ticket for SQLService was issued as 0x12 (AES-256) and the
+    RC4-only rule did not fire. Keying on the SPN owner rather than the encryption type is
+    what survives a domain that has moved to AES. Noisier by design, so tune the account
+    exclusions to the environment before alerting on it. Run both: the RC4 rule is not
+    obsolete, because preferring AES is not the same as blocking RC4. SQLService still held
+    an RC4 key in the v3 run (the Pass-the-Ticket TGT came back 0x17), so an attacker asking
+    for the downgrade explicitly would trip rule 2. This rule covers the roast that asks for
+    nothing special, which is what current tooling produces by default.
+references:
+    - https://attack.mitre.org/techniques/T1558/003/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026/10/24
+tags:
+    - attack.credential-access
+    - attack.t1558.003
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4769
+    filter_machine:
+        ServiceName|endswith: '$'
+    filter_krbtgt:
+        ServiceName|startswith: 'krbtgt'
+    filter_self:
+        TargetUserName|endswith: '$'
+    condition: selection and not 1 of filter_*
+fields:
+    - IpAddress
+    - ServiceName
+    - TargetUserName
+    - TicketEncryptionType
+falsepositives:
+    - >-
+      Normal service-ticket traffic for applications whose SPN sits on a user account.
+      This fires on every such request, so it needs a per-environment allowlist of the
+      SPNs that are requested routinely. Treat a request for an SPN that is never used
+      legitimately, or one from an unexpected source address, as the signal.
 level: medium
