@@ -25,6 +25,10 @@ detections/
 
 ## Install (works out-of-the-box)
 
+Scheduled searches and alerting are Enterprise features. On Splunk Free the app installs and
+every search runs on demand, but `enableSched = 1` has no effect and nothing fires on its
+own. Check with `| rest /services/licenser/groups | table title, is_active`.
+
 ```bash
 # 1. Prereq apps (Splunkbase): Splunk_TA_windows, Splunk_TA_microsoft_sysmon, Splunk_SA_CIM
 # 2. Deploy the detections app
