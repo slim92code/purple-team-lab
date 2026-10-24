@@ -62,7 +62,7 @@ certipy-ad find -u fcastle@MARVEL.LOCAL -p Password1 -dc-ip 192.168.182.135
   - CA: MARVEL-HYDRA-DC-CA
   - 33 templates, 11 enabled
   - ESC1/2/3/15 on SubCA template, ESC4 on most templates
-  - Note: all ESC findings are DA-scan artifacts — scan run as fcastle (Domain Admin). SubCA enrollment requires DA rights; no unprivileged ESC path exists in this lab.
+  - Note: all ESC findings are DA-scan artifacts, since the scan ran as fcastle (Domain Admin). SubCA enrollment requires DA rights; no unprivileged ESC path exists in this lab.
 
 ### Commands that do NOT work (and why)
 
@@ -77,7 +77,7 @@ certipy-ad find -u fcastle@MARVEL.LOCAL -p Password1 -dc-ip 192.168.182.135
 **MITRE:** T1110.003 (Password Spraying)
 
 ### Goal
-Find an account with a weak password — one password across all accounts, so each account gets exactly one failed attempt and the lockout policy never triggers.
+Find an account with a weak password. One password across all accounts, so each account gets exactly one failed attempt and the lockout policy never triggers.
 
 ### Pre-spray (recon)
 
@@ -169,7 +169,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogTo
 
 ### Defender behavior
 
-- Defender does **NOT block** InstallUtil — it is a Microsoft-signed binary
+- Defender does **NOT block** InstallUtil, because it is a Microsoft-signed binary
 - Defender does **NOT block** GlobalProtect_Update.dll because it is in the `C:\Temp` exclusion path
 - AMSI does **NOT block** because InstallUtil does not go through the PowerShell AMSI scan
 
@@ -276,7 +276,7 @@ ping 192.168.182.135
 ### Expected Splunk events
 
 - **Sysmon EC1** — Process Create: `GlobalProtect_Update.exe`
-- **Sysmon EC3** — Network Connect: 192.168.182.133:443 (only if the process is on the watchlist — not caught by default)
+- **Sysmon EC3** — Network Connect: 192.168.182.133:443 (only if the process is on the watchlist, so not caught by default)
 - **EC4688** — `GlobalProtect_Update.exe` started
 
 ---
@@ -331,8 +331,8 @@ C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MA
 4. No SYSTEM hive → no bootkey → local `secretsdump` failed; no hashes recovered
 
 **AD theory worth knowing (from the walkthrough, not a performed attack):**
-- A Domain Admin holds `DS-Replication-Get-Changes` / `-All` only **indirectly**, through nested `BUILTIN\Administrators` on the DC — not as a direct ACE on the domain object. Remove that nesting on the DC and DCSync via a DA breaks.
-- The control that would **detect** a real DCSync is SACL auditing — EC4662 with the replication GUIDs (visibility, not prevention).
+- A Domain Admin holds `DS-Replication-Get-Changes` / `-All` only **indirectly**, through nested `BUILTIN\Administrators` on the DC, not as a direct ACE on the domain object. Remove that nesting on the DC and DCSync via a DA breaks.
+- The control that would **detect** a real DCSync is SACL auditing: EC4662 with the replication GUIDs. That is visibility, not prevention.
 - The durable fix is **tiering** (Tier 0 isolation) so a compromised endpoint-admin can't reach a DA, not relying on AV signatures → Lab v2.
 
 ### Expected Splunk events
@@ -350,7 +350,7 @@ C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MA
 **MITRE:** T1053.005 (Scheduled Task/Job)
 
 ### Goal
-Establish persistence — keep the implant alive after reboot.
+Establish persistence: keep the implant alive after reboot.
 
 ### Commands (from the Sliver shell)
 
@@ -449,7 +449,7 @@ instead: any process from a user-writable path that initiates egress.
 </NetworkConnect>
 ```
 
-After restarting Sysmon, re-run the implant — Splunk captures EC3 with the Kali destination.
+After restarting Sysmon, re-run the implant. Splunk then captures EC3 with the Kali destination.
 Fidelity is raised by beacon-interval analysis (Sliver default 60s ± 30%), not the process name.
 The vendor-agnostic version is Sigma rule 7 in `detections/sigma/sigma_rules.yml`.
 

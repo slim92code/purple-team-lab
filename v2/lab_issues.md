@@ -85,7 +85,7 @@ auditpol /get /subcategory:"Kerberos Service Ticket Operations"
 
 **Symptom:** Scheduled task created but no EC4698 in Splunk. `auditpol /get` shows "No Auditing" for "Other Object Access Events" even after local set.
 
-**Root cause:** Same issue as #3 — GPO override. For endpoint machines, `Default Domain Policy` controls audit settings.
+**Root cause:** Same issue as #3, a GPO override. For endpoint machines, `Default Domain Policy` controls audit settings.
 
 **Fix — on HYDRA-DC:**
 ```
@@ -115,7 +115,7 @@ auditpol /get /subcategory:"Other Object Access Events"
 
 **Symptom:** `reg save HKLM\SAM` returns "Access Denied" even when the user is in the Administrators group.
 
-**Root cause:** UAC (User Account Control) is enabled. Even Administrator users get a split token — standard token for normal operations, elevated token only when explicitly accepting a UAC prompt. Sliver shell inherits the non-elevated token.
+**Root cause:** UAC (User Account Control) is enabled. Even Administrator users get a split token: a standard token for normal operations, and an elevated token only when explicitly accepting a UAC prompt. Sliver shell inherits the non-elevated token.
 
 **Temporary fix for lab — disable UAC on THEPUNISHER:**
 ```cmd
@@ -200,7 +200,7 @@ sysmon64 -c
 # Shows current configuration and schema version
 ```
 
-**Resolution:** Config with schema 4.50 runs on Sysmon 15.15 with a warning. For production — update config to a newer schema version.
+**Resolution:** Config with schema 4.50 runs on Sysmon 15.15 with a warning. For production, update the config to a newer schema version.
 
 ---
 
@@ -258,7 +258,7 @@ INFO: Trying LDAP connection to fd15:4ba5:5a2b:...
 bloodhound-python -c All -u fcastle -p Password1 -d MARVEL.LOCAL -ns 192.168.182.135
 ```
 
-**Status:** Works despite the IPv6 connection — enumeration is successful.
+**Status:** Works despite the IPv6 connection; enumeration is successful.
 
 ---
 
