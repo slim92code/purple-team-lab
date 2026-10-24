@@ -178,6 +178,14 @@ purple-team-lab/
 
 This is a lab, not production.
 
+- **The account design is wrong, and it changes how the chain should be read.** Four of the
+  six accounts are Domain Admins, including `fcastle`, which the Phase 2 spray recovers. So
+  the domain is owned at phase 2, and the Kerberoast in Phase 4 goes from one Domain Admin
+  to another. The eight phases are not a privilege-escalation path; each one is run to
+  produce the telemetry for that technique, and the detections are what the lab is about.
+  [v3](../v3/) fixes the entry point: the spray lands on `pparker`, a standard domain user,
+  who then Kerberoasts a Domain Admin SPN 98 seconds later, which is a real escalation.
+  [v4](../v4/) moves the service account to a gMSA.
 - `C:\Temp` is a Defender exclusion so payload delivery is reproducible on camera. In
   production it would not be, and the AppLocker fix in Segment 10 addresses that path.
 - Kali's SMB/RPC (445/135) is firewall-filtered from all three Windows hosts (see the

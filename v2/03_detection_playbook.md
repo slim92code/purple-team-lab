@@ -780,8 +780,8 @@ index=main source="WinEventLog:Security" earliest=-24h
 | eval phase=case(
     EventCode=4771 OR EventCode=4768, "1-Password_Spray",
     EventCode=4769, "2-Kerberoasting",
-    match('Process Command Line', "InstallUtil"), "3-LOLBin",
-    match('Process Command Line', "reg.*save.*SAM"), "4-Cred_Dump",
+    match(Process_Command_Line, "InstallUtil"), "3-LOLBin",
+    match(Process_Command_Line, "reg.*save.*SAM"), "4-Cred_Dump",
     EventCode=4698, "5-Persistence",
     true(), "Other"
 )

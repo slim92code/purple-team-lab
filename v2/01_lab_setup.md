@@ -30,10 +30,17 @@
 |---|---|---|---|
 | Administrator | `P@$$w0rd!` | Domain Admins | Built-in DA |
 | frankcastle (fcastle) | Password1 | **Domain Admins** | Compromised via password spray |
-| peterparker (pparker) | (unknown) | Domain Users | Not cracked — Domain User only |
+| peterparker (pparker) | (unknown) | Domain Users | Not cracked in v2; the v3 spray does recover it |
 | SQLService | MYpassword123# | **Domain Admins**, has SPN | Kerberoasted |
 | tstark | (unknown) | **Domain Admins** | — |
 | Guest | - | - | Disabled |
+
+> **Account design caveat.** Four of these six accounts are Domain Admins, including the one
+> the spray recovers. That is not how a real domain looks, and it means the eight phases are
+> not an escalation path: the domain is owned at Phase 2 and the Phase 4 Kerberoast runs
+> from one Domain Admin to another. The phases exist to generate the telemetry each
+> detection is written against. v3 sprays onto `pparker`, a standard user, which makes the
+> chain a real escalation.
 
 ### Recovered credentials
 
