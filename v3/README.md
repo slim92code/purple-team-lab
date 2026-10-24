@@ -4,24 +4,12 @@
 [`Purple_Team_Report_v3_EN.pdf`](Purple_Team_Report_v3_EN.pdf). All 26 screenshots, the seven
 findings with the measurements behind them, the rule verification log and the raw counts.
 
-A Serbian report written at the time of the run is also kept:
-[`Purple_Team_izvestaj_v3_SR.pdf`](Purple_Team_izvestaj_v3_SR.pdf). It is the earlier
-document, not a translation of the English one, and it predates the rule verification in
-section 7, so where the two differ the English report is the current state.
-
 This page is the summary. Repo entry point: [root README](../README.md).
 
 v3 adds two detection layers to the [v2](../v2/) Sysmon + Splunk baseline: network detection
 (Zeek + Suricata) and host EDR (Wazuh). Five telemetry sources feed one SIEM: Windows
 Security log, Sysmon, Wazuh, Zeek, Suricata, all into Splunk. The same kill chain was re-run
 and each phase checked against every source.
-
-> **On the PDF.** It describes the lab as it stood during the run on 20 Oct 2026. One
-> statement no longer matches: it says THEPUNISHER's Wazuh agent has no Sysmon `localfile`
-> block. That block is present and forwarding started at 12:08 on 20 Oct, part-way through
-> the run. The statement still holds for SPIDERMAN and HYDRA-DC. This page carries the state
-> checked against all three agents' `ossec.conf`, their live Sysmon config, and every
-> archived alert file. See [Known gaps](#known-gaps-carried-into-v4).
 
 ## Infrastructure
 
