@@ -163,17 +163,22 @@ The prevention fixes, re-proven:
 ```
 purple-team-lab/
 ├── detections/                     <- repo root, shared across versions
-│   ├── sigma/sigma_rules.yml       <- detection-as-code, vendor-agnostic
-│   └── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
+│   ├── sigma/sigma_rules.yml       <- 10 host rules, vendor-agnostic
+│   ├── sigma/v3_ndr.yml            <- 3 Zeek network rules, added in v3
+│   ├── wazuh/local_rules.xml       <- 5 Wazuh rules, added in v3
+│   ├── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
+│   └── attack_navigator_layer.json <- MITRE ATT&CK coverage layer
 ├── config/sysmonconfig.xml         <- Sysmon config incl. the C:\Temp NetworkConnect fix
-└── v2/
-    ├── README.md                   <- you are here
-    ├── 01_lab_setup.md             <- AD lab build (DC, endpoints, Sysmon, Splunk)
-    ├── 02_attack_playbook.md       <- 8 phases, commands, MITRE mapping
-    ├── 03_detection_playbook.md    <- detection cards, SPL, IR runbook, hardening
-    ├── lab_issues.md               <- build and debug log (GPO/auditpol, ACLs, forwarder)
-    ├── COMMAND_REFERENCE.md        <- command quick-reference
-    └── screenshots/                <- 12 detection screenshots + ATT&CK Navigator layer (SVG)
+├── v2/                             <- this version
+│   ├── README.md                   <- you are here
+│   ├── 01_lab_setup.md             <- AD lab build (DC, endpoints, Sysmon, Splunk)
+│   ├── 02_attack_playbook.md       <- 8 phases, commands, MITRE mapping
+│   ├── 03_detection_playbook.md    <- detection cards, SPL, IR runbook, hardening
+│   ├── lab_issues.md               <- build and debug log (GPO/auditpol, ACLs, forwarder)
+│   ├── COMMAND_REFERENCE.md        <- command quick-reference
+│   └── screenshots/                <- 12 detection screenshots + ATT&CK Navigator layer (SVG)
+├── v3/                             <- NDR + EDR layers, 7 case files, technical report
+└── v4/                             <- design document only, not yet built
 ```
 
 ## Scope and caveats
