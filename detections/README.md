@@ -201,6 +201,20 @@ Measured against 935 real `ProcessAccess` reads of
 have alerted 90 times with 89 benign (79 from `WmiPrvSE.exe`; `wazuh-agent.exe` itself reads
 LSASS at `0x1fffff`). The shipped version alerts once on the same sample.
 
+#### Why the exclusions anchor the full path
+
+The nine excluded readers are listed as full paths, not as `\svchost.exe`. A filename-suffix
+exclusion also suppresses `C:\Temp\svchost.exe`, which is how a masquerading implant would
+hide from the rule that is supposed to catch it. The Sigma rule and the Splunk search both
+matched on suffix until this was checked, and the Sigma list also carried `wininit.exe` and
+`csrss.exe` that the other two did not. All three now use the same nine anchored paths, and
+the Wazuh pattern is tested against both the real paths and a fake `svchost.exe` in a
+user-writable directory, which still alerts.
+
+What none of the three catch: code injected into the genuinely signed `svchost.exe` or
+`MsMpEng.exe` inherits a legitimate `SourceImage` and is suppressed. Separating that needs
+`CallTrace`, and this lab has no sample to test such a pattern against.
+
 #### Why `100205` is separate
 
 Built-in `92900` fires at level 12 for any read-permission

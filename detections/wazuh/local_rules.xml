@@ -65,6 +65,11 @@
     Platform processes observed reading LSASS on this baseline. Paths are anchored in full,
     so a payload named svchost.exe running from C:\Temp still alerts at level 12.
 
+    The same nine paths are the exclusion set in the Sigma rule and the Splunk search, which
+    both used to match on filename suffix ('\svchost.exe') and so would have suppressed
+    C:\Temp\svchost.exe as well. They are anchored the same way now. wininit.exe and
+    csrss.exe were in the Sigma list only; they are in all three.
+
     Not covered: code injected into the real signed svchost.exe or MsMpEng.exe inherits a
     legitimate SourceImage and is suppressed. Separating that needs CallTrace (an LSASS read
     whose stack runs through UNKNOWN frames or a non-Microsoft module). Left out because this
@@ -75,7 +80,7 @@
   -->
   <rule id="100201" level="0">
     <if_sid>100200</if_sid>
-    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr|wininit|csrss)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
     <description>LSASS access by a known-benign platform process - suppressed</description>
     <group>credential_access,</group>
   </rule>
@@ -87,7 +92,7 @@
   -->
   <rule id="100205" level="0">
     <if_sid>92900</if_sid>
-    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr|wininit|csrss)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
     <description>Routine platform LSASS read - suppresses the level-12 false positive from rule 92900</description>
     <group>credential_access,</group>
   </rule>

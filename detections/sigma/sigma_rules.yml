@@ -327,16 +327,20 @@ detection:
             - '0x1f3fff'
             - '0x1fffff'
     filter_platform:
-        SourceImage|endswith:
-            - '\wininit.exe'
-            - '\csrss.exe'
-            - '\MsMpEng.exe'
-            - '\svchost.exe'
-            - '\WmiPrvSE.exe'
-            - '\vmtoolsd.exe'
-            - '\wazuh-agent.exe'
-            - '\taskmgr.exe'
-            - '\MRT.exe'
+        # Full paths on purpose, not '\svchost.exe'. A filename-suffix exclusion also
+        # suppresses C:\Temp\svchost.exe, which is how a masquerading implant would hide
+        # from this rule. Anchored to the real path, a fake svchost in a user-writable
+        # directory still alerts. Same set as the Splunk search and the Wazuh rules.
+        SourceImage:
+            - 'C:\Windows\System32\svchost.exe'
+            - 'C:\Windows\System32\wininit.exe'
+            - 'C:\Windows\System32\csrss.exe'
+            - 'C:\Windows\System32\taskmgr.exe'
+            - 'C:\Windows\System32\MRT.exe'
+            - 'C:\Windows\System32\wbem\WmiPrvSE.exe'
+            - 'C:\ProgramData\Microsoft\Windows Defender\Platform\*\MsMpEng.exe'
+            - 'C:\Program Files\VMware\VMware Tools\vmtoolsd.exe'
+            - 'C:\Program Files (x86)\ossec-agent\wazuh-agent.exe'
     condition: selection and not filter_platform
 fields:
     - SourceImage
