@@ -483,8 +483,8 @@ index=main source="WinEventLog:Security" earliest=-24h
     EventCode=4771, "T1110.003 - Password Spray",
     EventCode=4769, "T1558.003 - Kerberoasting",
     EventCode=4698, "T1053.005 - Scheduled Task",
-    match('Process Command Line', "InstallUtil"), "T1218.004 - LOLBin",
-    match('Process Command Line', "reg.*save"), "T1003.002 - SAM Dump",
+    match(Process_Command_Line, "InstallUtil"), "T1218.004 - LOLBin",
+    match(Process_Command_Line, "reg.*save"), "T1003.002 - SAM Dump",
     true(), "Other"
 )
 | where mitre != "Other"
