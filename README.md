@@ -75,5 +75,5 @@ predictions and the residual-gap list have to be on record first.
 
 ---
 
-Self-taught. Certs: TCM Security SOC 201, Detection Engineering for Beginners,
+Self-taught. Training: TCM Security SOC 201, Detection Engineering for Beginners,
 Practical Windows Forensics.
