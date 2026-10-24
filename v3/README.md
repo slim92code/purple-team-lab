@@ -67,8 +67,8 @@ Residual gaps, deliberate, and the v4 before-state:
 
 | Phase | Technique | Recorded by |
 | ----- | --------- | ----------- |
-| Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log` |
-| Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5` |
+| Password spray | T1110.003 | Windows `4771`, Zeek `kerberos.log`, Suricata `weak_encryption` |
+| Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5`, Suricata `weak_encryption` |
 | Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log`, Suricata `weak_encryption` |
 | Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` (corroborating only — see [CASE-04](investigations/CASE-04-lateral-movement-winrm.md)) |
 | LSASS access | T1003.001 | Sysmon EID 10, THEPUNISHER only (SPIDERMAN logs no EID 10 at all, screenshot 12 — and not by design, see [`config/`](../config/)) |
@@ -90,16 +90,37 @@ because the two are not the same here:
   ruleset. They are a second, independent source agreeing with the Windows and Zeek evidence,
   which is worth having and is not the same as a detection.
 
-One placement in that table is reasoned rather than measured. `weak_encryption` keys on the
-Kerberos encryption type, and the roast against `SQLService` was issued as `0x12` (AES-256),
-so it cannot be what that event fired on. The only RC4 exchange in the run is the
-Pass-the-Ticket `4768` at 12:38, which is where the row now sits. Confirming it means reading
-the timestamps out of Suricata directly:
+### What `weak_encryption` actually fires on
 
-```
-jq -r 'select(.event_type=="anomaly" and (.anomaly.event|test("WEAK_ENCRYPTION")))
-       | [.timestamp, .src_ip, .dest_ip, .anomaly.event] | @tsv' /var/log/suricata/eve.json
-```
+That row appears three times above, and getting it right took a measurement that overturned
+the obvious reading. Counting every Suricata `WEAK_ENCRYPTION` between 11:00 and 13:00 on the
+run date returns 25 events:
+
+| Time | Count | Direction | Chain step |
+| ---- | ----- | --------- | ---------- |
+| 11:19:17 | 1 | `.138` → `.135` | — |
+| 11:31:09–10 | 11 | `.135` → `.133` | password spray |
+| 11:32:48 | 5 | `.133` → `.135` | Kerberoasting |
+| 12:20:54 | 1 | `.138` → `.135` | — |
+| 12:31:18 | 3 | `.135` ↔ `.137` | — |
+| 12:38:45 | 2 | `.135` → `.138` | Pass-the-Ticket |
+| 12:42:51 | 2 | `.138` → `.135` | WinRM pivot |
+
+**It fires during the Kerberoasting, even though that ticket was AES-256.** The reasonable
+guess — that an event named `weak_encryption` keys on the encryption type of the issued
+ticket, so an `0x12` roast cannot trip it — is wrong. Suricata raises it on a weak etype seen
+anywhere in the Kerberos exchange, including the client's *proposed* etype list. `GetUserSPNs`
+offers RC4 among its supported types; the KDC picks AES and issues `0x12`. Windows `4769`
+records only the outcome, Suricata sees the negotiation.
+
+That is the same point as [finding 5](#5-the-canonical-kerberoasting-detection-never-saw-its-input),
+reached from the network side: RC4 is still on the table in this domain. The host log makes
+the estate look AES-clean because it only ever shows what was issued.
+
+**And it is not high-fidelity.** Five of the 25 (11:19, 12:20, 12:31) fall on no attack step
+at all — ordinary domain traffic offering RC4. One in five is a false positive against a
+known-bad window, which is why this sits in a *recorded by* column rather than being written
+up as a detection.
 
 ### A note on timestamps
 
@@ -312,11 +333,13 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 
 ### 06 — Suricata application-layer anomalies
 [![Suricata anomaly](screenshots/06_suricata_anomaly.png)](screenshots/06_suricata_anomaly.png)
-> Suricata's built-in app-layer anomaly events, not written signatures: `weak_encryption` on
-> the RC4 Kerberos exchange, `REQUEST_AUTH_UNRECOGNIZED` during the 12:42–12:43 WinRM pivot.
-> Both corroborate the Windows and Zeek evidence rather than standing on their own — the
-> second one also fires on legitimate WinRM, since `Negotiate` is an `Authorization` header
-> Suricata's HTTP parser does not recognise.
+> Suricata's built-in app-layer anomaly events, not written signatures: `weak_encryption`
+> across the Kerberos exchanges — spray, roast and Pass-the-Ticket alike, because it keys on
+> the etypes offered rather than on the ticket issued — and `REQUEST_AUTH_UNRECOGNIZED` during
+> the 12:42–12:43 WinRM pivot. Both corroborate the Windows and Zeek evidence rather than
+> standing on their own. Measured false-positive rate for `weak_encryption` over the run
+> window is 5 in 25; `REQUEST_AUTH_UNRECOGNIZED` also fires on legitimate WinRM, since
+> `Negotiate` is an `Authorization` header Suricata's HTTP parser does not recognise.
 
 ### 07 — LSASS access (T1003.001)
 [![LSASS EID10](screenshots/07_lsass_sysmon_ec10.png)](screenshots/07_lsass_sysmon_ec10.png)
