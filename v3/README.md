@@ -287,13 +287,24 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 
 ## Alert triage — case files
 
-[`investigations/`](investigations/) holds the triage write-ups for this run: the alert, the
-questions asked, the queries run, the verdict, and the tuning and hardening recommendations.
+[`investigations/`](investigations/) holds a triage write-up for every phase of the run: the
+alert, the questions asked, the queries run, the verdict, and the tuning and hardening that
+follows. They chain in the order the attack ran.
 
-- [**CASE-01 — Password spray**](investigations/CASE-01-password-spray.md). True positive.
-  Seven accounts tried in 0.6 s from a non-domain host, one succeeded, and the compromised
-  account was used to Kerberoast a Domain Admin SPN 98 seconds later. Account lockout was
-  configured and did not fire, because the spray sent one attempt per account.
+| Case | Phase | MITRE | Verdict |
+| ---- | ----- | ----- | ------- |
+| [CASE-01](investigations/CASE-01-password-spray.md) | Password spray | T1110.003 | True positive, one account compromised |
+| [CASE-02](investigations/CASE-02-kerberoasting.md) | Kerberoasting | T1558.003 | True positive, Domain Admin credential cracked |
+| [CASE-03](investigations/CASE-03-pass-the-ticket.md) | Pass-the-Ticket | T1550.003 | True positive, stolen ticket in use |
+| [CASE-04](investigations/CASE-04-lateral-movement-winrm.md) | Lateral movement | T1021.006 | True positive, workstation-to-workstation pivot |
+| [CASE-05](investigations/CASE-05-lsass-access.md) | LSASS access | T1003.001 | True positive on one host, undetectable on another |
+| [CASE-06](investigations/CASE-06-persistence-scheduled-task.md) | Persistence | T1053.005 | True positive delivered at level 4 |
+| [CASE-07](investigations/CASE-07-c2-beaconing.md) | C2 beaconing | T1071.001 | True positive, two endpoints linked by one fingerprint |
+
+Three of them are about detections that did not work. CASE-02 covers a canonical rule that
+cannot fire on an AES domain, CASE-05 covers three separate reasons an EDR stayed silent on
+a credential dump, and CASE-06 covers an alert that arrived correctly and still told the
+analyst nothing.
 
 ## Shipped as detection-as-code
 

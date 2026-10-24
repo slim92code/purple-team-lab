@@ -58,6 +58,10 @@ the warning the whole time. The replacement rules are tuned against 935 real LSA
 sampled from the host, which took a draft that would have alerted 90 times (89 benign) down
 to one. Each rule is verified by a targeted trigger, with two negative tests.
 
+Seven [alert-triage case files](v3/investigations/) cover the chain phase by phase: the
+alert, the questions asked, the queries run, the verdict, and the tuning that follows. Three
+of them are about detections that did not work.
+
 ### v4 — planned, not yet built
 
 [`v4/README.md`](v4/README.md) is a design document. It scopes a rebuild of the v3 stack on a

@@ -7,6 +7,7 @@
 | Severity | High |
 | MITRE | [T1110.003 — Password Spraying](https://attack.mitre.org/techniques/T1110/003/) |
 | Verdict | True positive. One account compromised, used 98 seconds later. |
+| Handed to | [CASE-02](CASE-02-kerberoasting.md) |
 
 ## 1. What the alert showed
 
@@ -97,7 +98,8 @@ index=main host=HYDRA-DC EventCode=4769
 ```
 
 At 11:32:48, 98 seconds after the spray succeeded, `pparker` requested a service ticket for
-the `SQLService` SPN from the same address. That is Kerberoasting, handed off as CASE-02.
+the `SQLService` SPN from the same address. That is Kerberoasting, handed off as
+[CASE-02](CASE-02-kerberoasting.md).
 
 `SQLService` is a Domain Admin with an SPN, so the roast leads to domain compromise. The
 spray alert is the first link of that chain, not a low-severity hygiene finding.
