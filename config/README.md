@@ -68,9 +68,39 @@ SPIDERMAN therefore logged no EID 10 at all: 1,191 process-create events and zer
 `ProcessAccess` events over the same period. An LSASS dump on that host would have left no
 Sysmon trace. See screenshot 12 in [`v3/README.md`](../v3/README.md).
 
-The fix is in this file but has not been re-deployed and re-tested on both hosts, so the
-before/after proof that the rest of the repo insists on is not here yet. That is carried
-into [v4](../v4/README.md).
+### Re-deployed and re-proven, 25 Oct 2026
+
+The config above was applied with `sysmon64 -c` on all three hosts and the result measured in
+Splunk rather than assumed.
+
+| Host | Before: EID 10 over 7 days | After: EID 10 in 10 minutes |
+| ---- | -------------------------- | --------------------------- |
+| THEPUNISHER | 1,948 | already logging, unchanged |
+| SPIDERMAN | **0** | **18** |
+| HYDRA-DC | **0** | **20** |
+
+Two hosts that had produced nothing in a week started producing within minutes. The targeted
+trigger — a PowerShell handle to `lsass.exe` — came back as
+`powershell.exe` → `lsass.exe` at `GrantedAccess 0x1F3FFF` on SPIDERMAN, which is the same
+mask SharpKatz used during the v3 run and is in the shipped detection mask list. So the
+telemetry the LSASS rules were written against now exists on the host that was blind to it.
+
+The benign traffic that came with it is worth reading too, because it is the exclusion list
+proving itself: `MsMpEng.exe`, `svchost.exe`, `vmtoolsd.exe` and `wmiprvse.exe` all appear,
+and all of them at `0x1000`, `0x1010`, `0x1400`, `0x1410` — masks that are not in the
+detection list at all. The rules would stay silent on every one of them without the
+exclusions even being consulted.
+
+THEPUNISHER was unaffected, which is what the diff predicted: it was already running the
+`lsass` line by hand, so for that host the deployment was a no-op.
+
+**This fixes the sensor, not the EDR.** The events above reached Splunk, which is what the
+Sigma rule and the Splunk search need. They will still not reach Wazuh on SPIDERMAN or
+HYDRA-DC, because only THEPUNISHER has a `Microsoft-Windows-Sysmon/Operational` block in its
+`ossec.conf` — a separate gap, documented in [v3](../v3/README.md), and untouched by this
+change. The Wazuh LSASS rules therefore remain single-host until the agent config is fixed
+too. One blind spot had two independent causes stacked on top of each other, and clearing the
+first does not clear the second.
 
 Before reusing this file, compare it against what the host is actually running. The
 deployed config is the one that decides what gets logged.

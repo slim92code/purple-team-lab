@@ -94,19 +94,6 @@ v4 fixes it at the forwarder rather than in the rules:
 - Re-run both `tstats` detections and record before and after, since "the data model is
   empty" and "the rule is wrong" look identical from the alert list.
 
-## Re-deploying the Sysmon config and proving EID 10 arrives
-
-v3's SPIDERMAN blind spot turned out to be [`config/sysmonconfig.xml`](../config/sysmonconfig.xml)
-itself: it shipped `ProcessAccess` as an `onmatch="include"` with no rule lines, which logs
-nothing. SPIDERMAN was running the published baseline; THEPUNISHER was the exception because
-the `lsass` line had been added on the host by hand. The config now carries that rule, but a
-fix in a file is not a fix in the estate.
-
-v4 re-deploys it on all three hosts with `sysmon64 -c`, reads the running config back on each
-one, and confirms EID 10 for `lsass.exe` reaches both Splunk and Wazuh before the chain is
-re-run. Until that is done the LSASS case file rests on one host that happened to be
-hand-edited.
-
 ## Calibrating the exfiltration threshold
 
 The two detections that ran in the v3 lab without becoming shipped content — the JA4 C2

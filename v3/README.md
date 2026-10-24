@@ -414,8 +414,11 @@ one — it also carried three hand-added `NetworkConnect` paths, two of which th
 already covered. See [`config/`](../config/). So this was not one host
 drifting — it was the config, and any third host would have been blind too. The LSASS rules
 were written, tuned against 935 sampled reads and documented before anyone checked that the
-shipped config emitted EID 10 at all. The config is fixed; re-deploying it on both hosts and
-re-proving the event arrives is carried into [v4](../v4/).
+shipped config emitted EID 10 at all. The config is fixed, and on 25 Oct 2026 it was deployed to all
+three hosts and the result measured: SPIDERMAN went from 0 EID 10 in seven days to 18 in ten
+minutes, HYDRA-DC from 0 to 20, and the targeted trigger landed as `powershell.exe` reading
+`lsass.exe` at `0x1F3FFF` — the same mask SharpKatz used in the attack run. The before/after
+is in [`config/README.md`](../config/README.md).
 
 ### 13 — Wazuh EDR, the scheduled-task rule gap (T1053.005)
 [![Wazuh rule gap](screenshots/13_wazuh_rule_gap_60228.png)](screenshots/13_wazuh_rule_gap_60228.png)
