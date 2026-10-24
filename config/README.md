@@ -70,17 +70,17 @@ Sysmon trace. See screenshot 12 in [`v3/README.md`](../v3/README.md).
 
 ### Re-deployed and re-proven, 25 Oct 2026
 
-The config above was applied with `sysmon64 -c` on **SPIDERMAN only** so far, and the result
-measured in Splunk rather than assumed.
+The config above was applied with `sysmon64 -c` and the result measured in Splunk rather than
+assumed.
 
-| Host | Before: EID 10 over 7 days | After: EID 10 in 10 minutes | Config deployed |
-| ---- | -------------------------- | --------------------------- | --------------- |
-| THEPUNISHER | 1,948 | not in window | not yet |
-| SPIDERMAN | **0** | **18** | yes |
-| HYDRA-DC | **0** | **20** | **not yet — unexplained, see below** |
+| Host | Before: EID 10 over 7 days | After: EID 10 in 10 minutes |
+| ---- | -------------------------- | --------------------------- |
+| THEPUNISHER | 1,948 | not in window |
+| SPIDERMAN | **0** | **18** |
+| HYDRA-DC | **0** | **20** |
 
-SPIDERMAN is the clean result: zero in a week, 18 within minutes of the config being applied.
-The targeted trigger — a PowerShell handle to `lsass.exe` — came back as
+Two hosts that had produced nothing in a week started producing within minutes. The targeted
+trigger — a PowerShell handle to `lsass.exe` — came back as
 `powershell.exe` → `lsass.exe` at `GrantedAccess 0x1F3FFF` on SPIDERMAN, which is the same
 mask SharpKatz used during the v3 run and is in the shipped detection mask list. So the
 telemetry the LSASS rules were written against now exists on the host that was blind to it.
@@ -91,17 +91,17 @@ and all of them at `0x1000`, `0x1010`, `0x1400`, `0x1410` — masks that are not
 detection list at all. The rules would stay silent on every one of them without the
 exclusions even being consulted.
 
-**HYDRA-DC is an open question, not a result.** It also went from zero in seven days to 20
-events in the same ten-minute window, but the config was never applied there, so the deploy
-cannot be the cause. Something else changed on that host between the two measurements and
-nothing here identifies it. It is recorded as an anomaly rather than folded into the result,
-because attributing it to a change that did not happen is exactly the error this repo keeps
-documenting in other people's rules. The before/after above rests on SPIDERMAN alone until
-HYDRA-DC is explained.
+**HYDRA-DC was briefly written up as an anomaly, and that is worth keeping.** Its 20 events
+looked unexplained because the deployment was believed to have run on SPIDERMAN only. Reading
+the running config settled it: HYDRA-DC's `ProcessAccess` section held no rule at the first
+check and holds the `lsass` rule now, so the config had in fact been applied there. Recollection
+said one thing, `sysmon64 -c` said another, and the running config won — which is the same
+lesson as the rest of this directory, applied to the person doing the deploying rather than to
+the config.
 
-THEPUNISHER has not been redeployed either. The diff predicts the change will be a no-op
-there, since it is already running the `lsass` line by hand — but that is a prediction, and it
-is on record here before the test rather than after it.
+THEPUNISHER was not redeployed. The diff predicts the change would be a no-op there, since it
+is already running the `lsass` line by hand, and that prediction is on record here before the
+test rather than after it.
 
 **This fixes the sensor, not the EDR.** The events above reached Splunk, which is what the
 Sigma rule and the Splunk search need. They will still not reach Wazuh on SPIDERMAN or
