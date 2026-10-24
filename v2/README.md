@@ -5,7 +5,8 @@
 > Built to demonstrate detection engineering methodology: attack, detect, find the gap, fix, re-prove.
 
 > **This documents Lab v2** — the Sysmon + Splunk baseline. The NDR and EDR layers were
-> added in [v3](../v3/), and [v4](../) rebuilds the stack on a hardened baseline.
+> added in [v3](../v3/). [v4](../v4/) — a rebuild on a hardened baseline — is scoped as a
+> design document and not yet built.
 > Repo entry point: [root README](../README.md).
 
 **This README is the 2-minute scan for v2.** The full playbooks are linked below.

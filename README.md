@@ -23,9 +23,9 @@
 
 | Version | Detection stack | Status |
 | ------- | --------------- | ------ |
-| [**v2**](v2/) | Sysmon + Splunk SIEM | Documented — [playbooks and screenshots](v2/README.md) |
-| [**v3**](v3/) | + Zeek/Suricata NDR, Wazuh EDR — 5 layers | [Technical report (SR)](v3/Purple_Team_izvestaj_v3_SR.pdf) |
-| **v4** | v3 stack on a hardened, CIS-aligned baseline | In progress |
+| [**v2**](v2/) | Sysmon + Splunk SIEM | ✅ **Complete** — [playbooks and screenshots](v2/README.md) |
+| [**v3**](v3/) | + Zeek/Suricata NDR, Wazuh EDR — 5 layers | ✅ **Complete** — [summary](v3/README.md), [technical report (SR)](v3/Purple_Team_izvestaj_v3_SR.pdf) |
+| [**v4**](v4/) | v3 stack on a hardened, CIS-aligned baseline | 🚧 **Planned** — [design document](v4/README.md), not yet built |
 
 ### v2 — baseline
 Domain controller plus two domain-joined Windows 10 endpoints, Sysmon and a Splunk
@@ -51,14 +51,17 @@ alerted 90 times (89 benign) down to one, and each is verified by a targeted tri
 two negative tests — including a scheduled task that legitimately runs PowerShell with
 `-ExecutionPolicy Bypass`, which correctly does not fire.
 
-### v4 — in progress
-Rebuild of the v3 stack on a hardened baseline: advanced audit policy, credential
-protection, network-protocol hardening, account and Kerberos policy, and execution
-controls. The same kill chain is then re-run to produce a before/after detection-coverage
-matrix, with residual gaps recorded as a deliberate, documented risk register rather than
-left implicit. The deliverable is a set of alert-triage case files — what the alert showed,
-what was queried, the verdict, and the tuning recommendation — rather than an attack
-narrative.
+### v4 — planned, not yet built
+**[`v4/README.md`](v4/README.md) is a design document.** It scopes a rebuild of the v3 stack
+on a hardened baseline — advanced audit policy, credential protection, network-protocol
+hardening, account and Kerberos policy, execution controls — after which the same kill chain
+is re-run to produce a before/after detection-coverage matrix. The deliverable is a set of
+alert-triage case files rather than an attack narrative.
+
+The plan is committed **before** the work because the deliverable is a before/after
+comparison, and the residual gaps are named in advance so they read as a risk register
+rather than as excuses written around whatever got through. v2 and v3 are the completed
+labs; v4 is the next build.
 
 ---
 
