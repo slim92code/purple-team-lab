@@ -7,7 +7,7 @@ network (Zeek) rules and Wazuh custom rules.
 ```
 detections/
 ├── sigma/
-│   ├── sigma_rules.yml              # v2 — 9 host rules (Windows/Sysmon), source of truth
+│   ├── sigma_rules.yml              # 10 host rules (Windows/Sysmon), source of truth
 │   └── v3_ndr.yml                   # v3 — 3 network rules (Zeek: krb5, conn, ssl/JA4)
 ├── wazuh/
 │   └── local_rules.xml             # v3 — 5 rules: LSASS access + 92900 tuning + 60228 gap
@@ -15,7 +15,7 @@ detections/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
     │   │   ├── app.conf
-    │   │   ├── savedsearches.conf   # 12 detections (CIM/TA-normalized, macro-free)
+    │   │   ├── savedsearches.conf   # 13 detections (CIM/TA-normalized, macro-free)
     │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10)
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
@@ -89,7 +89,7 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 
 ## Coverage
 
-**v2 — host (Windows/Sysmon), `sigma/sigma_rules.yml`**
+**Host rules (Windows/Sysmon), `sigma/sigma_rules.yml`**
 
 | # | Rule | MITRE | Source |
 |---|---|---|---|
@@ -102,14 +102,25 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 | 7 | C2 beacon from user path (behavioral) | T1071.001 / T1572 | Sysmon EID 3 |
 | 8 | LSASS access mask | T1003.001 | Sysmon EID 10 |
 | 9 | Kerbrute userenum (4768 0x6) | T1087.002 | 4768 |
+| 10 | Kerberoasting by user-SPN, etype-agnostic | T1558.003 | 4769 |
 
-**v3 — network (Zeek), `sigma/v3_ndr.yml`**
+Rule 10 was added after the v3 run. Rule 2 keys on RC4 and is the higher-confidence of the
+two, but the v3 roast was issued as AES-256 (`0x12`) and rule 2 stayed silent. Rule 10 keys
+on the SPN owner instead of the encryption type, which is what survives a domain on AES. It
+is noisier and ships unscheduled in the Splunk pack until a per-environment SPN allowlist
+exists.
+
+**Network rules (Zeek), `sigma/v3_ndr.yml`**
 
 | # | Rule | MITRE | Source |
 |---|---|---|---|
-| 10 | Kerberoasting by user-SPN, etype-agnostic | T1558.003 | Zeek `kerberos.log` |
-| 11 | WinRM lateral movement east-west (5985) | T1021.006 | Zeek `conn.log` |
-| 12 | Sliver C2 via JA4 TLS fingerprint | T1071.001 | Zeek `ssl.log` |
+| 11 | Kerberoasting by user-SPN, etype-agnostic | T1558.003 | Zeek `kerberos.log` |
+| 12 | WinRM lateral movement east-west (5985) | T1021.006 | Zeek `conn.log` |
+| 13 | Sliver C2 via JA4 TLS fingerprint | T1071.001 | Zeek `ssl.log` |
+
+Rule 12 carries an approved-source list that has to be filled in per environment. Zeek
+`conn.log` cannot tell a jump host from a workstation, so without that list the rule matches
+every WinRM session rather than only east-west ones.
 
 **v3 — EDR tuning (Wazuh), `wazuh/local_rules.xml`**
 
@@ -173,7 +184,7 @@ channel is configured on all three. Full write-up in
 [`v3/README.md`](../v3/README.md#known-gaps-carried-into-v4).
 
 Two rules key on behaviour rather than an indicator. Rule 7 keys on
-process location + egress (a renamed binary still trips it), and rule 10 keys on the SPN
+process location + egress (a renamed binary still trips it), and rules 10 and 11 key on the SPN
 pattern rather than the ticket encryption type (AES Kerberoasting trips it, where an
 RC4-only rule would miss it). The Wazuh task rules score the task's *command*, which is what
 the built-in rule 60228 ignores, and `100201` builds its exclusion list from the sources

@@ -61,7 +61,7 @@ v4 replaces the six rules with one GPO, `MARVEL-Firewall-Baseline`, on all three
 - **Static SMB/WMI block between the two workstations** (THEPUNISHER ↔ SPIDERMAN), kept even
   though both are domain-joined — deliberate workstation isolation.
 - **WinRM (5985) left reachable east-west on purpose** — the monitored pivot the
-  lateral-movement case needs (Zeek `conn.log`, Sigma rule 11). Prevention narrows the lateral
+  lateral-movement case needs (Zeek `conn.log`, Sigma rule 12). Prevention narrows the lateral
   path to the one lane the detection already watches.
 
 **Caveat — this is a real project, not one switch.** The non-domain gate is Windows *domain
