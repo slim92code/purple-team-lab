@@ -84,9 +84,21 @@ alert queue.
 received, parsed and alerted. An analyst working a queue sorted by severity would never
 reach it, and if they did they would see a routine task-creation notice.
 
-**`taskContent` arrives HTML-escaped**, so the angle brackets of the task XML are encoded
-while the command text inside is not. Patterns have to key on command tokens rather than on
-XML structure.
+**In Wazuh, `taskContent` arrives HTML-escaped** (`&lt;Arguments&gt;...`), so the angle
+brackets of the task XML are encoded while the command text inside is not. The Wazuh rules
+therefore key on command tokens rather than on XML structure.
+
+Whether Splunk receives the same field escaped has not been checked. The Splunk query above
+and the shipped saved search both use `rex "<Command>...</Command>"` with literal angle
+brackets, which works only if the XML arrives unescaped there. Settle it with:
+
+```spl
+index=main EventCode=4698 | head 1
+| eval form=if(match(_raw,"<Command>"),"raw XML","escaped")
+| table form
+```
+
+If it returns `escaped`, the rex has to match `&lt;Command&gt;` instead.
 
 ## 5. Verdict
 
