@@ -30,28 +30,31 @@ sysmon64.exe -c sysmonconfig.xml
 
 ## This is the intended config, not what every host runs
 
-The running config was dumped off each host with `sysmon64 -c` and diffed against the
-SwiftOnSecurity baseline. THEPUNISHER differed in **two** sections, not one:
+The running config was read off all three hosts with `sysmon64 -c`, 25 Oct 2026, and this is
+what they were actually running during v3:
 
-| Section | THEPUNISHER (hand-edited) | SPIDERMAN | In this file |
-| ------- | ------------------------- | --------- | ------------ |
-| `NetworkConnect` | `C:\Temp\` + `C:\Users\` + `C:\ProgramData\` | baseline | `C:\Temp\` only |
-| `ProcessAccess` | `TargetImage is C:\Windows\system32\lsass.exe` | empty `include` | same rule (change 2) |
+| Host | `NetworkConnect` `C:\Temp\` | `ProcessAccess` lsass |
+| ---- | --------------------------- | --------------------- |
+| HYDRA-DC | yes | **no** |
+| SPIDERMAN | yes | **no** |
+| THEPUNISHER | yes | yes, added by hand |
 
-Note which way round that is. SPIDERMAN was not the drifted host — it was running the
-baseline faithfully, and the baseline logs no EID 10. THEPUNISHER was the odd one out,
-because someone had added those lines on the host and never folded them back into this file.
-The v3 finding was written up as a per-host blind spot; the cause was the config in this
-directory, and change 2 above is that fix.
+**The v2 fix was deployed everywhere; the LSASS rule was nowhere except one host.** That is
+the opposite of what a per-host blind spot would look like, and it points at this file rather
+than at the estate: every host was running the config from this directory faithfully, and the
+config had `ProcessAccess` as an empty `include`. THEPUNISHER produced LSASS telemetry only
+because someone added the `TargetImage` line on that machine and never folded it back here.
+The one host that worked was the exception, not the rule.
 
-**Two of THEPUNISHER's three `NetworkConnect` additions were redundant.** The
-SwiftOnSecurity baseline's include list already carries `C:\Users` (as `Usermode`),
-`C:\ProgramData` and `C:\Windows\Temp`. Adding `C:\Users\` and `C:\ProgramData\` on top
-of that changed nothing; only `C:\Temp\` was a real gap, and that is the one this file
-ships. Whoever made the edit did not check what the baseline already covered — which is the
-cheap version of the same mistake the rest of this repo keeps finding, and it is also why the
-v2 write-up can say precisely that the baseline covers `C:\Users`, `C:\ProgramData` and
-`C:\Windows\Temp` but not a bare `C:\Temp`.
+It also means the v3 write-up had the diagnosis right and the attribution wrong. SPIDERMAN
+was not misconfigured. It was configured exactly as this repo said to configure it.
+
+Worth separating from that: THEPUNISHER's hand-edit also added `C:\Users\` and
+`C:\ProgramData\` to `NetworkConnect`, and both were redundant — the SwiftOnSecurity
+baseline's include list already carries `C:\Users` (as `Usermode`), `C:\ProgramData` and
+`C:\Windows\Temp`. Only `C:\Temp\` was a real gap, which is why that is the single line
+this file adds, and why the v2 write-up can be that precise about which paths the baseline
+covers.
 
 **Deploying this file over THEPUNISHER loses nothing**, which was established by taking the
 diff rather than by assuming it. Its `C:\Temp\` rule is kept as the `PurpleLab` line here,
