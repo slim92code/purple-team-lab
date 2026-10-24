@@ -14,7 +14,7 @@
 | Asset | What it is |
 | ----- | ---------- |
 | [`detections/sigma/`](detections/sigma) | 12 vendor-agnostic Sigma rules — 9 host (v2) + 3 network/Zeek (v3) |
-| [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | Wazuh custom rules fixing the v3 scheduled-task rule gap |
+| [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | 5 Wazuh rules — LSASS detection, built-in false-positive tuning, scheduled-task gap |
 | [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app — 12 saved searches, CIM/TA-normalized |
 | [`detections/attack_navigator_layer.json`](detections/attack_navigator_layer.json) | MITRE ATT&CK Navigator coverage layer |
 | [`config/sysmonconfig.xml`](config/sysmonconfig.xml) | Sysmon config including the `NetworkConnect` gap fix |
@@ -39,8 +39,17 @@ Added Zeek + Suricata for network detection and Wazuh for host EDR on top of the
 Splunk/Sysmon stack, taking the lab to five detection layers. The full kill chain was
 re-run and each phase evaluated against all five. Findings include a spray attempt the
 network layer caught that the endpoint log never recorded, JA4 TLS fingerprinting linking
-C2 beacons across two endpoints, and a Wazuh coverage gap — scheduled-task creation firing
-at the same severity for a malicious task and a benign one alike.
+C2 beacons across two endpoints, and three distinct Wazuh problems: scheduled-task creation
+firing at the same severity for a malicious task and a benign one alike; a Sysmon ingestion
+gap leaving the EDR blind on two of three hosts, including a DC whose own Sysmon log holds
+43,683 events the agent never reads; and a built-in credential-access rule that fired 32
+times at level 12 with all 32 benign. The custom rule written to close the second one bound
+to a Wazuh rule group that does not exist, so it loaded, reported as coverage, and was
+silently ignored — the engine had been warning about it the whole time. Replacement rules
+are tuned against 935 real LSASS reads from the host, taking a draft that would have
+alerted 90 times (89 benign) down to one, and each is verified by a targeted trigger with
+two negative tests — including a scheduled task that legitimately runs PowerShell with
+`-ExecutionPolicy Bypass`, which correctly does not fire.
 
 ### v4 — in progress
 Rebuild of the v3 stack on a hardened baseline: advanced audit policy, credential

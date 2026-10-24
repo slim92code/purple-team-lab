@@ -5,6 +5,14 @@
 > This page is the English summary.
 > Repo entry point: [root README](../README.md).
 
+> **Note on the report.** The PDF records the lab as it stood during the run (20 Oct 2026).
+> One of its statements no longer matches: it reports that THEPUNISHER's Wazuh agent has no
+> Sysmon `localfile` block, but that block is present today and forwarding began at
+> **12:08 on 20 Oct**, part-way through the run. The statement still holds for SPIDERMAN and
+> HYDRA-DC. This page carries the state verified against all three agents' `ossec.conf`,
+> their live Sysmon configuration, and every archived alert file; see
+> [Known gaps](#known-gaps-carried-into-v4).
+
 v3 adds two detection layers on top of the [v2](../v2/) Sysmon + Splunk baseline: network
 detection (Zeek + Suricata) and host EDR (Wazuh). Five telemetry sources now feed one SIEM —
 Windows Security log, Sysmon, Wazuh, Zeek, and Suricata, all into Splunk. The same Active
@@ -20,7 +28,7 @@ Directory kill chain was re-run and each phase evaluated against every source.
 | SPIDERMAN | `.138` | Windows 10 endpoint |
 | THEPUNISHER | `.137` | Windows 10 endpoint |
 | Splunk | `.131` | Splunk 10.2 SIEM |
-| Wazuh | `.150` | Wazuh 4.12 manager — 3 Windows agents |
+| Wazuh | `.150` | Wazuh 4.12 manager — 3 Windows agents, Sysmon from 1 of them ([why](#known-gaps-carried-into-v4)) |
 | security-vm | `.151` | Zeek + Suricata |
 | Kali | `.133` | Attacker |
 
@@ -88,6 +96,32 @@ hash.
 persistence task created on THEPUNISHER fired rule `60228` at level 4 — the same rule and
 the same severity as a benign `\OneDrive Standalone Update Task` on the same host
 (screenshot 13). Task creation is alerted on; task *content* is not evaluated.
+
+**The EDR's only credential-access alert is a 100% false positive.** Wazuh's built-in rule
+`92900` fires at **level 12** for any process reading LSASS with read permissions. Across
+every archived alert file the lab has, it fired 32 times and **all 32 were benign** —
+`MsMpEng.exe` (Defender, 29), `svchost.exe` (2), `MRT.exe` (1). Not one was the attack: the
+SharpKatz read of LSASS never reached Wazuh at all. A high-severity alert that is wrong
+every single time is worse than no alert, because it trains the analyst to close it.
+
+**Wazuh's built-in LSASS rule has its severity inverted.** Rule `92900` carries its own
+filter — `grantedAccess` must be `0x1010` or `0x40`. So the one credential-access alert the
+EDR ships fires at level 12 for Defender's routine read, and is **silent** on a full-access
+handle (`0x1fffff`) or a `MiniDumpWriteDump` mask (`0x1438`). Confirmed by experiment: a
+PowerShell `OpenProcess` against `lsass.exe` with `PROCESS_ALL_ACCESS` produced no alert at
+all from the default ruleset. Wrong every time on the benign mask, silent on the aggressive
+ones. This also invalidated a draft of the replacement rule that hung off `92900` as its
+parent — a child requiring a full-access mask is mutually exclusive with a parent that only
+matches `0x1010`. The shipped rule binds to the `sysmon_event_10` group instead.
+
+**Tuning a rule needs the baseline, not the attack.** A first draft of the replacement rule
+matched access masks `0x1010` and `0x1410` alongside the full-access ones. Measured against
+935 real `ProcessAccess` reads of `lsass.exe` sampled from THEPUNISHER's own Sysmon log,
+that draft would have alerted **90 times, 89 of them benign** — `WmiPrvSE.exe` alone
+accounts for 79 at `0x1410`, and `wazuh-agent.exe`, the EDR agent itself, reads LSASS at
+`0x1fffff`. Restricting to full and `MiniDumpWriteDump` masks and excluding the platform
+sources measured in that sample brings it to **one** alert: a `powershell.exe` read at
+`0x1f3fff`, which is the only one that warrants triage.
 
 ## Attack chain
 
@@ -165,9 +199,16 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 [![Blind spot](screenshots/12_spiderman_lsass_blindspot.png)](screenshots/12_spiderman_lsass_blindspot.png)
 > SPIDERMAN forwarded 1,191 Sysmon process-create events (EID 1) but **zero** ProcessAccess
 > events (EID 10), while THEPUNISHER logged 629 EID 10. SPIDERMAN's Sysmon is alive and
-> forwarding — its ProcessAccess layer is simply dark (`include` with no rule), so an LSASS
-> dump on that host would not be seen. This is the deliberate blind spot from the coverage
-> table, shown as an absence rather than asserted.
+> forwarding — its ProcessAccess layer is simply dark, so an LSASS dump on that host would
+> not be seen. Confirmed from the live config rather than inferred from the absence:
+> `sysmon64 -c` on SPIDERMAN shows `ProcessAccess  onmatch: include` with **no rule lines
+> under it**, so the include list matches nothing. This is the deliberate blind spot from
+> the coverage table, shown as an absence and then verified at the source. Confirmed on the
+> host as well: grouping 5,000 recent Sysmon events on SPIDERMAN by event ID returns eleven
+> distinct IDs — 1 (2,529), 13, 11, 3, 22, 5, 12, 2, 8, 255 and 4 — and **no EID 10 in the
+> list at all**. THEPUNISHER, by contrast,
+> carries exactly one `ProcessAccess` rule (`TargetImage is C:\Windows\system32\lsass.exe`),
+> which is why the two hosts differ. The difference is the Sysmon config, not the agent.
 
 ### 13 — Wazuh EDR: the scheduled-task rule gap (T1053.005)
 [![Wazuh rule gap](screenshots/13_wazuh_rule_gap_60228.png)](screenshots/13_wazuh_rule_gap_60228.png)
@@ -196,9 +237,39 @@ The v3 findings are not just screenshots — they are committed as deployable ru
 - [`sigma/v3_ndr.yml`](../detections/sigma/v3_ndr.yml) — Kerberoasting keyed on the user-SPN
   pattern (etype-agnostic, catches the AES roast an RC4-only rule misses), WinRM east-west
   lateral movement, and the Sliver C2 JA4 fingerprint.
-- [`wazuh/local_rules.xml`](../detections/wazuh/local_rules.xml) — the fix for the rule-gap
-  in screenshot 13: it reads the scheduled task's command and re-scores a PowerShell download
-  cradle to level 12, so `\Updater` no longer looks like a benign OneDrive task.
+- [`wazuh/local_rules.xml`](../detections/wazuh/local_rules.xml) — five rules covering both
+  Wazuh gaps. `100210`/`100211` read the scheduled task's own definition and re-score a
+  PowerShell download cradle or a hidden-window launcher, so `\Updater` no longer looks
+  like a benign OneDrive task. `100200` alerts on a dump-capable `GrantedAccess` mask
+  against `lsass.exe`; `100201` and `100205` suppress the platform processes measured in the
+  baseline above — `100205` deliberately hangs off `92900` itself, so it also removes the
+  32-for-32 false positive the built-in rule produces.
+
+### Rule verification — 24 Oct 2026
+
+Each rule was deployed and fired by a targeted trigger rather than assumed to work. Times
+UTC; the Windows hosts run UTC+2.
+
+| Rule | Trigger | Result |
+| ---- | ------- | ------ |
+| — | `wazuh-analysisd -t` | **clean** — the previous version raised `(7610)` and discarded its rule |
+| `100200` | `OpenProcess(lsass, PROCESS_ALL_ACCESS)` from PowerShell | **level 12**, 11:42:39 |
+| `100201` | 20 platform `ProcessAccess` reads forced through the chain | **0 alerts** |
+| `100205` | `MsMpEng.exe` reading LSASS at `0x1010` | **0 alerts** (was level 12, 32/32) |
+| `100210` | task with `IEX` + `DownloadString` | **level 12**, 11:48:57 |
+| `100211` | task with `-nop -w hidden -enc` | **level 10**, 11:49:04 |
+| *negative* | task running `defrag.exe C: /O` | stays `60228` **level 4** |
+| *negative* | task running `powershell.exe -ExecutionPolicy Bypass -File …` | stays `60228` **level 4** |
+
+The second negative test is the one that counts: a scheduled task that legitimately runs
+PowerShell with `-ExecutionPolicy Bypass` is the realistic false positive for these rules,
+and neither fired on it.
+
+`100201` could not be triggered directly, because no platform process in this lab opens
+LSASS with a full-access mask. It was tested by temporarily widening `100200` to include
+`0x1000` — the mask `svchost.exe` and `MsMpEng.exe` use constantly — so ordinary platform
+reads had to pass through the suppression chain. Twenty such events produced zero alerts;
+the mask was then reverted.
 
 ## Known gaps carried into v4
 
@@ -214,4 +285,44 @@ The v3 findings are not just screenshots — they are committed as deployable ru
   cracks straight to Domain Admin — not a low-privilege service account. Its password was
   also stored in the account's AD `Description` field (T1552.001), a second, independent
   exposure. v4 moves it to a gMSA and clears the description.
-- The Wazuh scheduled-task rule gap above is unfixed here.
+- **The Wazuh gaps are fixed at the rule layer, not at the telemetry layer.** The tuned
+  rules in [`detections/`](../detections/wazuh/local_rules.xml) are deployed and verified
+  (see the table above), so the `\Updater` pattern now scores level 12 instead of 4 and a
+  full-access LSASS handle alerts at all. What is **not** fixed is the ingestion gap below:
+  the LSASS rule still only has telemetry on one of three hosts. A correct rule over missing
+  data is still no coverage, which is the distinction this lab exists to make. Screenshot 13
+  records the original behaviour, before the rules were written.
+- **Wazuh receives Sysmon from one of three Windows agents.** Across every archived alert
+  file: HYDRA-DC 51,725 alerts with **0** from Sysmon, SPIDERMAN 22,782 with **0**,
+  THEPUNISHER 18,591 with **376** (32 of them `ProcessAccess`). Only THEPUNISHER carries a
+  `Microsoft-Windows-Sysmon/Operational` block in its `ossec.conf`.
+  The DC case is the sharpest: Sysmon **is** installed and running there and its log holds
+  **43,683 events** — the Wazuh agent simply never reads the channel. So the EDR is blind to
+  all of it while the agent reports healthy and busy. Any Wazuh-side Sysmon detection,
+  including the LSASS rule, can only ever fire on one of three hosts. Agent count is not
+  telemetry coverage, and nothing in the agent list shows the difference.
+  The `4698` task rules are unaffected — the Security channel is configured on all three.
+- **A custom rule that could not fire — and the tool had been saying so.** A custom LSASS
+  rule was deployed against `<if_group>sysmon_event10</if_group>`. The real group name is
+  `sysmon_event_10` — one missing underscore. `grep` over `/var/ossec/ruleset/rules/` returns
+  nothing for the misspelling, and no alert in any archive has ever carried it. The rule
+  matched nothing and alerted zero times, ever. Its silence
+  was first read as "no attack has been run since it was added" — which was *also* true, so
+  two independent causes produced the same zero and the harmless one masked the real one.
+  What settles it is that Wazuh had been reporting the fault all along:
+
+  ```
+  wazuh-analysisd: WARNING: (7610): Group 'sysmon_event10' was not found.
+  Invalid 'if_group'. Rule '100200' will be ignored.
+  ```
+
+  One `wazuh-analysisd -t` would have shown that at any point. The lesson is not the typo —
+  it is that a silent rule was counted as coverage without ever asking the engine whether it
+  had loaded. A rule that cannot fire is worse than a missing one, because it reports as
+  coverage. Rewritten against `<if_sid>92900</if_sid>`, a parent SID that demonstrably fires
+  here and does not get renamed between ruleset versions. That replacement was itself wrong
+  and was caught the same way — by testing it. `92900` only matches `0x1010` and `0x40`, so a
+  child of it requiring a full-access mask could never fire either. The shipped rule binds to
+  `<if_group>sysmon_event_10</if_group>`, and the fix is proven by a controlled before/after:
+  the same trigger, from the same host, with the same mask, six minutes apart — 0 alerts
+  under the old parent, level 12 under the new one, with Sysmon recording both events.

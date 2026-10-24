@@ -1,16 +1,228 @@
 <!--
   Purple Team Home Lab — Wazuh custom rules (v3)
 
-  Fix for the v3 scheduled-task rule gap: Wazuh's built-in rule 60228
-  ("A scheduled task was created") fires at level 4 for every 4698, so the
-  malicious \Updater task and a benign OneDrive update task are scored the
-  same. These rules read the task's own command out of the 4698 body and
-  elevate the ones that carry a PowerShell download cradle or an obfuscated
-  / hidden-window launcher.
+  ===========================================================================
+  1) LSASS access (100200 / 100201 / 100205)
+  ===========================================================================
 
-  Deploy to:  /var/ossec/etc/rules/local_rules.xml  (then restart wazuh-manager)
-  Verify:     the \Updater event re-scores to level 12 while OneDrive stays 4.
+  WHY THE FIRST ATTEMPT PRODUCED NOTHING
+  ......................................
+  A custom LSASS rule was deployed during v3 and never alerted once — 0 hits
+  across every archived alert file. The first reading was "no attack has been
+  run since it was added", which was true and therefore hid the real cause.
+  The rule bound to:
+
+      <if_group>sysmon_event10</if_group>
+
+  The real group name is `sysmon_event_10` — with an underscore before the
+  number. One missing character, and the rule was loaded, counted as coverage,
+  and silently discarded. Wazuh had been saying so on every start:
+
+      wazuh-analysisd: WARNING: (7610): Group 'sysmon_event10' was not
+      found. Invalid 'if_group'. Rule '100200' will be ignored.
+
+  That line was available from `wazuh-analysisd -t` at any point. The lesson is
+  not the typo; it is that a silent rule was trusted as coverage without ever
+  asking the engine whether it had loaded.
+
+  Two group names are easy to confuse, and only one works as a parent:
+    * `sysmon_event_10` — assigned to EVERY Sysmon EID 10 event by the
+      eventchannel decoder. This is the correct parent for a new detection.
+    * `sysmon_eid10_detections` — the enclosing group of 0945-sysmon_id_10.xml,
+      carried only by events that already matched one of its rules. Using it as
+      a parent would scope a rule to events another rule had already caught.
+
+  WHY THE PARENT IS A GROUP AND NOT <if_sid>92900</if_sid>
+  ........................................................
+  A second draft of this file bound to <if_sid>92900</if_sid>, reasoning that a
+  concrete SID is more stable than a group name. Testing it proved the draft
+  could never fire, for the same structural reason as the original bug.
+  Built-in rule 92900 carries its own mask filter:
+
+      <rule id="92900" level="12">
+        <if_group>sysmon_event_10</if_group>
+        <field name="win.eventdata.targetImage">(?i)lsass\.exe</field>
+        <field name="win.eventdata.grantedAccess">(?i)(0x1010|0x40)</field>
+
+  So 92900 only matches 0x1010 and 0x40. A child of 92900 that requires a
+  full-access or MiniDumpWriteDump mask is mutually exclusive with its own
+  parent. Verified by experiment: a PowerShell OpenProcess against lsass.exe
+  with PROCESS_ALL_ACCESS (0x1FFFFF) on THEPUNISHER produced no alert at all.
+
+  That experiment also measured a real gap in Wazuh's default ruleset:
+
+      0x1010    Defender's routine read   -> alerts at LEVEL 12 (32 times
+                                             in this lab, all 32 benign)
+      0x1fffff  full-access handle         -> NO ALERT
+      0x1438    MiniDumpWriteDump          -> NO ALERT
+
+  The severity is inverted: the default rule is wrong every time on the benign
+  mask and silent on the aggressive ones. 100200 covers the silent half.
+
+  WHY THE ACCESS-MASK LIST IS SHORT
+  .................................
+  A first draft matched 0x1010 and 0x1410 as well. Measured against 935 real
+  EID 10 reads of lsass.exe sampled from THEPUNISHER's own Sysmon log, that
+  draft would have alerted 90 times at level 12, of which 89 were ordinary
+  platform behaviour:
+
+      79  0x1410    WmiPrvSE.exe
+       4  0x1410    vmtoolsd.exe
+       3  0x1410    wazuh-agent.exe
+       2  0x1fffff  wazuh-agent.exe      <- the EDR agent reading LSASS
+       1  0x1410    taskmgr.exe
+       1  0x1f3fff  powershell.exe       <- the only one worth triage
+
+  A 98.9% false-positive rate is not a detection, it is an alert generator.
+  Restricting to full / MiniDumpWriteDump masks and excluding the platform
+  sources measured above brings the same sample to a single alert — the
+  PowerShell read at 0x1f3fff. 0x1010 and 0x1410 are left to v4 as a
+  low-severity hunt tier; they are legitimate mimikatz masks, but on this
+  baseline they are indistinguishable from WMI.
+
+  WHY BACKSLASHES ARE WRITTEN \\+
+  ...............................
+  Wazuh emits Windows paths in eventdata with DOUBLED backslashes. Checked
+  with repr() rather than print(), which cannot show the difference:
+
+      sourceImage repr = 'C:\\\\ProgramData\\\\Microsoft\\\\...\\\\MsMpEng.exe'
+                         12 backslashes for 6 path separators
+
+  A pattern anchored on exactly one backslash silently fails to match. `\\+`
+  matches either form.
+
+  ===========================================================================
+  2) Scheduled-task persistence (100210 / 100211) — a RULE-SET gap
+  ===========================================================================
+  Built-in rule 60228 ("A scheduled task was created") fires at level 4 for
+  every 4698, so the malicious \Updater task and a benign OneDrive task score
+  the same. These read the task's own definition and elevate the ones carrying
+  a PowerShell download cradle or an obfuscated / hidden-window launcher.
+
+  The `taskContent` field was confirmed present on a real 60228 alert in this
+  lab. Note it arrives HTML-escaped (`&lt;Arguments&gt;...`), so the angle
+  brackets of the task XML are encoded while the command text inside is not —
+  which is why these patterns key on command tokens and not on XML structure.
+
+  Unlike the LSASS rules, these work on all three hosts: 4698 arrives over the
+  Security channel, which every agent is configured to read.
+
+  ===========================================================================
+  STATUS AND DEPLOYMENT
+  ===========================================================================
+  VERIFIED BY LIVE TRIGGER — 24 Oct 2026, THEPUNISHER + wazuh-vm
+  (times UTC; the host runs UTC+2)
+
+    wazuh-analysisd -t        clean, no warning          where the original
+                                                         raised (7610) and
+                                                         discarded its rule
+    100200  11:42:39  level 12   powershell.exe OpenProcess(lsass, 0x1FFFFF)
+    100201  11:54-11:58  0 alerts from 20 platform EID 10 events
+                               (svchost x16, MsMpEng x4). Tested by temporarily
+                               adding 0x1000 to 100200's mask so ordinary
+                               platform reads had to pass through the chain;
+                               mask reverted afterwards.
+    100205  11:42:16  0 alerts   MsMpEng.exe read lsass at 0x1010 — the exact
+                               mask 92900 matches. Before this rule the same
+                               event was a level-12 alert, 32 times out of 32.
+    100210  11:48:57  level 12   \ZZ-Verify-Cradle  (IEX + DownloadString)
+    100211  11:49:04  level 10   \ZZ-Verify-Hidden  (-nop -w hidden -enc)
+
+    NEGATIVE TESTS — both stayed at built-in 60228, level 4, as required:
+    11:49:07  \ZZ-Verify-Benign    defrag.exe C: /O
+    11:51:25  \ZZ-Verify-BenignPS  powershell.exe -ExecutionPolicy Bypass
+                                     -File C:\Scripts\DailyReport.ps1
+
+  The second negative test matters more than the first: a scheduled task that
+  legitimately runs PowerShell with -ExecutionPolicy Bypass is the realistic
+  false positive for 100210/100211, and it did not trip either rule.
+
+  A controlled before/after fell out of the run by accident. The same trigger
+  was fired twice from the same host with the same mask, six minutes apart,
+  with only the rule's parent changed in between:
+
+      11:36:58  powershell.exe 0x1fffff   <if_sid>92900</if_sid>          0 alerts
+      11:42:38  powershell.exe 0x1fffff   <if_group>sysmon_event_10</..>  level 12
+
+  Sysmon recorded all three events; only the second configuration alerted.
+
+  Still not covered: an LSASS read from code injected into an already-excluded
+  signed process. See the CallTrace note on 100201.
+
+  Deploy:
+      cp local_rules.xml /var/ossec/etc/rules/
+      /var/ossec/bin/wazuh-analysisd -t      # must print no WARNING/ERROR
+      systemctl restart wazuh-manager
+
+  Coverage limit: Wazuh receives Sysmon from 1 of this lab's 3 Windows agents,
+  so 100200 can only fire on THEPUNISHER. See v3/README.md "Known gaps".
 -->
+
+<group name="windows,sysmon,credential_access,">
+
+  <!--
+    Dump-capable handle opened on LSASS.
+
+      0x1438 / 0x143a            masks MiniDumpWriteDump commonly requests
+      0x1f0fff - 0x1fffff        near-full / full access
+    0x1f3fff is the mask recorded from notepad.exe during the v3 SharpKatz run
+    (Sysmon EID 10, v3 detection screenshot 07) and from powershell.exe in the
+    sample above.
+  -->
+  <rule id="100200" level="12">
+    <if_group>sysmon_event_10</if_group>
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)\\+lsass\.exe$</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">(?i)^0x(1438|143a|1f0fff|1f1fff|1f2fff|1f3fff|1ffff|1fffff)$</field>
+    <description>Dump-capable handle opened on LSASS — possible credential dumping (T1003.001)</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+    <group>credential_access,pci_dss_10.6.1,gdpr_IV_35.7.d,</group>
+  </rule>
+
+  <!--
+    Platform processes observed reading LSASS on this baseline, suppressed.
+    Every path is anchored in full, so a payload named svchost.exe running from
+    C:\Temp does not match the exclusion and still alerts at level 12.
+
+    Residual limitation, and it is not solved by signature checking: code
+    injected into the *real* signed svchost.exe or MsMpEng.exe inherits a
+    legitimate SourceImage and is suppressed. Separating that needs the
+    CallTrace field — an LSASS read whose stack runs through UNKNOWN frames or
+    a non-Microsoft module. CallTrace is present in Sysmon EID 10 and is the
+    natural next iteration; it is left out here because this lab has no
+    injected-into-svchost sample to test it against, and an untested pattern
+    is exactly the failure this file documents.
+
+    100201 and 100205 overlap on purpose. 100201 guards the high-severity path
+    and 100205 guards the built-in 92900 directly, so a benign platform read is
+    suppressed whichever rule the engine settles on.
+  -->
+  <rule id="100201" level="0">
+    <if_sid>100200</if_sid>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
+    <description>LSASS access by a known-benign platform process — suppressed</description>
+    <group>credential_access,</group>
+  </rule>
+
+  <!--
+    Fixes a false positive that exists in the lab today, independent of the
+    rules above. Built-in rule 92900 fires at LEVEL 12 for any LSASS read with
+    read permissions, including Defender's. Every one of the 32 EID 10 alerts
+    Wazuh has ever recorded here is benign — MsMpEng.exe (29), svchost.exe (2),
+    MRT.exe (1) — and every one scored level 12. That is a 100% false-positive
+    rate on the one credential-access alert the EDR produces, which trains an
+    analyst to ignore it.
+  -->
+  <rule id="100205" level="0">
+    <if_sid>92900</if_sid>
+    <field name="win.eventdata.sourceImage" type="pcre2">(?i)^C:\\+(Windows\\+System32\\+(svchost|MRT|taskmgr)\.exe|Windows\\+System32\\+wbem\\+WmiPrvSE\.exe|ProgramData\\+Microsoft\\+Windows Defender\\+Platform\\+[^\\]+\\+MsMpEng\.exe|Program Files\\+VMware\\+VMware Tools\\+vmtoolsd\.exe|Program Files \(x86\)\\+ossec-agent\\+wazuh-agent\.exe)$</field>
+    <description>Routine platform LSASS read — suppresses the level-12 false positive from built-in rule 92900</description>
+    <group>credential_access,</group>
+  </rule>
+
+</group>
+
 <group name="windows,windows_security,persistence,">
 
   <rule id="100210" level="12">

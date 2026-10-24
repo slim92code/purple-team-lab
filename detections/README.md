@@ -3,7 +3,7 @@
 Vendor-agnostic detections (Sigma) + a deployable Splunk pack, version-controlled.
 This is the artifact that backs the "Detection-as-Code" claim in the playbooks. It is
 the shared library for the whole lab and grows per iteration: v2 added the host rules,
-v3 added network (Zeek) rules and a Wazuh custom rule.
+v3 added network (Zeek) rules and Wazuh custom rules.
 
 ```
 detections/
@@ -11,7 +11,7 @@ detections/
 │   ├── sigma_rules.yml              # v2 — 9 host rules (Windows/Sysmon), source of truth
 │   └── v3_ndr.yml                   # v3 — 3 network rules (Zeek: krb5, conn, ssl/JA4)
 ├── wazuh/
-│   └── local_rules.xml             # v3 — custom rules fixing the 60228 scheduled-task gap
+│   └── local_rules.xml             # v3 — 5 rules: LSASS access + 92900 tuning + 60228 gap
 └── splunk/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
@@ -82,8 +82,11 @@ The Wazuh rules are deployed directly:
 
 ```bash
 cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
+/var/ossec/bin/wazuh-analysisd -t        # MUST print no WARNING and no ERROR
 /var/ossec/bin/wazuh-control restart
-# the \Updater task now re-scores to level 12; a benign OneDrive task stays level 4
+
+# Never skip the -t step. The bug these rules document was a rule that loaded,
+# counted as coverage, and was silently ignored — and -t had been saying so.
 ```
 
 ## Coverage
@@ -112,13 +115,60 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 
 **v3 — EDR tuning (Wazuh), `wazuh/local_rules.xml`**
 
-| id | Rule | MITRE |
+| id | Level | Rule | MITRE |
+|---|---|---|---|
+| 100200 | 12 | Dump-capable `GrantedAccess` mask on `lsass.exe` | T1003.001 |
+| 100201 | 0 | Suppress measured platform LSASS readers (child of 100200) | — |
+| 100205 | 0 | Suppress the same readers under built-in `92900` directly | — |
+| 100210 | 12 | Scheduled task with a PowerShell download cradle | T1053.005 / T1059.001 |
+| 100211 | 10 | Scheduled task with obfuscated/hidden-window launcher | T1053.005 / T1027 |
+
+**Why `100200` exists.** It replaces an earlier attempt bound to
+`<if_group>sysmon_event10</if_group>` — the real group is `sysmon_event_10`, one underscore
+away — so the rule was loaded, counted as coverage, and silently ignored. `wazuh-analysisd -t`
+had been printing `WARNING: (7610): Group 'sysmon_event10' was not found ... Rule '100200'
+will be ignored.` the whole time.
+
+A second draft bound to `<if_sid>92900</if_sid>` and could not fire either: `92900` filters
+on `grantedAccess` being `0x1010` or `0x40`, so a child requiring a full-access mask is
+mutually exclusive with its own parent. Caught by running it, not by reading it. The shipped
+rule binds to `<if_group>sysmon_event_10</if_group>`, the group the eventchannel decoder
+assigns to every EID 10 event.
+
+**Why the mask list is short.** Measured against 935 real `ProcessAccess` reads of
+`lsass.exe` from THEPUNISHER's Sysmon log, a draft that also matched `0x1010`/`0x1410` would
+have alerted 90 times with 89 benign (79 from `WmiPrvSE.exe`; `wazuh-agent.exe` itself reads
+LSASS at `0x1fffff`). The shipped version alerts **once** on the same sample.
+
+**Why `100205` is separate.** Built-in `92900` fires at level 12 for any read-permission
+LSASS access. In this lab it fired 32 times and all 32 were benign. `100205` hangs off
+`92900` itself so that existing false positive is suppressed whether or not `100200` matches.
+
+**Verification — 24 Oct 2026.** Every rule was deployed and fired by a targeted trigger.
+Times UTC.
+
+| Rule | Trigger | Result |
 |---|---|---|
-| 100210 | Scheduled task with a PowerShell download cradle → level 12 | T1053.005 / T1059.001 |
-| 100211 | Scheduled task with obfuscated/hidden-window launcher → level 10 | T1053.005 / T1027 |
+| — | `wazuh-analysisd -t` | clean (previous version raised `7610`) |
+| `100200` | PowerShell `OpenProcess(lsass, 0x1FFFFF)` | **level 12**, 11:42:39 |
+| `100201` | 20 platform reads forced through the chain | **0 alerts** |
+| `100205` | `MsMpEng.exe` on LSASS at `0x1010` | **0 alerts** (was level 12, 32/32) |
+| `100210` | task with `IEX` + `DownloadString` | **level 12**, 11:48:57 |
+| `100211` | task with `-nop -w hidden -enc` | **level 10**, 11:49:04 |
+| negative | task running `defrag.exe` | stays `60228` level 4 |
+| negative | task running `powershell.exe -ExecutionPolicy Bypass -File …` | stays `60228` level 4 |
+
+Not covered: an LSASS read from code injected into an already-excluded signed process —
+that needs `CallTrace`, and this lab has no sample to test a pattern against.
+
+**Coverage limit:** Wazuh receives Sysmon from 1 of the lab's 3 Windows agents, so `100200`
+can only fire on THEPUNISHER. The `4698` task rules are unaffected — the Security channel is
+configured on all three. Full write-up in
+[`v3/README.md`](../v3/README.md#known-gaps-carried-into-v4).
 
 Two rules are deliberately **behavioral/pattern-based, not IOC-based**: rule 7 keys on
 process location + egress (a renamed binary still trips it), and rule 10 keys on the SPN
 pattern rather than the ticket encryption type (AES Kerberoasting trips it, where an
-RC4-only rule would miss it). The Wazuh rules score the task's *command*, which is what
-the built-in rule 60228 ignores.
+RC4-only rule would miss it). The Wazuh task rules score the task's *command*, which is what
+the built-in rule 60228 ignores, and `100201` builds its exclusion list from the sources
+actually observed in this lab rather than from a generic allowlist.
