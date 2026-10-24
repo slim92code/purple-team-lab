@@ -473,7 +473,14 @@
 		<!--DATA: UtcTime, SourceProcessGuid, SourceProcessId, SourceThreadId, SourceImage, TargetProcessGuid, TargetProcessId, TargetImage, GrantedAccess, CallTrace-->
 	<RuleGroup name="" groupRelation="or">
 		<ProcessAccess onmatch="include">
-			<!--NOTE: Using "include" with no rules means nothing in this section will be logged-->
+			<!--Purple Lab FIX (T1003.001): the baseline leaves this section as an empty "include",
+				which logs nothing. That is why the v3 LSASS detections had telemetry on one host
+				only, and it is a shipped-config defect rather than host drift. Scoped to lsass as
+				the target so the volume stays bounded; the benign readers (MsMpEng, WmiPrvSE,
+				wazuh-agent, vmtoolsd, svchost, taskmgr, MRT, wininit) are filtered in the
+				detection rules, not here, because excluding them at the sensor would also hide a
+				process masquerading as one of them.-->
+			<TargetImage name="PurpleLab,T1003.001" condition="is">C:\Windows\system32\lsass.exe</TargetImage>
 		</ProcessAccess>
 	</RuleGroup>
 

@@ -1,6 +1,6 @@
 # Lab v3 — Network Detection and Host EDR Layers
 
-**Full technical report (English, 30 pages):**
+**Full technical report (English, 31 pages):**
 [`Purple_Team_Report_v3_EN.pdf`](Purple_Team_Report_v3_EN.pdf). All 26 screenshots, the seven
 findings with the measurements behind them, the rule verification log and the raw counts.
 
@@ -71,7 +71,7 @@ Residual gaps, deliberate, and the v4 before-state:
 | Kerberoasting | T1558.003 | Windows `4769`, Suricata `krb5` |
 | Pass-the-Ticket | T1550.003 | Windows `4768` TGT for `SQLService` (RC4), Zeek `kerberos.log`, Suricata `weak_encryption` |
 | Lateral movement (WinRM) | T1021.006 | Zeek `conn.log` port 5985, Suricata `REQUEST_AUTH_UNRECOGNIZED` (corroborating only — see [CASE-04](investigations/CASE-04-lateral-movement-winrm.md)) |
-| LSASS access | T1003.001 | Sysmon EID 10, THEPUNISHER only (SPIDERMAN is a deliberate blind spot, screenshot 12) |
+| LSASS access | T1003.001 | Sysmon EID 10, THEPUNISHER only (SPIDERMAN logs no EID 10 at all, screenshot 12 — and not by design, see [`config/`](../config/)) |
 | Scheduled task persistence | T1053.005 | Windows `4698`, Wazuh rule `60228` (screenshot 13) |
 | C2 beaconing | T1071.001 | Zeek `ssl.log`, JA4 TLS fingerprinting |
 
@@ -339,6 +339,15 @@ carried into [v4](../v4/).
 > nothing. Grouping 5,000 recent Sysmon events on that host by event ID returns eleven
 > distinct IDs (1, 2, 3, 4, 5, 8, 11, 12, 13, 22, 255) and no EID 10. THEPUNISHER carries one
 > `ProcessAccess` rule, `TargetImage is C:\Windows\system32\lsass.exe`.
+
+Found afterwards, and it reverses the reading: the empty include is what
+[`config/sysmonconfig.xml`](../config/sysmonconfig.xml) shipped. SPIDERMAN was running the
+repo's own baseline unmodified, and THEPUNISHER was the exception, because the `lsass` line
+had been added there by hand and never folded back into the file. So this was not one host
+drifting — it was the config, and any third host would have been blind too. The LSASS rules
+were written, tuned against 935 sampled reads and documented before anyone checked that the
+shipped config emitted EID 10 at all. The config is fixed; re-deploying it on both hosts and
+re-proving the event arrives is carried into [v4](../v4/).
 
 ### 13 — Wazuh EDR, the scheduled-task rule gap (T1053.005)
 [![Wazuh rule gap](screenshots/13_wazuh_rule_gap_60228.png)](screenshots/13_wazuh_rule_gap_60228.png)

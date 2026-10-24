@@ -80,6 +80,13 @@ The same dump on SPIDERMAN would have left no trace. Not a missed alert, no even
 
 ![The blind spot](../screenshots/12_spiderman_lsass_blindspot.png)
 
+Checked later, and it is worse than one host being misconfigured: the empty include is what
+[`config/sysmonconfig.xml`](../../config/sysmonconfig.xml) shipped. SPIDERMAN was running the
+repo's own baseline exactly as published. THEPUNISHER only had the event because someone had
+added the `lsass` line on the host and never put it back in the file. Every rule in this case
+file was written and tuned against a config that could not produce its input, and the one
+host that worked was the accident.
+
 ### 4.2 The EDR never received the event
 
 Wazuh is deployed on all three Windows hosts and reports healthy. Across every archived
