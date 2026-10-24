@@ -101,9 +101,11 @@ Detection tuning:
 
 4. Alert on `4768` where the principal is a service account and the source is not the host
    that runs the service. Build the account-to-host mapping once and alert on exceptions.
-5. On an AES-only domain, alert on any `0x17` ticket regardless of event ID. There were
+5. Where AES is the norm, alert on any `0x17` ticket regardless of event ID. There were
    zero legitimate RC4 service tickets here across 30 days, so the false-positive cost is
-   close to nothing.
+   close to nothing. Note this domain is not AES-*only* — this `4768` is proof RC4 is still
+   issued on request, which is exactly why the alert is worth having and why
+   recommendation 8 below is the durable fix.
 6. Correlate `4769` for an SPN with a later `4768` for the same principal from a different
    source. That pair is the roast and the reuse, and it is stronger than either alone.
 

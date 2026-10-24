@@ -58,6 +58,20 @@ the warning the whole time. The replacement rules are tuned against 935 real LSA
 sampled from the host, which took a draft that would have alerted 90 times (89 benign) down
 to one. Each rule is verified by a targeted trigger, with two negative tests.
 
+Auditing the repo afterwards turned up three more of the same shape, this time in the
+shipped content rather than in the lab:
+
+- The [Sysmon config](config/) here shipped `ProcessAccess` as an empty `include`, which logs
+  nothing. The host that produced the LSASS evidence was the one that had been hand-edited;
+  the host documented as a blind spot was running this baseline correctly.
+- The [Zeek Kerberoasting rule](detections/sigma/v3_ndr.yml) excluded machine accounts with
+  `endswith: '$'`, but Zeek writes `THEPUNISHER$/MARVEL.LOCAL`, so the filter never matched.
+  The field format was visible in a screenshot already in the write-up.
+- The Splunk app's `props.conf` was keyed on a sourcetype this lab's forwarder never emits,
+  so the timestamp fix it documents was never applied.
+
+All three are fixed and described where they happened. None were found by reading the rule.
+
 Seven [alert-triage case files](v3/investigations/) cover the chain phase by phase: the
 alert, the questions asked, the queries run, the verdict, and the tuning that follows. Three
 of them are about detections that did not work.
