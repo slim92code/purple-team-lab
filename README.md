@@ -75,5 +75,8 @@ predictions and the residual-gap list have to be on record first.
 
 ---
 
-Self-taught. Training: TCM Security SOC 201, Detection Engineering for Beginners,
-Practical Windows Forensics.
+Stevan Mrkšić, self-taught, Belgrade. [LinkedIn](https://www.linkedin.com/in/stevan92mrksic/)
+
+**Training, all TCM Security.** Completed: SOC 101, SOC 201, Detection Engineering for
+Beginners, Practical Windows Forensics, Practical Ethical Hacking. In progress: Practical
+Malware Analysis and Triage.
