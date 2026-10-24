@@ -1,6 +1,6 @@
 # Lab v3 — Network Detection and Host EDR Layers
 
-**Full technical report (English, 29 pages):**
+**Full technical report (English, 30 pages):**
 [`Purple_Team_Report_v3_EN.pdf`](Purple_Team_Report_v3_EN.pdf). All 26 screenshots, the seven
 findings with the measurements behind them, the rule verification log and the raw counts.
 
@@ -305,10 +305,29 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > `SQLService → HTTP/THEPUNISHER` (the cracked account reused), and
 > `Administrator → cifs/HYDRA-DC`.
 
-### 11 — Detection content shipped as alerts
+### 11 — The alerts running in the lab's own Splunk
 [![V3 Alerts](screenshots/11_v3_alerts_enabled.png)](screenshots/11_v3_alerts_enabled.png)
 > Six v3 saved alerts, all enabled: spray, Kerberoasting, LSASS, persistence, JA4 C2, large
-> outbound transfer.
+> outbound transfer. This is the live instance, not the shipped app, and the two are not the
+> same list — see below.
+
+The lab instance and the [Splunk app in this repo](../detections/splunk/purple_lab) are not
+the same set, which matters if you are trying to reproduce any of this:
+
+| Alert in screenshot 11 | Shipped as |
+| ---------------------- | ---------- |
+| Password spray | `Purple - Password Spray (multi-user from one source)` |
+| Kerberoasting | `Purple - Kerberoasting RC4 Service Ticket` + the etype-agnostic companion |
+| LSASS | `Purple - LSASS Access (credential theft mask)` |
+| Persistence | `Purple - Scheduled Task Persistence (SYSTEM + user path)` |
+| JA4 C2 | Sigma only ([`v3_ndr.yml`](../detections/sigma/v3_ndr.yml)) — no Splunk search in the app |
+| Large outbound transfer | **not shipped.** Written ad hoc in the lab and never turned into rule content |
+
+The app ships 13 searches with 9 scheduled, so it is the larger set in most respects but it
+is missing the two network detections above. The alert names also differ: the lab instance
+uses `V3 - …`, which is what the case files quote, while the app uses `Purple - …`. Closing
+both gaps — a JA4 search over `ssl.log`, a byte-volume search, and one naming scheme — is
+carried into [v4](../v4/).
 
 ### 12 — The SPIDERMAN LSASS blind spot
 [![Blind spot](screenshots/12_spiderman_lsass_blindspot.png)](screenshots/12_spiderman_lsass_blindspot.png)
@@ -452,3 +471,9 @@ minutes apart.
 | 11:42:38 | `<if_group>sysmon_event_10</if_group>` | level 12 |
 
 Sysmon recorded both events.
+
+**Two of the lab's six alerts never became rule content.** The JA4 C2 detection ships as a
+Sigma rule but has no Splunk search in the app, and the large-outbound-transfer alert was
+written ad hoc in the lab and is not in the repo at all. The lab also names its alerts
+`V3 - …` while the app names them `Purple - …`, so a case file's alert name does not match
+anything a reader can deploy. v4 ships both searches and settles on one naming scheme.

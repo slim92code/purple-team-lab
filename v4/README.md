@@ -94,6 +94,18 @@ v4 fixes it at the forwarder rather than in the rules:
 - Re-run both `tstats` detections and record before and after, since "the data model is
   empty" and "the rule is wrong" look identical from the alert list.
 
+## Closing the v3 content gaps
+
+Two detections ran in the v3 lab without becoming shipped content: the JA4 C2 beacon, which
+exists as a Sigma rule but has no Splunk search, and a large-outbound-transfer alert that was
+written ad hoc and never committed. v3 also ran its alerts as `V3 - …` while the repo's app
+names them `Purple - …`, so the alert name in a case file matches nothing a reader can
+deploy.
+
+v4 ships a `ssl.log` JA4 search and a byte-volume search in the Splunk app, and uses one
+naming scheme across the app, the Sigma pack and the case files. The point of the case files
+is that someone else can follow them, which fails if the alert name is local to one machine.
+
 ## Logging improvement over v3
 
 Zeek is switched to JSON output and ingested through the Splunk Add-on for Zeek, so fields

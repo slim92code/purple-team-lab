@@ -24,7 +24,7 @@ Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 | Version | Detection stack | Status |
 | ------- | --------------- | ------ |
 | [v2](v2/) | Sysmon + Splunk SIEM | Complete. [Playbooks and screenshots](v2/README.md) |
-| [v3](v3/) | + Zeek/Suricata NDR, Wazuh EDR | Complete. [Summary](v3/README.md), [technical report, 29 pp. (EN)](v3/Purple_Team_Report_v3_EN.pdf) |
+| [v3](v3/) | + Zeek/Suricata NDR, Wazuh EDR | Complete. [Summary](v3/README.md), [technical report, 30 pp. (EN)](v3/Purple_Team_Report_v3_EN.pdf) |
 | [v4](v4/) | v3 stack on a hardened, CIS-aligned baseline | Planned. [Design document](v4/README.md), not yet built |
 
 ### v2 — baseline
