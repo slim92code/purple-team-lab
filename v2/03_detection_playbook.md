@@ -132,6 +132,11 @@ index=main source="WinEventLog:Security" EventCode=4771
 | sort - _time
 ```
 
+> The threshold here is 3 so the query fires on this run, which sprayed 3 accounts. The
+> shipped rule in [`detections/`](../detections/splunk/purple_lab/default/savedsearches.conf)
+> uses 5, because 3 distinct accounts from one source in five minutes is something a
+> helpdesk session or a service-account rotation produces often enough in a real estate.
+
 **SPL 2.2 — Spray success identification (4771 followed by 4768)**
 
 ```spl
