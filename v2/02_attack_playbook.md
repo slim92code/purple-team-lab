@@ -1,5 +1,3 @@
-**English** · **[Srpski](02_attack_playbook.sr.md)**
-
 # Purple Team Home Lab — Attack Playbook
 
 ## 8-PHASE OVERVIEW
@@ -437,9 +435,9 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 
 **Detection iteration — behavioral, NOT by filename:**
 
-The naive fix would be to add `GlobalProtect_Update.exe` to a watchlist. That's an anti-pattern —
-the attacker renames the binary and the detection dies. We detect **location + behavior**,
-not the name: any process from a user-writable path that initiates egress.
+The naive fix would be to add `GlobalProtect_Update.exe` to a watchlist, which breaks the
+moment the attacker renames the binary. The detection keys on location and behaviour
+instead: any process from a user-writable path that initiates egress.
 
 ```xml
 <NetworkConnect onmatch="include">

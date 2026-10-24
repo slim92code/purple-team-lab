@@ -1,5 +1,3 @@
-**English** · **[Srpski](lab_issues.sr.md)**
-
 # Purple Team Home Lab — Issues & Solutions
 
 **Documented problems during setup and testing**

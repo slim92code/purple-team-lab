@@ -1,5 +1,3 @@
-**English** · **[Srpski](03_detection_playbook.sr.md)**
-
 # Purple Team Home Lab — Detection Playbook
 
 **Project:** Purple LAB — SOC Analyst Level 2
@@ -920,7 +918,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 
 **Goal:** "Before/After Detection Engineering" — for each attack from Phases 1-8, define a hardening fix + re-run SPL query that proves the attack now fails or is detected at a new layer.
 
-**Central point:** Hardening ≠ Detection. Prevention reduces the attack surface, but the surface never reaches zero. Detection remains the *safety net* for everything that slips through the prevention layer.
+**Central point:** Hardening is not detection. Prevention reduces the attack surface but never to zero, so detection has to cover what gets through.
 
 ---
 
@@ -1075,6 +1073,6 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 
 **L3 thinking:** "Threat model → attack paths → which attacks are realistic → prevention investment vs detection investment optimization."
 
-Defense in Depth means an attacker must bypass multiple layers. But no single layer is bulletproof. Detection remains the *safety net* for everything prevention lets through. That is the difference between an SOC analyst who thinks about tools and one who thinks about methodology.
+Defense in depth means an attacker has to get past several layers, and no single layer stops everything. Detection covers what prevention lets through.
 
 ---

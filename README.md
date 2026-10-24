@@ -17,7 +17,7 @@ Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 | [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | 5 Wazuh rules: LSASS detection, built-in false-positive tuning, scheduled-task gap |
 | [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app, 12 saved searches, CIM/TA-normalized |
 | [`detections/attack_navigator_layer.json`](detections/attack_navigator_layer.json) | MITRE ATT&CK Navigator coverage layer |
-| [`config/sysmonconfig.xml`](config/sysmonconfig.xml) | Sysmon config including the `NetworkConnect` gap fix |
+| [`config/`](config/) | Sysmon config including the `NetworkConnect` gap fix, and what the hosts actually run |
 
 ## Lab iterations
 
