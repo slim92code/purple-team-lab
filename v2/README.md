@@ -15,7 +15,9 @@ the same material as a single document.
 
 - **Detection engineering.** 10 host detections shipped as
   [Sigma rules](../detections/sigma/sigma_rules.yml) and a deployable
-  [Splunk pack](../detections/splunk/purple_lab), CIM/TA-normalized and version-controlled.
+  [Splunk pack](../detections/splunk/purple_lab), version-controlled. Two of its detections
+  run on CIM data models; see [`detections/README.md`](../detections/README.md) for which of
+  those this lab's forwarder configuration actually populates.
 - **Adversary emulation.** 8 MITRE ATT&CK techniques across a full AD kill chain, Defender
   left on throughout.
 - **The purple loop.** Attack, detect, find the detection gap, fix it, re-run to prove the
