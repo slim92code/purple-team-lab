@@ -27,7 +27,9 @@ detections/
 
 Scheduled searches and alerting are Enterprise features. On Splunk Free the app installs and
 every search runs on demand, but `enableSched = 1` has no effect and nothing fires on its
-own. Check with `| rest /services/licenser/groups | table title, is_active`.
+own. That is the difference between the two lab versions: v2 ran on Free and is documented
+as queries, v3 runs on Enterprise and its six alerts fire on schedule. Check which you have
+with `| rest /services/licenser/groups | table title, is_active`.
 
 ```bash
 # 1. Prereq apps (Splunkbase): Splunk_TA_windows, Splunk_TA_microsoft_sysmon, Splunk_SA_CIM

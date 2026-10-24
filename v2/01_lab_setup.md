@@ -56,16 +56,20 @@
 ## 2. SPLUNK CONFIGURATION
 
 ### Version
-- **Splunk Enterprise 10.2.0**, 500 MB/day ingest limit
+- **Splunk 10.2.0, Free licence**, 500 MB/day ingest limit
 - **Location:** `/opt/splunk/`
 
-> The active licence group is `Enterprise`, confirmed with
-> `| rest /services/licenser/groups | table title, is_active`. That matters for the
-> detection pack: scheduled searches and alerting are Enterprise features, so the
-> `cron_schedule` and `enableSched = 1` settings in
-> [`savedsearches.conf`](../detections/splunk/purple_lab/default/savedsearches.conf) are
-> live here rather than aspirational. On Splunk Free the same app installs and the searches
-> run by hand, but nothing fires on a schedule.
+> **The licence changes what the detections can do, and it changes between versions.**
+> v2 ran on Free, where scheduled searches and alerting are not available. Every detection
+> in this document was therefore run on demand, which is why v2 is documented as queries
+> and screenshots rather than as fired alerts. The
+> [`savedsearches.conf`](../detections/splunk/purple_lab/default/savedsearches.conf) pack
+> still carries `cron_schedule` and `enableSched = 1`, because it is written to be
+> deployable, but on Free those settings have no effect.
+>
+> [v3](../v3/) moved to an Enterprise licence, so the six scheduled alerts in v3 detection
+> screenshot 11 do fire on their own. Check which applies with
+> `| rest /services/licenser/groups | table title, is_active`.
 
 ### Installed Apps
 - ✅ Splunk_TA_windows
