@@ -7,7 +7,9 @@ stress-tested for what default tooling misses. The gap is then closed and re-pro
 > in [v3](../v3/). [v4](../v4/), a rebuild on a hardened baseline, is scoped as a design
 > document and not yet built. Repo entry point: [root README](../README.md).
 
-This page is the 2-minute scan. The full playbooks are linked below.
+This page is the 2-minute scan. The full playbooks are linked below, and
+[`Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf`](Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf) is
+the same material as a single document.
 
 ## What this covers
 

@@ -1,5 +1,3 @@
-**English** · **[Srpski](01_lab_setup.sr.md)**
-
 # Purple Team Home Lab — Lab Setup
 
 **Project:** Purple LAB — SOC Analyst Level 2

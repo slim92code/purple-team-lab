@@ -42,10 +42,16 @@ Inbound block rules, per host:
 | THEPUNISHER | SPIDERMAN → SMB, Kali → WMI |
 | SPIDERMAN | THEPUNISHER → SMB, Kali → WMI |
 
-The attacker is denied WMI on every host and SMB to the DC. The two endpoints cannot reach
-each other over SMB. Also applied: SMBv1 removed on all three hosts, SMB signing required on
-the DC, account lockout at 5 attempts, RemoteRegistry and several discovery/legacy services
-disabled on the endpoints.
+The attacker is denied WMI on every host and SMB to the DC by these rules. SMB from the
+attacker to the two endpoints is blocked as well, but by the Windows inbound default rather
+than by a rule, since their firewall profiles are `NotConfigured`. The DC's inbound default
+is `Allow`, so there the explicit rule is the only thing stopping it. The connectivity matrix
+in [`v2/01_lab_setup.md`](../v2/01_lab_setup.md) shows the result from the attacker's side:
+445 and 135 blocked on all three.
+
+The two endpoints also cannot reach each other over SMB. Also applied: SMBv1 removed on all
+three hosts, SMB signing required on the DC, account lockout at 5 attempts, RemoteRegistry
+and several discovery and legacy services disabled on the endpoints.
 
 WinRM (5985) was left open east-west, and that is the path the lateral movement took
 (screenshot 05). The mesh moved the attack off SMB and WMI without closing it, and the
@@ -57,7 +63,7 @@ Residual gaps, deliberate, and the v4 before-state:
 | --- | ----------- | ----- |
 | WinRM open east-west | the lateral-movement path | kept by design; v4 tightens SMB/WMI around it and the pivot stays open and monitored |
 | SMB signing only on the DC | endpoints accept unsigned SMB | v4 |
-| Kali → SMB blocked only on the DC | endpoints reachable over SMB from the attacker | v4 |
+| The DC's inbound default is `Allow`, the endpoints' is `NotConfigured` | on the DC only an explicit rule blocks Kali on SMB; the endpoints fall back to the Windows default, which blocks. One host is protected by a rule, two by a default nobody set. | v4 |
 | No LSA Protection (`RunAsPPL`) | LSASS dump succeeds, which is what screenshot 07 detects | v4 |
 | WDigest / LLMNR not hardened | credential-exposure and name-poisoning surface | v4 |
 
@@ -114,9 +120,9 @@ body and is not evaluated.
 | `svchost.exe` | 2 | `0x101000` |
 | `MRT.exe` | 1 | `0x101000` |
 
-The SharpKatz read of LSASS during the run is not among them. It never reached Wazuh.
+The SharpKatz read of LSASS during the run is not among them.
 
-Reading the rule explains both halves. From `0945-sysmon_id_10.xml`:
+Reading the rule explains why. From `0945-sysmon_id_10.xml`:
 
 ```xml
 <rule id="92900" level="12">
@@ -126,10 +132,15 @@ Reading the rule explains both halves. From `0945-sysmon_id_10.xml`:
 ```
 
 `0x1010` is what Defender uses. `0x1fffff` (full access) and `0x1438`
-(`MiniDumpWriteDump`) are not matched.
+(`MiniDumpWriteDump`) are not matched, and SharpKatz read LSASS at `0x1F3FFF`.
 
 Confirmed by trigger: a PowerShell `OpenProcess(lsass, PROCESS_ALL_ACCESS)` on THEPUNISHER
 produced a Sysmon EID 10 event and no Wazuh alert.
+
+The event reaching the manager and the manager alerting are separate questions, and only the
+second one is answered here. `alerts.json` holds events that matched a rule, so it cannot
+show whether an unmatched event arrived. Checking that needs the archives, which are not
+enabled in this lab.
 
 ### 5. The replacement rule was tuned against the baseline, not the attack
 
