@@ -24,7 +24,7 @@ and each phase checked against every source.
 | HYDRA-DC | `.135` | Windows Server 2022, AD DS, `MARVEL.LOCAL` |
 | SPIDERMAN | `.138` | Windows 10 endpoint |
 | THEPUNISHER | `.137` | Windows 10 endpoint |
-| Splunk | `.131` | Splunk 10.2 SIEM |
+| Splunk | `.131` | Splunk 10.2 SIEM, Enterprise licence (v2 ran on Free, so its detections were run on demand; the six alerts in screenshot 11 fire on schedule because of this change) |
 | Wazuh | `.150` | Wazuh 4.12 manager, 3 Windows agents, Sysmon from 1 of them ([why](#known-gaps-carried-into-v4)) |
 | security-vm | `.151` | Zeek + Suricata |
 | Kali | `.133` | Attacker |
