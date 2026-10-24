@@ -101,6 +101,24 @@ jq -r 'select(.event_type=="anomaly" and (.anomaly.event|test("WEAK_ENCRYPTION")
        | [.timestamp, .src_ip, .dest_ip, .anomaly.event] | @tsv' /var/log/suricata/eve.json
 ```
 
+### A note on timestamps
+
+Two clocks appear in this write-up and only one of them is labelled, so read them with care.
+The rule-verification times (24 Oct, `11:36:58` onward) are UTC, taken from Wazuh. The attack
+timeline (20 Oct, `11:31` through `12:43`) is as rendered in Splunk, which displays in the
+instance's own timezone, and the Windows hosts run UTC+2. The two sets are therefore not
+necessarily on the same clock, and nothing here reconciles them — the attack narrative is
+internally consistent because every time in it comes from the same Splunk render.
+
+Nothing in the findings depends on the offset: the intervals that carry meaning are all
+within the attack timeline (98 seconds from spray to roast, four minutes from
+Pass-the-Ticket to the WinRM pivot). Settle it before quoting a single time against an
+external source:
+
+```spl
+index=main earliest=-1h | head 1 | eval tz=strftime(_time,"%Z %z") | table tz
+```
+
 ## Findings
 
 ### 1. Zeek recorded a spray attempt Windows did not
@@ -493,12 +511,14 @@ The shipped rule binds to `<if_group>sysmon_event_10</if_group>`. The fix is bac
 before/after that fell out of the test run: the same trigger, same host, same mask, six
 minutes apart.
 
-| Time (UTC) | Parent | Alert |
-| ---------- | ------ | ----- |
+| Time (UTC), 24 Oct 2026 | Parent | Alert |
+| ----------------------- | ------ | ----- |
 | 11:36:58 | `<if_sid>92900</if_sid>` | none |
 | 11:42:38 | `<if_group>sysmon_event_10</if_group>` | level 12 |
 
-Sysmon recorded both events.
+Sysmon recorded both events. These are rule-verification times from 24 October, not the
+20 October attack run — both happen to fall in the same hour of the clock, which is a good
+reason to read the date column rather than the time.
 
 **Two of the lab's six alerts never became rule content.** The JA4 C2 detection ships as a
 Sigma rule but has no Splunk search in the app, and the large-outbound-transfer alert was
