@@ -73,11 +73,11 @@ Sysmon trace. See screenshot 12 in [`v3/README.md`](../v3/README.md).
 The config above was applied with `sysmon64 -c` and the result measured in Splunk rather than
 assumed.
 
-| Host | Before: EID 10 over 7 days | After: EID 10 in 10 minutes |
-| ---- | -------------------------- | --------------------------- |
-| THEPUNISHER | 1,948 | not in window |
-| SPIDERMAN | **0** | **18** |
-| HYDRA-DC | **0** | **20** |
+| Host | Before: EID 10 over 7 days | After: EID 10 in the first hour |
+| ---- | -------------------------- | ------------------------------- |
+| THEPUNISHER | 1,948 | 179 |
+| SPIDERMAN | **0** | **60** |
+| HYDRA-DC | **0** | **49** |
 
 Two hosts that had produced nothing in a week started producing within minutes. The targeted
 trigger — a PowerShell handle to `lsass.exe` — came back as
@@ -102,6 +102,41 @@ the config.
 THEPUNISHER was not redeployed. The diff predicts the change would be a no-op there, since it
 is already running the `lsass` line by hand, and that prediction is on record here before the
 test rather than after it.
+
+### What the redeployment turned up on the way
+
+THEPUNISHER did not appear in Splunk after its trigger, which looked at first like the
+deployment having broken the one host that worked. Reading its local Sysmon log directly
+settled that: the events were there, at `01:16:58` and `01:20:58`, with the service running
+and the rule loaded. Sysmon was fine. The events were not reaching the SIEM.
+
+Grouping everything that host had ever sent, by source, showed why:
+
+| Source | Last seen |
+| ------ | --------- |
+| `Perfmon:CPU Load` | 01:23:34 — current |
+| `Perfmon:Available Memory` | 01:23:34 — current |
+| `Perfmon:Network Interface` | 01:23:34 — current |
+| `WinEventLog:Security` | **00:17:54 — stopped** |
+| `WinEventLog:Microsoft-Windows-Sysmon/Operational` | **00:17:49 — stopped** |
+| `WinEventLog:Microsoft-Windows-PowerShell/Operational` | **00:17:53 — stopped** |
+| `WinEventLog:System` | **00:14:32 — stopped** |
+
+**Every Windows event log channel had stopped about 68 minutes earlier while Perfmon kept
+flowing.** The forwarder was alive; only its Windows Event Log inputs had wedged. It had
+nothing to do with the Sysmon change, which came after. `Restart-Service SplunkForwarder`
+cleared it and every channel resumed within a minute.
+
+This is worse than the gap it was found chasing. A host whose security telemetry is dead but
+whose performance counters keep arriving **looks healthy in every "is this host reporting?"
+check there is.** Host count, event volume, agent status, the forwarder's own service state —
+all green, for over an hour, with no Security, Sysmon, PowerShell or Defender events from a
+domain endpoint. An attack on THEPUNISHER in that window would have left nothing in the SIEM.
+
+The lesson is that liveness has to be measured per channel, not per host, and the detection
+for it is in the Splunk app as `Purple - Telemetry Gap (Windows logs stale, host still
+reporting)`. It is the only rule in this repo that watches the pipeline rather than the
+attacker.
 
 **This fixes the sensor, not the EDR.** The events above reached Splunk, which is what the
 Sigma rule and the Splunk search need. They will still not reach Wazuh on SPIDERMAN or

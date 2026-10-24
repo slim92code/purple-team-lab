@@ -15,7 +15,7 @@ detections/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
     │   │   ├── app.conf
-    │   │   ├── savedsearches.conf   # 15 detections, macro-free (2 via CIM, 11 Windows, 2 Zeek)
+    │   │   ├── savedsearches.conf   # 16 searches, macro-free (2 CIM, 11 Windows, 2 Zeek, 1 pipeline health)
     │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
@@ -31,7 +31,7 @@ own. That is the difference between the two lab versions: v2 ran on Free and is 
 as queries, v3 runs on Enterprise and its alerts fire on schedule. Check which you have
 with `| rest /services/licenser/groups | table title, is_active`.
 
-This app ships 15 searches, 10 of them scheduled. It now covers every alert that ran in the
+This app ships 16 searches, 11 of them scheduled. It now covers every alert that ran in the
 v3 lab: the JA4 C2 beacon and the large-outbound-transfer check were written ad hoc during
 the run and had no Splunk search here until they were added afterwards. Screenshot 11 in
 [`v3/README.md`](../v3/README.md) maps the lab's six against what ships.

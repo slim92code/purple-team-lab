@@ -384,8 +384,8 @@ the same set, which matters if you are trying to reproduce any of this:
 | Large outbound transfer | `Purple - Large Outbound Transfer (possible exfiltration)` |
 
 **Both gaps are closed.** The last two rows were written ad hoc during the run and had no
-rule content behind them; they are in the app now, so it ships 15 searches with 10 scheduled
-and covers every alert in the screenshot. The byte-volume search ships unscheduled and says
+rule content behind them; they are in the app now, so it ships 16 searches with 11 scheduled
+and covers every alert in the screenshot, plus one that watches the collection pipeline. The byte-volume search ships unscheduled and says
 so in its own description: its 10 MB threshold is a placeholder that was never calibrated
 against this estate's normal egress, and shipping an uncalibrated threshold as an enabled
 alert is how an alert queue fills with noise.
