@@ -7,6 +7,9 @@
 
 **Detection-as-code lives at the repo root. Each lab iteration has its own folder.**
 
+**Lab status —** [**v2**](v2/) ✅ complete · [**v3**](v3/) ✅ complete · [**v4**](v4/) 🚧 planned,
+[design document](v4/README.md) only, not yet built.
+
 ---
 
 ## Detection-as-Code
