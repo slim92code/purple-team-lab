@@ -55,9 +55,12 @@ Windows host, audit policy enforced via GPO.
 | C2 / Exfil     | T1071.001 / T1041 | Sliver beacon           | Sysmon EID3 (C:\Temp fix) | TLS inspection            |
 
 Full coverage matrix and per-technique detection cards:
-[`03_detection_playbook.md`](03_detection_playbook.md). Rendered as an
-[ATT&CK Navigator layer](screenshots/09_attack_navigator.svg) (JSON source in
-[`detections/`](../detections/attack_navigator_layer.json)).
+[`03_detection_playbook.md`](03_detection_playbook.md). The
+[rendered ATT&CK Navigator layer](screenshots/09_attack_navigator.svg) is this version's
+render and shows the v2 techniques only; the
+[JSON source](../detections/attack_navigator_layer.json) has since been extended to cover
+v3 as well, so it carries LSASS access, Pass-the-Ticket and the WinRM pivot that this SVG
+does not.
 
 ## Headline finding: the C2 detection gap
 
