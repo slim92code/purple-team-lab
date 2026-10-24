@@ -68,14 +68,24 @@ detection:
             - 'SF'
             - 'S1'
             - 'OTH'
-    condition: selection
+    filter_approved_source:
+        # Replace with the real management and configuration-management hosts.
+        # Zeek conn.log does not know which address is a jump host, so without this
+        # list the rule matches every WinRM session, not only east-west ones.
+        id.orig_h:
+            - '192.168.182.1'
+    condition: selection and not filter_approved_source
 fields:
     - id.orig_h
     - id.resp_h
     - id.resp_p
 falsepositives:
-    - WinRM from an approved management/jump host (allowlist its source IP)
-    - Configuration-management tooling (DSC, Ansible winrm) from a known controller
+    - >-
+      Any WinRM session whose source is not in filter_approved_source. The east-west
+      qualifier in the title comes from that list and nothing else, so an empty or
+      unmaintained list turns this into an alert on all WinRM. In this lab there is no
+      jump host, which is why the v3 pivot from SPIDERMAN to THEPUNISHER stands out.
+    - Configuration-management tooling (DSC, Ansible winrm) from a controller not listed
 level: medium
 
 ---

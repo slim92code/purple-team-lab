@@ -13,7 +13,7 @@ the same material as a single document.
 
 ## What this covers
 
-- **Detection engineering.** 9 detections shipped as
+- **Detection engineering.** 10 host detections shipped as
   [Sigma rules](../detections/sigma/sigma_rules.yml) and a deployable
   [Splunk pack](../detections/splunk/purple_lab), CIM/TA-normalized and version-controlled.
 - **Adversary emulation.** 8 MITRE ATT&CK techniques across a full AD kill chain, Defender
