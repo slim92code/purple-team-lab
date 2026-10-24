@@ -319,23 +319,39 @@ detection:
     selection:
         TargetImage|endswith: '\lsass.exe'
         GrantedAccess:
-            - '0x1010'
-            - '0x1410'
             - '0x1438'
             - '0x143a'
+            - '0x1f0fff'
+            - '0x1f1fff'
+            - '0x1f2fff'
+            - '0x1f3fff'
             - '0x1fffff'
-    filter_system:
+    filter_platform:
         SourceImage|endswith:
             - '\wininit.exe'
             - '\csrss.exe'
             - '\MsMpEng.exe'
-    condition: selection and not filter_system
+            - '\svchost.exe'
+            - '\WmiPrvSE.exe'
+            - '\vmtoolsd.exe'
+            - '\wazuh-agent.exe'
+            - '\taskmgr.exe'
+            - '\MRT.exe'
+    condition: selection and not filter_platform
 fields:
     - SourceImage
     - TargetImage
     - GrantedAccess
 falsepositives:
-    - EDR/AV agents reading lsass for inspection (allowlist by signed path)
+    - >-
+      Platform processes reading lsass during normal operation. The exclusion list is
+      measured, not assumed. Against 935 real EID 10 reads of lsass.exe sampled from one
+      host, a version of this rule that also matched 0x1010 and 0x1410 fired 90 times with
+      89 benign, 79 of them from WmiPrvSE.exe alone. Re-measure on your own baseline before
+      deploying.
+    - >-
+      Code injected into one of the excluded signed binaries inherits its SourceImage and is
+      suppressed. Separating that needs CallTrace, which this rule does not use.
 level: high
 
 ---
