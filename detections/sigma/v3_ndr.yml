@@ -6,6 +6,16 @@
 #
 # These key on network evidence, so they fire even on a host whose endpoint
 # telemetry is blind (see the SPIDERMAN EID10 blind spot in v3).
+#
+# PREREQUISITE for the JA4 rule: the `ja4` field is NOT part of base Zeek. It comes from
+# the FoxIO JA4 package (https://github.com/FoxIO-LLC/ja4), installed with
+# `zkg install zeek/foxio/ja4`. Without it ssl.log has no ja4 column and that rule can
+# never fire. Base Zeek ships ja3 only via a separate package as well.
+#
+# The Zeek deployment in this lab is otherwise stock -- default scripts, default logs, no
+# local.zeek customisation -- which is why no sensor config ships in this repo. Suricata
+# is likewise stock: the Suricata evidence cited in v3 is its built-in protocol logging
+# and app-layer anomaly events, not signatures written here.
 
 title: Kerberoasting — Service Ticket for a User SPN (network, etype-agnostic)
 id: 3b8f0c21-6a4e-4d9b-9f2a-1c7e5d0a4411
@@ -31,7 +41,15 @@ detection:
     filter_krbtgt:
         service|startswith: 'krbtgt'
     filter_machine:
-        client|endswith: '$'
+        # 'contains', not 'endswith'. Zeek writes the client as principal/REALM, so a
+        # machine account reads THEPUNISHER$/MARVEL.LOCAL and does not end in '$' --
+        # confirmed against this lab's own kerberos.log (v3 screenshot 01, where the
+        # clients are Administrator/MARVEL.LOCAL, pparker/MARVEL.LOCAL ...). Written as
+        # 'endswith' the filter matched nothing and the rule alerted on every machine
+        # account's service ticket, which in a real estate is most of the traffic. The
+        # host-side 4769 rule can use a suffix test because Windows supplies the bare
+        # account name; the same expression is wrong on the wire.
+        client|contains: '$'
     condition: selection and not (filter_krbtgt or filter_machine)
 fields:
     - id.orig_h

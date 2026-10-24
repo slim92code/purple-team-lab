@@ -170,6 +170,22 @@ Rule 12 carries an approved-source list that has to be filled in per environment
 `conn.log` cannot tell a jump host from a workstation, so without that list the rule matches
 every WinRM session rather than only east-west ones.
 
+Rule 13 needs the **FoxIO JA4 package** (`zkg install zeek/foxio/ja4`). `ja4` is not a base
+Zeek field, so without the package `ssl.log` has no such column and the rule cannot fire.
+The Zeek deployment here is otherwise stock, which is why no sensor config ships in this
+repo; Suricata is stock too, and the Suricata evidence cited in v3 is its built-in protocol
+logging and anomaly events rather than signatures written for this lab.
+
+Rule 11 had the same defect as the Wazuh rule documented in [v3](../v3/README.md): a filter
+that could not match. Its machine-account exclusion was written `client|endswith: '$'`, but
+Zeek writes the client as `principal/REALM`, so a machine account reads
+`THEPUNISHER$/MARVEL.LOCAL` and does not end in `$`. The exclusion did nothing and the rule
+alerted on every machine account's service ticket. Caught by reading the lab's own
+`kerberos.log` screenshot, where the clients are `Administrator/MARVEL.LOCAL`,
+`pparker/MARVEL.LOCAL` and so on. It uses `contains` now. The host-side `4769` rule can use a
+suffix test because Windows supplies the bare account name; the same expression is wrong on
+the wire.
+
 **v3 — EDR tuning (Wazuh), `wazuh/local_rules.xml`**
 
 | id | Level | Rule | MITRE |

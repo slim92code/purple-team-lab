@@ -236,6 +236,25 @@ would have alerted 90 times:
 Restricting to full and `MiniDumpWriteDump` masks and excluding the sources above brings the
 same sample to one alert, the `powershell.exe` read at `0x1f3fff`.
 
+### 7. The same mistake again, in the Zeek rule, found in a screenshot
+
+The network Kerberoasting rule in [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) excluded
+machine accounts with `client|endswith: '$'`. Zeek writes the client as `principal/REALM`, so
+a machine account reads `THEPUNISHER$/MARVEL.LOCAL` and does not end in `$`. The exclusion
+matched nothing, and the rule alerted on every machine account's service ticket — which in a
+real estate is most of Kerberos traffic.
+
+The evidence was already in this page. Screenshot 01 above shows the `client` column as
+`Administrator/MARVEL.LOCAL`, `pparker/MARVEL.LOCAL`, `jsmith/MARVEL.LOCAL`. The field format
+had been on screen since the spray was written up, and the rule was written against the shape
+of the Windows field instead, where `Account_Name` is the bare name and a suffix test is
+correct. Same expression, different wire format, silently inert.
+
+That makes three rules in this lab that reported coverage and could not deliver it: one bound
+to a group that did not exist, one whose input the environment never produced, and this one.
+Two were caught by running the rule; this one by re-reading a screenshot. None were caught by
+reading the rule.
+
 ## Attack chain
 
 The red-team side of the run (spray, Kerberoasting, C2, Pass-the-Ticket, Defender enabled
