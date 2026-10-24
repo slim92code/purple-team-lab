@@ -110,11 +110,15 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 | 9 | Kerbrute userenum (4768 0x6) | T1087.002 | 4768 |
 | 10 | Kerberoasting by user-SPN, etype-agnostic | T1558.003 | 4769 |
 
-Rule 10 was added after the v3 run. Rule 2 keys on RC4 and is the higher-confidence of the
-two, but the v3 roast was issued as AES-256 (`0x12`) and rule 2 stayed silent. Rule 10 keys
-on the SPN owner instead of the encryption type, which is what survives a domain on AES. It
-is noisier and ships unscheduled in the Splunk pack until a per-environment SPN allowlist
-exists.
+Rule 10 was added after the v3 run. Rule 2 keys on RC4, which is the canonical
+Kerberoasting signal, and on this domain it cannot fire at all: 30 days of `4769` traffic
+here is 1,649 tickets, every one of them `0x12` (AES-256), zero RC4. Rule 10 keys on the SPN
+owner instead of the encryption type, which is what survives a domain on AES. It is noisier
+and ships unscheduled in the Splunk pack until a per-environment SPN allowlist exists.
+
+Rule 2 is kept rather than deleted, because it is correct for a domain that still permits
+RC4. It is worth knowing which of the two your environment can actually use before trusting
+either.
 
 **Network rules (Zeek), `sigma/v3_ndr.yml`**
 
