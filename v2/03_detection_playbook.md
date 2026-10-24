@@ -3,7 +3,7 @@
 **Project:** Purple LAB — SOC Analyst Level 2
 **Goal:** Detection engineering — SPL queries, MITRE Detection Cards, Splunk dashboard panels
 
-> **Note on query format.** The SPL queries in this document are *pedagogical* — they intentionally parse raw `Message` fields with `rex` to show event structure. **Production detections do not parse Message** — they rely on the Splunk Add-on for Windows and Sysmon Add-on, which already extract all fields (`Account_Name`, `Ticket_Encryption_Type`, `Image`, `DestinationIp`…), and high-volume detections use `tstats` over accelerated CIM data models. The deployable, CIM/TA-normalized version + vendor-agnostic Sigma rules are in `detections/` (see `detections/README.md`).
+> **Note on query format.** The SPL queries in this document are *pedagogical*: they parse raw `Message` fields with `rex` to show event structure. **Production detections do not parse Message.** They rely on the Splunk Add-on for Windows and Sysmon Add-on, which already extract all fields (`Account_Name`, `Ticket_Encryption_Type`, `Image`, `DestinationIp`…), and high-volume detections use `tstats` over accelerated CIM data models. The deployable, CIM/TA-normalized version + vendor-agnostic Sigma rules are in `detections/` (see `detections/README.md`).
 
 ---
 
@@ -82,7 +82,7 @@ index=main source="WinEventLog:Security" EventCode=4662
 
 | Scenario | Explanation |
 |---|---|
-| Vulnerability scanner (Nessus, Qualys) | Legitimate security scan — verify with security team |
+| Vulnerability scanner (Nessus, Qualys) | Legitimate security scan; verify with the security team |
 | Network monitoring (Nagios, PRTG) | Can generate similar patterns |
 | Administrator nmap scan | Verify with IT |
 
@@ -90,14 +90,14 @@ index=main source="WinEventLog:Security" EventCode=4662
 
 - Whitelist IP addresses of legitimate scanners
 - Set thresholds based on baseline
-- Time-based alert — lower threshold to > 10 after hours
+- Time-based alert: lower the threshold to > 10 after hours
 - Correlate with other alerts from the same source IP
 
 ### Incident Response
 
 1. Identify source IP
 2. Check if IP belongs to a known scanner (whitelist check)
-3. If unknown — escalate to P2
+3. If unknown, escalate to P2
 4. Block IP on firewall
 5. Review all activities from the same source IP in the last 24 hours
 
@@ -110,7 +110,7 @@ index=main source="WinEventLog:Security" EventCode=4662
 
 ### Attack description
 
-Attacker attempts the same password against multiple user accounts via Kerberos pre-auth requests. Goal — find an account with a default/weak password without triggering the lockout policy.
+Attacker attempts the same password against multiple user accounts via Kerberos pre-auth requests. Goal: find an account with a default or weak password without triggering the lockout policy.
 
 ### Data Sources
 
@@ -274,7 +274,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 
 ### Attack description
 
-Attacker seeks TGS tickets for accounts with SPNs (service accounts). RC4 encryption in the TGS response is crackable offline. Goal — obtain the hash of a service account that often has privileged permissions.
+Attacker seeks TGS tickets for accounts with SPNs (service accounts). RC4 encryption in the TGS response is crackable offline. Goal: obtain the hash of a service account, which often holds privileged permissions.
 
 ### Data Sources
 
@@ -543,7 +543,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 
 - Whitelist backup software service accounts
 - Alert only on SAM + SYSTEM + SECURITY combination in a short timeframe
-- DCSync alert is high-fidelity — always investigate
+- DCSync alert is high-fidelity, always investigate
 
 ### Incident Response
 
@@ -552,7 +552,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 3. Force krbtgt password reset (TWICE, not once)
 4. Reset all privileged accounts
 5. Forensic memory analysis
-6. Threat hunt — other hosts with the same IOCs
+6. Threat hunt for other hosts with the same IOCs
 
 ---
 
@@ -649,7 +649,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 ### Incident Response
 
 1. Identify task command and runas
-2. Disable task (don't delete — preserve evidence)
+2. Disable the task, do not delete it, so the evidence is preserved
 3. Hash check command binary
 4. Identify creator account
 5. Review other tasks created by the same account
@@ -916,7 +916,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 
 ## PRODUCTION HARDENING PLAYBOOK (Segment 10)
 
-**Goal:** "Before/After Detection Engineering" — for each attack from Phases 1-8, define a hardening fix + re-run SPL query that proves the attack now fails or is detected at a new layer.
+**Goal:** "Before/After Detection Engineering". For each attack from Phases 1-8, define a hardening fix + re-run SPL query that proves the attack now fails or is detected at a new layer.
 
 **Central point:** Hardening is not detection. Prevention reduces the attack surface but never to zero, so detection has to cover what gets through.
 
@@ -974,7 +974,7 @@ index=main source="WinEventLog:Security" EventCode=4769
 | stats count by service, enc_type
 ```
 
-> After AES enforcement, every 0x17 (RC4) event is an anomaly. The alert threshold flips — RC4 now *must* alert because it shouldn't exist.
+> After AES enforcement, every 0x17 (RC4) event is an anomaly. The alert threshold flips: RC4 now *must* alert, because it should not exist.
 
 ---
 
