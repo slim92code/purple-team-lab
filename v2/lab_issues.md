@@ -232,12 +232,29 @@ w32tm /resync /force
 
 **Fix — Splunk props.conf (for Sysmon):**
 ```ini
-[WinEventLog:Microsoft-Windows-Sysmon/Operational]
+[source::WinEventLog:Microsoft-Windows-Sysmon/Operational]
 DATETIME_CONFIG = CURRENT
-MAX_TIMESTAMP_LOOKAHEAD = 128
+TRUNCATE = 0
 ```
 
-**Lesson learned:** Always run `w32tm /resync /force` before recording. Add to pre-flight checklist.
+**Corrected later, twice.** This was originally written as
+`[WinEventLog:Microsoft-Windows-Sysmon/Operational]`, which is a *sourcetype* stanza. This
+lab's forwarder ships every Windows channel as a bare `WinEventLog` sourcetype and keeps the
+channel name only in `source`, so that stanza matched nothing and the fix was never actually
+applied. Keyed on `source::` it works. The same forwarder defect is what leaves
+`Network_Traffic.All_Traffic` empty in [v3](../v3/README.md), and it is why every raw search
+in the Splunk pack filters on `source=`. `MAX_TIMESTAMP_LOOKAHEAD` was also dropped: it tunes
+timestamp *parsing*, and `DATETIME_CONFIG = CURRENT` skips parsing entirely, so it did
+nothing here.
+
+**What `DATETIME_CONFIG = CURRENT` costs.** It stamps events at index time, not event time,
+which is what makes the timeline usable when a resumed VM has a stale clock — but true event
+time is lost with it, so sub-second ordering inside a burst is gone. It is a lab workaround.
+In production, fix the clock.
+
+**Lesson learned:** Always run `w32tm /resync /force` before recording. Add to pre-flight
+checklist. And check that a config stanza matches something before believing it fixed
+anything — this one shipped unmatched for two lab versions.
 
 ---
 

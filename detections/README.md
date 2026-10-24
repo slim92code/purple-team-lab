@@ -16,7 +16,7 @@ detections/
     │   ├── default/
     │   │   ├── app.conf
     │   │   ├── savedsearches.conf   # 13 detections, macro-free (2 via CIM, 11 raw)
-    │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10)
+    │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
         ├── datamodels.conf          # accelerate Endpoint + Network_Traffic

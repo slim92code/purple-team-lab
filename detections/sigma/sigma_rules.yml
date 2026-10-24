@@ -284,9 +284,14 @@ detection:
             - '\Users\Public\'
             - '\ProgramData\'
     filter_known:
-        Image|contains:
-            - '\Microsoft\Teams\'
-            - '\Microsoft\EdgeUpdate\'
+        # Anchored with startswith, not contains. '\Microsoft\Teams\' anywhere in the path
+        # would let C:\Temp\Microsoft\EdgeUpdate\implant.exe through, which defeats the
+        # point of a rule that deliberately ignores the file name: the attacker stops
+        # renaming the binary and creates a directory instead. These are the two
+        # ProgramData stagers seen on this baseline; re-measure on your own.
+        Image|startswith:
+            - 'C:\ProgramData\Microsoft\Teams\'
+            - 'C:\ProgramData\Microsoft\EdgeUpdate\'
     condition: selection and not filter_known
 fields:
     - Image
