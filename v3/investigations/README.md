@@ -28,7 +28,7 @@ rather than summarised away:
   tickets to zero over 30 days, so the rule has never had an input.
 - **CASE-05.** A deployed EDR, a built-in rule at level 12, and a custom rule written for
   this exact technique. None of the three would have told an analyst that credentials were
-  being read out of memory, for three different reasons.
+  being read out of memory, for four different reasons.
 - **CASE-06.** Everything worked. The event arrived, parsed and alerted, at the same
   severity as a OneDrive updater, which put it below where anyone looks.
 

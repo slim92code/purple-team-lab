@@ -1,6 +1,6 @@
 # Lab v3 — Network Detection and Host EDR Layers
 
-**Full technical report (English, 28 pages):**
+**Full technical report (English, 29 pages):**
 [`Purple_Team_Report_v3_EN.pdf`](Purple_Team_Report_v3_EN.pdf). All 26 screenshots, the seven
 findings with the measurements behind them, the rule verification log and the raw counts.
 
@@ -298,7 +298,7 @@ follows. They chain in the order the attack ran.
 | [CASE-07](investigations/CASE-07-c2-beaconing.md) | C2 beaconing | T1071.001 | True positive, two endpoints linked by one fingerprint |
 
 Three of them are about detections that did not work. CASE-02 covers a canonical rule that
-cannot fire on an AES domain, CASE-05 covers three separate reasons an EDR stayed silent on
+cannot fire on an AES domain, CASE-05 covers four separate reasons an EDR stayed silent on
 a credential dump, and CASE-06 covers an alert that arrived correctly and still told the
 analyst nothing.
 

@@ -1,4 +1,4 @@
-# CASE-05 — LSASS access, and three layers of coverage that were not there
+# CASE-05 — LSASS access, and four layers of coverage that were not there
 
 | | |
 | --- | --- |
@@ -62,7 +62,7 @@ for (s, g), n in c.most_common(): print(n, g, s)
 ## 4. Findings
 
 The attack was caught on one host by one source. Everything else that should have covered
-it did not, for three different reasons.
+it did not, for four different reasons.
 
 ### 4.1 The other endpoint cannot produce the event
 
