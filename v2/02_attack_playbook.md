@@ -9,7 +9,7 @@
 | 3 | Execution (LOLBins) | InstallUtil.exe + .NET payload | T1218.004 | ✅ Works |
 | 4 | Kerberoasting | impacket-GetUserSPNs | T1558.003 | ✅ Works |
 | 5 | Lateral Movement | Sliver C2 mTLS | T1071.001 | ✅ Works |
-| 6 | Credential Dumping | reg save SAM/SYSTEM, DCSync attempt | T1003.002/.005/.006 | ❌ Blocked — AMSI + Defender + SYSTEM-hive ACL (no successful dump) |
+| 6 | Credential Dumping | reg save SAM/SYSTEM, DCSync attempt | T1003.002/.005/.006 | ❌ Blocked — AMSI + Defender + SYSTEM hive denied (no successful dump) |
 | 7 | Persistence | schtasks (LogonTrigger) | T1053.005 | ✅ Works |
 | 8 | C2 + Exfiltration | Sliver mTLS port 443 | T1071.001, T1041 | ✅ Works (evasion successful) |
 
@@ -300,11 +300,25 @@ net use \\192.168.182.135\IPC$ /user:MARVEL\fcastle Password1
 
 # 6.2 Save registry hives locally
 reg save HKLM\SAM C:\Temp\sam.hive       # ✅ succeeded
-reg save HKLM\SYSTEM C:\Temp\system.hive  # ❌ Access is denied — SYSTEM requires SeBackupPrivilege (UAC split token in Sliver shell)
+reg save HKLM\SYSTEM C:\Temp\system.hive  # ❌ Access is denied — cause not established, see below
 reg save HKLM\SECURITY C:\Temp\security.hive # ✅ succeeded
 
 # Without the SYSTEM hive there is no bootkey → local SAM dump cannot be decrypted.
 ```
+
+**On that "Access is denied" — the cause was never established.** This write-up gave two
+different explanations in different places, a Windows ACL on the hive and a missing
+`SeBackupPrivilege` from a UAC split token, and neither survives the evidence: all three
+hives need the same privilege and carry the same kind of ACL, and the same shell saved SAM
+and SECURITY in the same second. Whatever stopped `HKLM\SYSTEM` was specific to that hive,
+and nothing here identifies it. Candidates worth testing are a Defender ASR or
+tamper-protection rule scoped to the SYSTEM hive, and the hive being held open.
+
+What is recorded is the observation: SAM and SECURITY saved, SYSTEM did not, and without the
+bootkey nothing could be decrypted. The outcome of the phase does not depend on the cause,
+but a blue-team claim does — "an ACL stopped it" would credit a control that may not have
+been involved. Settling it needs one run with
+`whoami /priv`, the hive's `Get-Acl`, and the Defender Operational log for the same second.
 
 ### Local secretsdump — attempted, FAILED
 
@@ -331,7 +345,7 @@ C:\Temp\mimikatz.exe "privilege::debug" "lsadump::dcsync /user:krbtgt /domain:MA
 **Credential dumping was stopped by defense-in-depth — four layers, no successful dump:**
 1. **AMSI** blocked the Mimikatz `lsadump::dcsync` command in-memory before execution (the control that actually worked against DCSync)
 2. **Defender** real-time scan flagged `reg save HKLM\SAM` on behaviour (EC1116/1117), not just signature
-3. **Windows ACL** on the SYSTEM hive denied `reg save HKLM\SYSTEM`
+3. **`reg save HKLM\SYSTEM` denied** ("Access is denied"), which is what left the dump without a bootkey. The cause is recorded as an observation, not an explanation — see the note under 6.2
 4. No SYSTEM hive → no bootkey → local `secretsdump` failed; no hashes recovered
 
 **AD theory worth knowing (from the walkthrough, not a performed attack):**

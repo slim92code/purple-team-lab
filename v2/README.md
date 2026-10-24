@@ -81,12 +81,14 @@ Credential dumping was stopped by four layers, with no successful dump:
 1. **AMSI** blocked the Mimikatz `lsadump::dcsync` call in-memory
    (`ScriptContainedMaliciousContent`) before the command executed.
 2. **Defender** real-time scan flagged the `reg save HKLM\SAM` behaviour (EC1116/1117).
-3. **A Windows ACL** on the SYSTEM hive denied `reg save HKLM\SYSTEM` ("Access is denied").
+3. **`reg save HKLM\SYSTEM` was denied** ("Access is denied") while the SAM and SECURITY
+   hives saved from the same shell. Why only that one failed is not established; see Phase 6
+   of [`02_attack_playbook.md`](02_attack_playbook.md).
 4. Without the SYSTEM hive there is no bootkey, so **local `secretsdump` failed**
    ("SYSTEM hive or bootkey required").
 
-DCSync never landed. The control that worked was AMSI stopping the tool, backed by the
-SYSTEM-hive ACL stopping local parsing.
+DCSync never landed. The control that demonstrably worked was AMSI stopping the tool. The
+missing bootkey did the rest, though what denied the SYSTEM hive is not established.
 
 The AD point from the walkthrough: a Domain Admin reaches `DS-Replication-Get-Changes` only
 indirectly, through nested `BUILTIN\Administrators` on the DC. Remove that nesting and

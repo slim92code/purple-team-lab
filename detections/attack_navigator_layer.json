@@ -453,7 +453,7 @@
     },
     {
       "name": "Blue-team wins",
-      "value": "AMSI blocked Mimikatz DCSync; a SYSTEM-hive ACL stopped local parsing; AppLocker blocked the C2 implant from C:\\Temp"
+      "value": "AMSI blocked Mimikatz DCSync; reg save of HKLM\\SYSTEM was denied so there was no bootkey to decrypt the SAM hive; AppLocker blocked the C2 implant from C:\\Temp"
     }
   ],
   "links": [

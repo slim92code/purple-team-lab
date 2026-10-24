@@ -48,7 +48,7 @@
 - **SQLService:MYpassword123#** — service account with SPN, recovered via Kerberoasting + hashcat offline crack (Phase 4)
 
 > No SAM/LSA/cached hashes were recovered. The Phase 6 credential-dumping attempt was
-> blocked (SYSTEM-hive ACL denied the dump, local secretsdump failed with no bootkey,
+> blocked (`reg save HKLM\SYSTEM` was denied, local secretsdump failed with no bootkey,
 > and AMSI blocked the Mimikatz DCSync call). See `02_attack_playbook.md` Phase 6.
 
 ---
