@@ -1,21 +1,20 @@
 # Lab v4 — Hardened Baseline and Alert Triage Case Files
 
-> ## 🚧 Status: design document — not yet built
+> ## Status: design document, not yet built
 >
-> **This page is the plan for v4, published before the work starts. It is not a results
-> page, and nothing here is presented as a finding.** Last updated 24 Oct 2026.
+> This page is the plan for v4, written before the work starts. It is not a results page and
+> nothing here is a finding. Last updated 24 Oct 2026.
 >
 > | | |
 > | --- | --- |
-> | **Written** | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | **Not yet done** | applying the baseline, re-running the kill chain, the coverage matrix, the case files |
-> | **Completed labs** | [v2](../v2/) and [v3](../v3/) — built, documented, evidenced |
+> | Written | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
+> | Not yet done | applying the baseline, re-running the kill chain, the coverage matrix, the case files |
+> | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
-> It is published first on purpose. v4's deliverable is a **before/after** detection-coverage
-> matrix, and a before/after written after the fact is worth nothing — the predictions have
-> to be on record first. The residual gaps below are the same: committing to them in advance
-> is what makes them a risk register rather than an excuse list written around whatever
-> happened to get through.
+> It is published first on purpose. v4's deliverable is a before/after detection-coverage
+> matrix, and a before/after written afterwards proves nothing, so the predictions have to be
+> on record first. The residual gaps below work the same way: committing to them in advance
+> is what makes them a risk register instead of a list written around whatever got through.
 >
 > Repo entry point: [root README](../README.md).
 
@@ -93,8 +92,8 @@ register, and are what the kill chain works through:
 
 ## Planned contents
 
-**None of the files below exist yet** — this is the target structure, listed so the scope is
-explicit rather than open-ended.
+None of the files below exist yet. This is the target structure, listed so the scope is
+explicit.
 
 ```
 v4/

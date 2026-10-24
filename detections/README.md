@@ -1,9 +1,8 @@
 # Detections — Detection-as-Code
 
 Vendor-agnostic detections (Sigma) + a deployable Splunk pack, version-controlled.
-This is the artifact that backs the "Detection-as-Code" claim in the playbooks. It is
-the shared library for the whole lab and grows per iteration: v2 added the host rules,
-v3 added network (Zeek) rules and Wazuh custom rules.
+Shared across the whole lab and grown per iteration: v2 added the host rules, v3 added
+network (Zeek) rules and Wazuh custom rules.
 
 ```
 detections/
@@ -43,22 +42,21 @@ even before acceleration finishes building summaries, then speed up automaticall
 ## Why this is built on TAs + CIM (and not raw `rex field=Message`)
 
 The teaching playbook (`03_detection_playbook.md`) shows hand-parsed `rex field=Message`
-queries so the raw event structure is visible. **Production detections do not parse the
-raw Message** — they rely on the Splunk Technology Add-ons, which already extract every
-field at index/search time:
+queries so the raw event structure is visible. The deployed detections do not parse the raw
+Message. They use the Splunk Technology Add-ons, which extract the fields at index and
+search time:
 
 | Source | Add-on | Gives you (no rex) |
 |---|---|---|
 | Windows Security | Splunk Add-on for Microsoft Windows | `Account_Name`, `Service_Name`, `Ticket_Encryption_Type`, `Client_Address`, `Logon_Type`, `Process_Command_Line`, `New_Process_Name`, `Creator_Process_Name`, … |
 | Sysmon | Splunk Add-on for Sysmon | `Image`, `ParentImage`, `CommandLine`, `TargetFilename`, `DestinationIp`, `DestinationPort`, `GrantedAccess`, `SourceImage`, `TargetImage`, `Initiated`, … |
 
-The headliner detections run via `tstats` against the **accelerated Endpoint and
-Network_Traffic CIM data models** — millisecond search over millions of events, the
-difference between "I parsed some logs" and "I do detection engineering."
+The main detections run via `tstats` against the accelerated Endpoint and Network_Traffic
+CIM data models, so they search millions of events in milliseconds.
 
-> The only rex that remains is in the scheduled-task rule, which parses the **task XML
-> embedded inside the 4698 event body** — that XML is data inside the event, not the
-> event wrapper, so a targeted extraction there is correct.
+The one remaining `rex` is in the scheduled-task rule, which parses the task XML embedded in
+the `4698` event body. That XML is data inside the event rather than the event wrapper, so a
+targeted extraction there is correct.
 
 ## Compile Sigma → Splunk
 
@@ -86,7 +84,7 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 /var/ossec/bin/wazuh-control restart
 
 # Never skip the -t step. The bug these rules document was a rule that loaded,
-# counted as coverage, and was silently ignored — and -t had been saying so.
+# counted as coverage, and was silently ignored, and -t had been saying so.
 ```
 
 ## Coverage
@@ -123,9 +121,11 @@ cp detections/wazuh/local_rules.xml /var/ossec/etc/rules/
 | 100210 | 12 | Scheduled task with a PowerShell download cradle | T1053.005 / T1059.001 |
 | 100211 | 10 | Scheduled task with obfuscated/hidden-window launcher | T1053.005 / T1027 |
 
-**Why `100200` exists.** It replaces an earlier attempt bound to
-`<if_group>sysmon_event10</if_group>` — the real group is `sysmon_event_10`, one underscore
-away — so the rule was loaded, counted as coverage, and silently ignored. `wazuh-analysisd -t`
+#### Why `100200` exists
+
+It replaces an earlier attempt bound to
+`<if_group>sysmon_event10</if_group>`. The real group is `sysmon_event_10`, one underscore
+away, so the rule was loaded, counted as coverage, and silently ignored. `wazuh-analysisd -t`
 had been printing `WARNING: (7610): Group 'sysmon_event10' was not found ... Rule '100200'
 will be ignored.` the whole time.
 
@@ -135,38 +135,44 @@ mutually exclusive with its own parent. Caught by running it, not by reading it.
 rule binds to `<if_group>sysmon_event_10</if_group>`, the group the eventchannel decoder
 assigns to every EID 10 event.
 
-**Why the mask list is short.** Measured against 935 real `ProcessAccess` reads of
+#### Why the mask list is short
+
+Measured against 935 real `ProcessAccess` reads of
 `lsass.exe` from THEPUNISHER's Sysmon log, a draft that also matched `0x1010`/`0x1410` would
 have alerted 90 times with 89 benign (79 from `WmiPrvSE.exe`; `wazuh-agent.exe` itself reads
-LSASS at `0x1fffff`). The shipped version alerts **once** on the same sample.
+LSASS at `0x1fffff`). The shipped version alerts once on the same sample.
 
-**Why `100205` is separate.** Built-in `92900` fires at level 12 for any read-permission
+#### Why `100205` is separate
+
+Built-in `92900` fires at level 12 for any read-permission
 LSASS access. In this lab it fired 32 times and all 32 were benign. `100205` hangs off
 `92900` itself so that existing false positive is suppressed whether or not `100200` matches.
 
-**Verification — 24 Oct 2026.** Every rule was deployed and fired by a targeted trigger.
+#### Verification, 24 Oct 2026
+
+Every rule was deployed and fired by a targeted trigger.
 Times UTC.
 
 | Rule | Trigger | Result |
 |---|---|---|
 | — | `wazuh-analysisd -t` | clean (previous version raised `7610`) |
-| `100200` | PowerShell `OpenProcess(lsass, 0x1FFFFF)` | **level 12**, 11:42:39 |
-| `100201` | 20 platform reads forced through the chain | **0 alerts** |
-| `100205` | `MsMpEng.exe` on LSASS at `0x1010` | **0 alerts** (was level 12, 32/32) |
-| `100210` | task with `IEX` + `DownloadString` | **level 12**, 11:48:57 |
-| `100211` | task with `-nop -w hidden -enc` | **level 10**, 11:49:04 |
+| `100200` | PowerShell `OpenProcess(lsass, 0x1FFFFF)` | level 12, 11:42:39 |
+| `100201` | 20 platform reads forced through the chain | 0 alerts |
+| `100205` | `MsMpEng.exe` on LSASS at `0x1010` | 0 alerts (was level 12, 32/32) |
+| `100210` | task with `IEX` + `DownloadString` | level 12, 11:48:57 |
+| `100211` | task with `-nop -w hidden -enc` | level 10, 11:49:04 |
 | negative | task running `defrag.exe` | stays `60228` level 4 |
 | negative | task running `powershell.exe -ExecutionPolicy Bypass -File …` | stays `60228` level 4 |
 
-Not covered: an LSASS read from code injected into an already-excluded signed process —
-that needs `CallTrace`, and this lab has no sample to test a pattern against.
+Not covered: an LSASS read from code injected into an already-excluded signed process.
+That needs `CallTrace`, and this lab has no sample to test a pattern against.
 
 **Coverage limit:** Wazuh receives Sysmon from 1 of the lab's 3 Windows agents, so `100200`
-can only fire on THEPUNISHER. The `4698` task rules are unaffected — the Security channel is
-configured on all three. Full write-up in
+can only fire on THEPUNISHER. The `4698` task rules are unaffected, since the Security
+channel is configured on all three. Full write-up in
 [`v3/README.md`](../v3/README.md#known-gaps-carried-into-v4).
 
-Two rules are deliberately **behavioral/pattern-based, not IOC-based**: rule 7 keys on
+Two rules key on behaviour rather than an indicator. Rule 7 keys on
 process location + egress (a renamed binary still trips it), and rule 10 keys on the SPN
 pattern rather than the ticket encryption type (AES Kerberoasting trips it, where an
 RC4-only rule would miss it). The Wazuh task rules score the task's *command*, which is what
