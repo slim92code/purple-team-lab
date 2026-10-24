@@ -408,7 +408,10 @@ one, because the point of a case file is what the analyst actually saw.
 Found afterwards, and it reverses the reading: the empty include is what
 [`config/sysmonconfig.xml`](../config/sysmonconfig.xml) shipped. SPIDERMAN was running the
 repo's own baseline unmodified, and THEPUNISHER was the exception, because the `lsass` line
-had been added there by hand and never folded back into the file. So this was not one host
+had been added there by hand and never folded back into the file. Diffing both running
+configs against the baseline later showed THEPUNISHER had drifted in two sections rather than
+one — it also carried three hand-added `NetworkConnect` paths, two of which the baseline
+already covered. See [`config/`](../config/). So this was not one host
 drifting — it was the config, and any third host would have been blind too. The LSASS rules
 were written, tuned against 935 sampled reads and documented before anyone checked that the
 shipped config emitted EID 10 at all. The config is fixed; re-deploying it on both hosts and

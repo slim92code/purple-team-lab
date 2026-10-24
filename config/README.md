@@ -30,19 +30,36 @@ sysmon64.exe -c sysmonconfig.xml
 
 ## This is the intended config, not what every host runs
 
-The two endpoints were running different `ProcessAccess` sections during the v3 run. Checked
-with `sysmon64 -c` on each host:
+The running config was dumped off each host with `sysmon64 -c` and diffed against the
+SwiftOnSecurity baseline. THEPUNISHER differed in **two** sections, not one:
 
-| Host | `ProcessAccess` section during v3 | Relationship to this file |
-| ---- | --------------------------------- | ------------------------- |
-| THEPUNISHER | one rule, `TargetImage is C:\Windows\system32\lsass.exe` | hand-edited on the host |
-| SPIDERMAN | `onmatch: include` with no rule lines, so it matches nothing | the shipped baseline, unmodified |
+| Section | THEPUNISHER (hand-edited) | SPIDERMAN | In this file |
+| ------- | ------------------------- | --------- | ------------ |
+| `NetworkConnect` | `C:\Temp\` + `C:\Users\` + `C:\ProgramData\` | baseline | `C:\Temp\` only |
+| `ProcessAccess` | `TargetImage is C:\Windows\system32\lsass.exe` | empty `include` | same rule (change 2) |
 
 Note which way round that is. SPIDERMAN was not the drifted host — it was running the
 baseline faithfully, and the baseline logs no EID 10. THEPUNISHER was the odd one out,
-because someone had added the `lsass` line there by hand and never folded it back into this
-file. The v3 finding was written up as a per-host blind spot; the cause was the config in
-this directory, and change 2 above is that fix.
+because someone had added those lines on the host and never folded them back into this file.
+The v3 finding was written up as a per-host blind spot; the cause was the config in this
+directory, and change 2 above is that fix.
+
+**Two of THEPUNISHER's three `NetworkConnect` additions were redundant.** The
+SwiftOnSecurity baseline's include list already carries `C:\Users` (as `Usermode`),
+`C:\ProgramData` and `C:\Windows\Temp`. Adding `C:\Users\` and `C:\ProgramData\` on top
+of that changed nothing; only `C:\Temp\` was a real gap, and that is the one this file
+ships. Whoever made the edit did not check what the baseline already covered — which is the
+cheap version of the same mistake the rest of this repo keeps finding, and it is also why the
+v2 write-up can say precisely that the baseline covers `C:\Users`, `C:\ProgramData` and
+`C:\Windows\Temp` but not a bare `C:\Temp`.
+
+**Deploying this file over THEPUNISHER loses nothing**, which was established by taking the
+diff rather than by assuming it. Its `C:\Temp\` rule is kept as the `PurpleLab` line here,
+its two redundant lines are covered by the baseline, and its `lsass` rule is now in this
+file. The order matters and is worth copying: a running config is evidence, so dump it with
+`sysmon64 -c > before.txt` and diff it before you overwrite it. THEPUNISHER's running config
+was the only record of what produced the v3 LSASS events, and replacing it blind would have
+destroyed that record to apply a change that turned out to be a no-op for that host.
 
 SPIDERMAN therefore logged no EID 10 at all: 1,191 process-create events and zero
 `ProcessAccess` events over the same period. An LSASS dump on that host would have left no
