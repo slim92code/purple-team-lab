@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Alert | `V3 - Password Spray EC4771` (Splunk, scheduled) |
+| Alert | `Purple - Password Spray (multi-user from one source)` (ran in the lab as `V3 - Password Spray EC4771`) (Splunk, scheduled) |
 | Fired | 20 Oct 2026, 11:31 |
 | Severity | High |
 | MITRE | [T1110.003 — Password Spraying](https://attack.mitre.org/techniques/T1110/003/) |

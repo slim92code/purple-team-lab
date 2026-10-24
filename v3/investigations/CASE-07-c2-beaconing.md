@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Alert | `V3 - JA4 C2 Beacon` (Splunk, scheduled), Zeek `ssl.log` |
+| Alert | `Purple - Sliver C2 Beacon by JA4 Fingerprint` (ran in the lab as `V3 - JA4 C2 Beacon`), Zeek `ssl.log` |
 | Fired | 20 Oct 2026, across the whole run |
 | Severity | High |
 | MITRE | [T1071.001 — Web Protocols](https://attack.mitre.org/techniques/T1071/001/) |

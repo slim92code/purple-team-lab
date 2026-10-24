@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Alert | `V3 - Kerberoasting` (Splunk, scheduled) and Suricata `krb5` |
+| Alert | `Purple - Kerberoasting RC4 Service Ticket` (Splunk, scheduled; ran in the lab as `V3 - Kerberoasting`) and Suricata `krb5` |
 | Fired | 20 Oct 2026, 11:32 |
 | Severity | High |
 | MITRE | [T1558.003 — Kerberoasting](https://attack.mitre.org/techniques/T1558/003/) |

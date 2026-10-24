@@ -107,17 +107,27 @@ one, and confirms EID 10 for `lsass.exe` reaches both Splunk and Wazuh before th
 re-run. Until that is done the LSASS case file rests on one host that happened to be
 hand-edited.
 
-## Closing the v3 content gaps
+## Calibrating the exfiltration threshold
 
-Two detections ran in the v3 lab without becoming shipped content: the JA4 C2 beacon, which
-exists as a Sigma rule but has no Splunk search, and a large-outbound-transfer alert that was
-written ad hoc and never committed. v3 also ran its alerts as `V3 - …` while the repo's app
-names them `Purple - …`, so the alert name in a case file matches nothing a reader can
-deploy.
+The two detections that ran in the v3 lab without becoming shipped content — the JA4 C2
+beacon and a large-outbound-transfer check — were written into the
+[Splunk app](../detections/splunk/purple_lab) after the run rather than being deferred to
+here, and the naming is settled on `Purple - …` across the app, the Sigma pack and the case
+files. What was not done is the part that needs data.
 
-v4 ships a `ssl.log` JA4 search and a byte-volume search in the Splunk app, and uses one
-naming scheme across the app, the Sigma pack and the case files. The point of the case files
-is that someone else can follow them, which fails if the alert name is local to one machine.
+`Purple - Large Outbound Transfer` ships **unscheduled** with a placeholder threshold of
+10 MB per ten minutes. That number is a guess. Windows Update, OneDrive and ordinary browser
+traffic will all cross it, so enabling it as written would bury a real exfil event in its own
+false positives.
+
+v4 measures the baseline first: `orig_bytes` per internal host per ten-minute window across a
+full week of normal operation, the 95th and 99th percentiles of that distribution, and the
+threshold set from the result with the measurement recorded next to it. Then the chain is
+re-run and the alert is checked against a transfer that is known to be real.
+
+Shipping an uncalibrated threshold as an enabled alert is the same failure as shipping a rule
+that cannot fire, pointed the other way: one reports coverage and never speaks, the other
+speaks constantly and means nothing. v3 produced an example of each.
 
 ## Logging improvement over v3
 

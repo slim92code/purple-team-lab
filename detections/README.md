@@ -15,7 +15,7 @@ detections/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
     │   │   ├── app.conf
-    │   │   ├── savedsearches.conf   # 13 detections, macro-free (2 via CIM, 11 raw)
+    │   │   ├── savedsearches.conf   # 15 detections, macro-free (2 via CIM, 11 Windows, 2 Zeek)
     │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
@@ -31,10 +31,10 @@ own. That is the difference between the two lab versions: v2 ran on Free and is 
 as queries, v3 runs on Enterprise and its alerts fire on schedule. Check which you have
 with `| rest /services/licenser/groups | table title, is_active`.
 
-This app ships 13 searches, 9 of them scheduled. The v3 lab's own Splunk runs six alerts,
-which is a different list — two of those six (JA4 C2, large outbound transfer) were written
-ad hoc in the lab and have no Splunk search here. Screenshot 11 in
-[`v3/README.md`](../v3/README.md) maps the six against what ships.
+This app ships 15 searches, 10 of them scheduled. It now covers every alert that ran in the
+v3 lab: the JA4 C2 beacon and the large-outbound-transfer check were written ad hoc during
+the run and had no Splunk search here until they were added afterwards. Screenshot 11 in
+[`v3/README.md`](../v3/README.md) maps the lab's six against what ships.
 
 ```bash
 # 1. Prereq apps (Splunkbase): Splunk_TA_windows, Splunk_TA_microsoft_sysmon, Splunk_SA_CIM
@@ -171,7 +171,15 @@ Rule 12 carries an approved-source list that has to be filled in per environment
 every WinRM session rather than only east-west ones.
 
 Rule 13 needs the **FoxIO JA4 package** (`zkg install zeek/foxio/ja4`). `ja4` is not a base
-Zeek field, so without the package `ssl.log` has no such column and the rule cannot fire.
+Zeek field, so without the package `ssl.log` has no such column and the rule cannot fire. Its
+Splunk counterpart is `Purple - Sliver C2 Beacon by JA4 Fingerprint`, which adds the beacon
+interval and jitter the Sigma form cannot express.
+
+**There is no Sigma rule for the byte-volume exfiltration search**, and that is deliberate
+rather than an omission. `Purple - Large Outbound Transfer` is a threshold over a sum across a
+time bucket; Sigma expresses single-event matches well and aggregations poorly, so writing it
+as Sigma would produce something that does not survive the conversion to any backend. The SPL
+is the honest form for that one.
 The Zeek deployment here is otherwise stock, which is why no sensor config ships in this
 repo; Suricata is stock too, and the Suricata evidence cited in v3 is its built-in protocol
 logging and anomaly events rather than signatures written for this lab.

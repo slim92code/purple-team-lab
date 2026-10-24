@@ -380,14 +380,19 @@ the same set, which matters if you are trying to reproduce any of this:
 | Kerberoasting | `Purple - Kerberoasting RC4 Service Ticket` + the etype-agnostic companion |
 | LSASS | `Purple - LSASS Access (credential theft mask)` |
 | Persistence | `Purple - Scheduled Task Persistence (SYSTEM + user path)` |
-| JA4 C2 | Sigma only ([`v3_ndr.yml`](../detections/sigma/v3_ndr.yml)) — no Splunk search in the app |
-| Large outbound transfer | **not shipped.** Written ad hoc in the lab and never turned into rule content |
+| JA4 C2 | `Purple - Sliver C2 Beacon by JA4 Fingerprint`, plus Sigma rule 13 in [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) |
+| Large outbound transfer | `Purple - Large Outbound Transfer (possible exfiltration)` |
 
-The app ships 13 searches with 9 scheduled, so it is the larger set in most respects but it
-is missing the two network detections above. The alert names also differ: the lab instance
-uses `V3 - …`, which is what the case files quote, while the app uses `Purple - …`. Closing
-both gaps — a JA4 search over `ssl.log`, a byte-volume search, and one naming scheme — is
-carried into [v4](../v4/).
+**Both gaps are closed.** The last two rows were written ad hoc during the run and had no
+rule content behind them; they are in the app now, so it ships 15 searches with 10 scheduled
+and covers every alert in the screenshot. The byte-volume search ships unscheduled and says
+so in its own description: its 10 MB threshold is a placeholder that was never calibrated
+against this estate's normal egress, and shipping an uncalibrated threshold as an enabled
+alert is how an alert queue fills with noise.
+
+The naming is settled on the app's `Purple - …`, which is what a reader can deploy. The case
+files still record the `V3 - …` name the alert carried during the run, alongside the shipped
+one, because the point of a case file is what the analyst actually saw.
 
 ### 12 — The SPIDERMAN LSASS blind spot
 [![Blind spot](screenshots/12_spiderman_lsass_blindspot.png)](screenshots/12_spiderman_lsass_blindspot.png)
@@ -543,8 +548,15 @@ Sysmon recorded both events. These are rule-verification times from 24 October, 
 20 October attack run — both happen to fall in the same hour of the clock, which is a good
 reason to read the date column rather than the time.
 
-**Two of the lab's six alerts never became rule content.** The JA4 C2 detection ships as a
-Sigma rule but has no Splunk search in the app, and the large-outbound-transfer alert was
-written ad hoc in the lab and is not in the repo at all. The lab also names its alerts
-`V3 - …` while the app names them `Purple - …`, so a case file's alert name does not match
-anything a reader can deploy. v4 ships both searches and settles on one naming scheme.
+**Closed after the run: two of the lab's six alerts had never become rule content.** The JA4
+C2 detection existed only as a Sigma rule with no Splunk search, and the
+large-outbound-transfer alert was written ad hoc during the run and was not in the repo at
+all. Both are in the Splunk app now, the naming is settled on `Purple - …`, and the case
+files record the `V3 - …` name each alert carried at the time alongside it.
+
+What is still open is the byte-volume threshold. It ships at 10 MB per 10 minutes and
+unscheduled, because that number was never calibrated against this estate's normal egress —
+Windows Update and OneDrive alone will cross it. Measuring a real baseline and setting the
+threshold from it is v4 work. An uncalibrated threshold shipped as an enabled alert is how a
+queue fills with noise, which is the same mistake as a rule that cannot fire, pointed the
+other way.
