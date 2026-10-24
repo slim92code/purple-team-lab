@@ -96,6 +96,20 @@ Windows logged `4771` for five of these. The `jsmith` attempt produced none, bec
 Kerberos emits no `4771` for an account that does not exist. The Splunk alert reported five
 accounts; seven were tried.
 
+The shipped spray rule narrows it further by filtering `Failure_Code="0x18"`, wrong password.
+Counting every `4771` failure code in this lab over 30 days:
+
+| Failure code | Meaning | Count |
+| ------------ | ------- | ----- |
+| `0x18` | wrong password | 67 |
+| `0xE` | encryption type not supported | 7 |
+| `0x25` | clock skew | 2 |
+
+The seven `0xE` events are the `Guest`-style failures. They are spray attempts, they do
+produce a `4771`, and the rule drops them. So the endpoint layer undercounts twice: once for
+accounts that do not exist and produce no event at all, and again for accounts that fail on
+something other than the password.
+
 ### 2. One JA4 fingerprint linked both endpoints
 
 Both endpoints beaconed to the attacker over TLS with the same Sliver JA4 client
@@ -142,7 +156,28 @@ second one is answered here. `alerts.json` holds events that matched a rule, so 
 show whether an unmatched event arrived. Checking that needs the archives, which are not
 enabled in this lab.
 
-### 5. The replacement rule was tuned against the baseline, not the attack
+### 5. The canonical Kerberoasting detection cannot fire on this domain
+
+The RC4 rule is the one every guide teaches: alert on `4769` with
+`Ticket_Encryption_Type = 0x17`, because RC4 service tickets are what the classic roast
+produces. Counted over 30 days of this lab's `4769` traffic:
+
+| Encryption type | Tickets |
+| --------------- | ------- |
+| `0x12` (AES-256) | 1,649 |
+| `0x17` (RC4) | 0 |
+
+Not one RC4 ticket. The rule is scheduled, it appears in the coverage table, and it has
+never had anything to match. The v3 roast against `SQLService` was issued as `0x12` and
+walked past it.
+
+This is the same failure as the Wazuh rule above, reached from the other direction: there
+the rule could not load, here it loads and the environment never produces its input. Both
+report as coverage. The repo ships an etype-agnostic companion keyed on the SPN owner
+instead, which is noisier and needs a per-environment allowlist, and that is the honest
+trade: on an AES domain there is no cheap high-confidence Kerberoasting signal.
+
+### 6. The replacement rule was tuned against the baseline, not the attack
 
 A first draft matched `0x1010` and `0x1410` alongside the full-access masks. Measured
 against 935 `ProcessAccess` reads of `lsass.exe` sampled from THEPUNISHER's Sysmon log, it
