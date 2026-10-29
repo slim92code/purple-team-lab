@@ -7,29 +7,14 @@ stress-tested for what default tooling misses. The gap is then closed and re-pro
 > in [v3](../v3/). [v4](../v4/), a rebuild on a hardened baseline, is scoped as a design
 > document and not yet built. Repo entry point: [root README](../README.md).
 
-> **What is original here and what is not.** The SPL queries, the screenshots and the
-> findings are exactly as they were when v2 was run, and nothing in them has been rewritten
-> to look better in hindsight. The prose around them has been edited since: translated out of
-> Serbian, tightened, and corrected where it made a claim that later measurement contradicted.
-> Those corrections are marked where they apply rather than folded in silently.
->
-> Three of them matter. The LSASS access-mask list in
-> [`03_detection_playbook.md`](03_detection_playbook.md) matched mostly benign masks and
-> omitted `0x1F3FFF`, the one the attack actually used. The "Excellent / Low-FP" coverage
-> grades did not survive measurement in [v3](../v3/). And the `props.conf` stanza in
-> [`01_lab_setup.md`](01_lab_setup.md) was keyed on a sourcetype this forwarder never emits,
-> so the fix it documents was never applied. The queries themselves are untouched, so the
-> difference between this page and v3 is still readable.
+> The queries and screenshots are as they were when v2 ran; the prose has been edited since,
+> and where a claim did not survive later measurement it is flagged on the spot. [v3](../v3/)
+> has the measured state.
 
 This page is the 2-minute scan and the full playbooks are linked below.
 
-[`Portfolio_OnePager_v2.pdf`](Portfolio_OnePager_v2.pdf) is a one-page summary **of v2 as it
-stood in June 2026**, kept with the rest of this version rather than updated. Its figures are
-v2 figures: 9 Sigma rules, an 18-entry Navigator layer, the eight-phase chain, Splunk and
-Sysmon only — and they no longer match the repository, which now ships 13 Sigma rules across
-15 scored techniques and adds Zeek, Suricata and Wazuh. For the current state read the
-[root README](../README.md); for the full write-up, the
-[32-page v3 report](../v3/Purple_Team_Report_v3_EN.pdf).
+[`Portfolio_OnePager_v2.pdf`](Portfolio_OnePager_v2.pdf) is a one-page v2 snapshot from June
+2026; current figures are in the [root README](../README.md).
 
 ## What this covers
 
