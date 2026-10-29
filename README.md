@@ -113,10 +113,13 @@ the events by timestamp and reading `sysmon64 -c` off the host, and both reversa
 up where they happened ([Suricata](v3/README.md#what-weak_encryption-actually-fires-on),
 [Sysmon](config/README.md)). A review is a hypothesis; the estate is what decides it.
 
-**On the commit history.** The work came first and the repository second. The v2 detections
-are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
-created in June 2026 but the files were only uploaded that October, so the history begins at
-that import rather than at the lab, and the first bulk commit is it. Everything after it is
+**On the commit history.** The work came first and the repository second. The v2 lab was
+built and run in June 2026: the Splunk screenshots in [`v2/`](v2/) carry 1 June timestamps,
+and the
+[walkthrough](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-) was
+recorded and uploaded that month, which is a date stamped by someone other than me. The v3 kill chain was run on 20 October 2026. This
+repository was created in June 2026 but the files were only uploaded that October, so the
+history begins at that import rather than at the lab, and the first bulk commit is it. Everything after it is
 ordinary work, including the corrections, which are kept rather than squashed because several
 of them are the point.
 
