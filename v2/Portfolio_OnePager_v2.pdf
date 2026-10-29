@@ -1,86 +1,578 @@
 %PDF-1.4
-%“Œ‹ž ReportLab Generated PDF document (opensource)
+%âãÏÓ
 1 0 obj
 <<
-/F1 2 0 R /F2 3 0 R /F3 4 0 R /F4 5 0 R
+/Producer (pypdf)
 >>
 endobj
 2 0 obj
 <<
-/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+/Type /Pages
+/Count 1
+/Kids [ 4 0 R ]
 >>
 endobj
 3 0 obj
 <<
-/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+/Type /Catalog
+/Pages 2 0 R
 >>
 endobj
 4 0 obj
 <<
-/BaseFont /Symbol /Name /F3 /Subtype /Type1 /Type /Font
+/Contents 5 0 R
+/MediaBox [ 0 0 595.2756 841.8898 ]
+/Resources <<
+/Font <<
+/F1 6 0 R
+/F1-0 7 0 R
+/F2 8 0 R
+/F2-0 9 0 R
+/F3 10 0 R
+/F4 11 0 R
+>>
+/ProcSet [ /ImageB /ImageC /ImageI /PDF /Text ]
+>>
+/Rotate 0
+/Trans <<
+>>
+/Type /Page
+/Annots [ ]
+/Parent 2 0 R
 >>
 endobj
 5 0 obj
 <<
-/BaseFont /Courier /Encoding /WinAnsiEncoding /Name /F4 /Subtype /Type1 /Type /Font
+/Length 9482
 >>
+stream
+q
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+q
+1 0 0 1 59.85827 776.2047 cm
+q
+.101961 .101961 .180392 rg
+BT 1 0 0 1 0 2 Tm /F2 18 Tf 20 TL (Purple Team Home Lab) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 760.2047 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 1.5 Tm /F2 10.5 Tf 12 TL (Detection Engineering Portfolio) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 742.2047 cm
+q
+BT 1 0 0 1 0 3 Tm 12 TL /F1 9 Tf .4 .4 .4 rg (Stevan Mrksic) Tj ( ) Tj ( ) Tj (\267) Tj ( ) Tj ( ) Tj (stevan92mrksic@gmail.com) Tj ( ) Tj ( ) Tj (\267) Tj ( ) Tj ( ) Tj (github.com/slim92code/purple-team-lab) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 735.2047 cm
+Q
+q
+1 0 0 1 59.85827 733.0047 cm
+q
+1.2 w
+1 J
+.086275 .129412 .243137 RG
+n 0 0 m 475.5591 0 l S
+Q
+Q
+q
+1 0 0 1 59.85827 712.0047 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 1.5 Tm /F2 10.5 Tf 12 TL (Overview) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 658.0047 cm
+q
+BT 1 0 0 1 0 41 Tm .657948 Tw 12.5 TL /F1 9 Tf 0 0 0 rg (A self-built purple team lab covering the full attack-detect lifecycle end to end. For every attacker technique I execute) Tj T* 0 Tw 3.407948 Tw (the attack, build the detection, identify the telemetry gap, fix it, and re-test \227 the same loop a production) Tj T* 0 Tw 2.419543 Tw (detection-engineering team runs. Core thesis: ) Tj /F2 9 Tf (hardening ) Tj /F3 9 Tf 12.5 TL (\271) Tj /F2 9 Tf 12.5 TL ( detection) Tj /F1 9 Tf (. Every prevention layer is bypassable, so) Tj T* 0 Tw (detection is the safety net.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 637.0047 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 1.5 Tm /F2 10.5 Tf 12 TL (Infrastructure) Tj T* ET
+Q
+Q
+q
+1 0 0 1 60.94488 555.0047 cm
+q
+0 0 0 rg
+BT /F1 10 Tf 12 TL ET
+q
+1 0 0 1 0 62 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (Domain Controller) Tj T* ET
+Q
+Q
+q
+1 0 0 1 113.7165 62 cm
+q
+BT 1 0 0 1 0 4 Tm 12.5 TL /F1 8.5 Tf 0 0 0 rg (Windows Server 2022 \227 MARVEL.LOCAL Active Directory) Tj T* ET
+Q
+Q
+q
+1 0 0 1 0 42.5 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (Endpoints) Tj T* ET
+Q
+Q
+q
+1 0 0 1 113.7165 42.5 cm
+q
+BT 1 0 0 1 0 4 Tm 12.5 TL /F1 8.5 Tf 0 0 0 rg (2) Tj (\327 Windows 10 \(domain-joined\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 0 23 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (Attacker) Tj T* ET
+Q
+Q
+q
+1 0 0 1 113.7165 23 cm
+q
+BT 1 0 0 1 0 4 Tm 12.5 TL /F1 8.5 Tf 0 0 0 rg (Kali Linux \227 Sliver C2, Impacket, BloodHound, kerbrute) Tj T* ET
+Q
+Q
+q
+1 0 0 1 0 3.5 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (SIEM) Tj T* ET
+Q
+Q
+q
+1 0 0 1 113.7165 3.5 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Splunk + Universal Forwarder + Sysmon on all Windows hosts) Tj T* ET
+Q
+Q
+q
+1 J
+1 j
+.847059 .862745 .894118 RG
+.5 w
+n 0 58.5 m 473.3858 58.5 l S
+n 0 39 m 473.3858 39 l S
+n 0 19.5 m 473.3858 19.5 l S
+Q
+Q
+Q
+q
+1 0 0 1 59.85827 534.0047 cm
+q
+BT 1 0 0 1 0 1.5 Tm 12 TL /F2 10.5 Tf .086275 .129412 .243137 rg (8-Phase Attack Chain \227 MITRE ATT) Tj (&) Tj (CK) Tj T* ET
+Q
+Q
+q
+1 0 0 1 60.94488 358.1047 cm
+q
+.086275 .129412 .243137 rg
+n 0 171.9 473.3858 -19.1 re f*
+1 .956863 .901961 rg
+n 0 19.1 473.3858 -19.1 re f*
+1 1 1 rg
+n 0 152.8 473.3858 -19.1 re f*
+.964706 .972549 .984314 rg
+n 0 133.7 473.3858 -19.1 re f*
+1 1 1 rg
+n 0 114.6 473.3858 -19.1 re f*
+.964706 .972549 .984314 rg
+n 0 95.5 473.3858 -19.1 re f*
+1 1 1 rg
+n 0 76.4 473.3858 -19.1 re f*
+.964706 .972549 .984314 rg
+n 0 57.3 473.3858 -19.1 re f*
+1 1 1 rg
+n 0 38.2 473.3858 -19.1 re f*
+0 0 0 rg
+BT /F1 10 Tf 12 TL ET
+q
+1 0 0 1 6 156.1 cm
+q
+1 1 1 rg
+BT 1 0 0 1 0 4.5 Tm /F2 8 Tf 12.5 TL (#) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 156.1 cm
+q
+1 1 1 rg
+BT 1 0 0 1 0 4.5 Tm /F2 8 Tf 12.5 TL (PHASE) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 156.1 cm
+q
+1 1 1 rg
+BT 1 0 0 1 0 4.5 Tm /F2 8 Tf 12.5 TL (TECHNIQUE) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 137 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (1) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 137 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Reconnaissance) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 137 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1046 / T1087) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 117.9 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (2) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 117.9 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Password Spray) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 117.9 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1110.003) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 98.8 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (3) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 98.8 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (LOLBin Execution \(InstallUtil\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 98.8 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1218.004) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 79.7 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (4) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 79.7 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Kerberoasting \(SQLService\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 79.7 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1558.003) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 60.6 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (5) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 60.6 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Lateral Movement \(Sliver C2, mTLS\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 60.6 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1071.001 / T1572) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 41.5 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (6) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 41.5 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Credential Dumping \(Impacket secretsdump\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 41.5 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1003.002 / .006) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 22.4 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (7) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 22.4 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (Persistence \(Scheduled Task\)) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 22.4 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (T1053.005) Tj T* ET
+Q
+Q
+q
+1 0 0 1 6 3.3 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F2 8.5 Tf 12.5 TL (8) Tj T* ET
+Q
+Q
+q
+1 0 0 1 31.51181 3.3 cm
+q
+0 0 0 rg
+BT 1 0 0 1 0 4 Tm /F1 8.5 Tf 12.5 TL (C2 Evasion + Sysmon gap fix) Tj T* ET
+Q
+Q
+q
+1 0 0 1 323.4803 3.3 cm
+q
+0 .4 .8 rg
+BT 1 0 0 1 0 4.5 Tm /F4 8 Tf 12.5 TL (Defense Evasion) Tj T* ET
+Q
+Q
+q
+1 J
+1 j
+.847059 .862745 .894118 RG
+.4 w
+n 0 133.7 m 473.3858 133.7 l S
+n 0 114.6 m 473.3858 114.6 l S
+n 0 95.5 m 473.3858 95.5 l S
+n 0 76.4 m 473.3858 76.4 l S
+n 0 57.3 m 473.3858 57.3 l S
+n 0 38.2 m 473.3858 38.2 l S
+n 0 19.1 m 473.3858 19.1 l S
+Q
+Q
+Q
+q
+1 0 0 1 59.85827 343.6047 cm
+q
+BT 1 0 0 1 0 5 Tm 12.5 TL /F1 7.5 Tf .533333 .533333 .533333 rg (Phase 8 is the narrative climax \227 a detection gap found, diagnosed, and closed.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 322.6047 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 1.5 Tm /F2 10.5 Tf 12 TL (Detection Engineering Output) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 306.6047 cm
+q
+BT 1 0 0 1 12 3 Tm 12 TL /F1 9 Tf 0 0 0 rg (\177) Tj ( ) Tj ( ) Tj /F2 9 Tf (9 production-grade Sigma rules) Tj /F1 9 Tf ( \227 vendor-agnostic, convertible to SPL / KQL / EQL, version-controlled) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 292.6047 cm
+q
+BT 1 0 0 1 12 3 Tm 12 TL /F1 9 Tf 0 0 0 rg (\177) Tj ( ) Tj ( ) Tj /F2 9 Tf (30+ SPL queries) Tj /F1 9 Tf ( \227 detection cards, threat-hunt hypotheses, hardening verification) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 278.6047 cm
+q
+BT 1 0 0 1 12 3 Tm 12 TL /F1 9 Tf 0 0 0 rg (\177) Tj ( ) Tj ( ) Tj /F2 9 Tf (MITRE ATT) Tj (&) Tj (CK Navigator layer) Tj /F1 9 Tf ( \227 18 techniques mapped for coverage visibility) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 264.6047 cm
+q
+BT 1 0 0 1 12 3 Tm 12 TL /F1 9 Tf 0 0 0 rg (\177) Tj ( ) Tj ( ) Tj /F2 9 Tf (Splunk dashboard) Tj /F1 9 Tf ( \227 8-panel Simple XML, savedsearches.conf, props.conf, datamodels.conf) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 243.6047 cm
+q
+BT 1 0 0 1 0 1.5 Tm 12 TL /F2 10.5 Tf .086275 .129412 .243137 rg (Highlighted Finding \227 C2 Beacon Detection Gap) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 189.6047 cm
+q
+BT 1 0 0 1 0 41 Tm .062448 Tw 12.5 TL /F1 9 Tf 0 0 0 rg (Default Sysmon configuration silently missed the Sliver C2 beacon \(mTLS, port 443, 60s + 30% jitter\) originating from a) Tj T* 0 Tw .724737 Tw (user-writable path. I traced the gap to missing NetworkConnect monitoring, deployed a behavioral watchlist via GPO,) Tj T* 0 Tw .866191 Tw (and confirmed Sysmon EC3 then captured the beacon. Key insight: detect ) Tj /F2 9 Tf (behavior) Tj /F1 9 Tf ( \(a process from a user-writable) Tj T* 0 Tw (path beaconing on a periodic interval\), not IOCs like filename or hash \227 which an attacker trivially changes.) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 168.6047 cm
+q
+.086275 .129412 .243137 rg
+BT 1 0 0 1 0 1.5 Tm /F2 10.5 Tf 12 TL (Tooling) Tj T* ET
+Q
+Q
+q
+1 0 0 1 59.85827 139.6047 cm
+q
+BT 1 0 0 1 0 16 Tm .538137 Tw 12.5 TL /F2 9 Tf 0 0 0 rg (Detection:) Tj /F1 9 Tf ( Splunk SPL, Sigma, MITRE ATT) Tj (&) Tj (CK Navigator, Sysmon) Tj ( ) Tj ( ) Tj (|) Tj ( ) Tj ( ) Tj /F2 9 Tf (Offensive:) Tj /F1 9 Tf ( Sliver C2, Impacket, BloodHound,) Tj T* 0 Tw (kerbrute, SharpKatz, John the Ripper, Certipy) Tj ( ) Tj ( ) Tj (|) Tj ( ) Tj ( ) Tj /F2 9 Tf (Dev:) Tj /F1 9 Tf ( Python, Bash, PowerShell, Git, Java / Spring Boot) Tj T* ET
+Q
+Q
+ 
+
+Q
+q
+0.0 0.0 595.2756 841.8898 re
+W
+n
+1 0 0 1 0 0 cm
+BT
+/F1-0 12 Tf
+14.4 TL
+ET
+BT
+/F2-0 8.2 Tf
+9.84 TL
+ET
+0.690196 0.188235 0.188235 rg
+BT
+1 0 0 1 59.86 806 Tm
+(LAB v2 \227 JUNE 2026) Tj
+T*
+ET
+BT
+/F1-0 7.6 Tf
+9.12 TL
+ET
+0.478431 0.478431 0.478431 rg
+BT
+1 0 0 1 152.254 806 Tm
+(Superseded by v3\056 Current figures are in the repository README\056) Tj
+T*
+ET
+Q
+
+endstream
 endobj
 6 0 obj
 <<
-/Contents 10 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 9 0 R /Resources <<
-/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
->> /Rotate 0 /Trans <<
-
->> 
-  /Type /Page
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
 >>
 endobj
 7 0 obj
 <<
-/PageMode /UseNone /Pages 9 0 R /Type /Catalog
+/BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
+/Name /F1
+/Subtype /Type1
+/Type /Font
 >>
 endobj
 8 0 obj
 <<
-/Author (\(anonymous\)) /CreationDate (D:20260712221127+00'00') /Creator (\(unspecified\)) /Keywords () /ModDate (D:20260712221127+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
-  /Subject (\(unspecified\)) /Title (\(anonymous\)) /Trapped /False
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Name /F2
+/Subtype /Type1
+/Type /Font
 >>
 endobj
 9 0 obj
 <<
-/Count 1 /Kids [ 6 0 R ] /Type /Pages
+/BaseFont /Helvetica-Bold
+/Encoding /WinAnsiEncoding
+/Name /F2
+/Subtype /Type1
+/Type /Font
 >>
 endobj
 10 0 obj
 <<
-/Filter [ /ASCII85Decode /FlateDecode ] /Length 3100
+/BaseFont /Symbol
+/Name /F3
+/Subtype /Type1
+/Type /Font
 >>
-stream
-Gau0F>Bed^(4OT5fPAa#=m7s)qL7\Xj?hTXBp0;n1Cnb.C]S:0jiRYIXSMCm-/2f/%ONPT8W56:?bX4]02aAUnRLgunI4?'"E31%@+d4PKB4"(N,E#W3r+&1<H!2G&UL,k5S3^FD7Tbn_dUG<XiRtZEt(hkZ9_/ZOJ]EtK7mmY_?MMi/8S6>35(f>4Jaa+A-O.ON5?$LGQX]_0`".Vs,*Fs')6'+!Y\C6,M_6k);^g[WP4G$HH>cB8fC@B1DjX9Q;K,62M!qBjHuj(G7_Qt)ZjhqFVN/bNrh.9CmBDE7nhi_.-Z=on6%jh/Cpmt@I%rPqn^#0Kq9.71Hk?%P8Rf.&bF[11aYmkk7;=YgEL48aGtO4hr`W"I>M"gVk"7SG\d7^?>p<o%?P/RYf)klSJYu&gOY,d@Ri&FAD"%p3<=O)E0=oR1N3HBn@V;S9OZR'JRpbW[#sbD'"85u(5sjVlgB+.KC]k(f2C*-h[:VE]mP[T'pFA"R/3T5i!]s]Nr'?.Q:`P7!6P:l#(W'o8tV>H$KHE#!g/YaO8VIn/u3;Wj&M%:BU420l=.PU/qDs"<V86b826]Jm,snU(!p;ESkE7&BIX$'__l4<:DL3VAe1,2M.WC0MkpY0Tp]HOQ$t?"8nV*I[gC0'0P8(MaW;!-817gp,i%.1Q[6+`\?o2[F!-PPT$0(./P0cr[3Eq>Zm9FYIG.er)BLWZ$3MojTSdd+MKbn4/"::0:T$URS8(AJi04>O0lV+8f(PX,cpldTL!";2"q3>o\Nkg(*BR0)6A/JB&$)37"aNXQ%gp%IeOC5F@L:#@aq\Gd)BF4M$!u0*YHkDUKbT@C>gQON(g\H=%7BVIYJItshNL!'QlFIXWPSeq5#,Xt(-&DWXUK6l1!F3Bmn=([VGso0D-;l2=MD9,^!!(Z*%OLJ"o3)&-%&k2&-DseeM_9VFPtJXhu5LC0lCk^c>MPKNOb^$aTS&tMcHf;aAR#)*>A]\P&lr2iir+qY".bq=.-rlQ"qqt_Y9sb2F7?J$:'gP2pZ/R40PIK=V\[]X';nm;V>iK1:UcGr)[Um@EOh^0C0`bc#UcB6eOIhXQ1UuB1WV1Qj;#pSpRhg?Hq9CX23u:Wiu4UfB!KbCR9@=cEg%9'>A*Ol%5]\F"C>@'_ld[.V9O#n:tE.WBF\4MnS!A$%IGp(nhn9?A);q.dj%n+Y&M+*i='j]%":H;f\i/mMHF'\+3j:GW"\Qbosa##HVTcQG0QgK"WnfF545%>Qr-Y3no>.G)O1NfY<o=JjS^cE%tA_W!j)9UMg5o)i`"*o8iH_EIBgL3iK^A-*D"h!m?BX#kS]1$WAU8s$4FjjS>M<i3b,NlT+7$Q7;)t^ZO3O3:D:ALjZS/O+[ViF4%?lLf1eLR98AN>rZ4FiP119KOnNr#2"mE0;@n=L=:^f'4ULCpU/<2cpsUSS6"4X2=^(Q\k1T6emeS^X"ud"c+(cp^Hh_bj4SCucG7Hb&=^5F^gK"/q"Wt9lh>QLLlJa=]]]nPXU`Eo,/"p=^X8E]).?XsAT<(<hZ2^WBLUMQ\PE7C.,`!I^hXcL#Efg0%!W(PFpFBq'&NlX%dVst(C:Lk6/$+J%8]bo7mgir\2I(E)47-0.D>q]G+rc:3mujgl/q^%*)jjB[pQ-K\ApYCOI0=g99qb?:p"/AZ9B0agX?&c1T1J>nZjIn:3;J!8(tSR?":]>"ikLLF`R5S_ll#!11r?/Jln6(d>3(Z_gftX0Tl5c6HhNM=@_(lr/=/rYaG=3(YG*f;Lu8*CM0E3@2J!nm#MZh=K7acV$!/&["f^(#cpeOlRmeg@0A[?hF6p#:qabt+C<?+H0KQr56(kH"dMN.,@,h98oZtTVV48@&P0RAX6bIU,OLiUfUcs23-M+2-S8_-_$WagGq(2#V_jg>1k?5f*kO\hA:-L]Sq=+nU&!>#3A5t84:G@OdX++&L;AHU.Qa^nYR/G%Y1d<o)GH2[l]R9BL:p=#qaLIS>P32O8'l)&oRh92V]13LY^TCZlY=0hWpf7>?/mjJomK!%lhG(!WUAAdV5iCASY`o9oTn'lhU6_a[rblqnFu[ChU=WCTP?&A8,_2QWn+Il/AldL0I&mq]tG,XCdtG,$*r6J/7#"*O@U4VAA"R,\`Fa-l?e:<70aWqs,($<qp//Xk;&[Q%apaDIR'%l^6=f+%aMa&loX1YC]d1eS`]o>OG(K49kFM2`hMJ7p2130Jn><*I1<8gE=]8__#,Y7KA)jY0YBbMi;0MN48=-N"1<QOaN*uIA9(d`40j@&b)Z:qQLX,XXjEg&`gL9[P+m`'-Rb,Uko;4.kpkk2=.S@Bbr3-oM\rdfaSd:AWI@/.]C]mnE.KZQ_'VQj;/XPF<?/p,qD>!u)9HsD87S0a%pR,._L`NhJYc&KG;:*hIJ7r"=maN]UmO>b1r<R9_L>68MSY1peB-*f5,1%PA3lE2&qL@u0[M2f4gbLbqKkOSRIPs-jb"%8[YMI2D5DYkPA,oh&s7[iZ:#L28fLHRkEMW9YR)[!8:FZ-.u`1-X:F8ahf]MO`aKo6o2O;/=/!MYF.k`<$C5-uR''i:$B25N<3H[FGUV[f5?.kFim!/[f6)CA8/IZ:*V8ahK1W/gn)"*]$pu;f*R.^U)3Cu<+sX<H(BsZjBO4N_?OA.1YnH+c:(=]7.7d]8TMbfF,UJWupOu4U`#gXWQDjsQe:QY"^_&Cbbu;?nB`s-\i_&1093;fEUG3+4DGT3.h/.(7QI,B.aO7BXr1Y;G1SdoW1q7Lh*%Hp.l7f3%W^OaTCUsS5(!>+rWfZi%c"gI*h"t'C&]V1+.Ze$GN:$3oKhTHc_4YtR+ieiH',I>GM#2d3O55GI9=VRH-m3)^'^I6UWB-9^ooD[h>.W[5b2OkIe&M3_?jKPc`fI#CS)CU;i0/WbWYouuH&B1U@-k6Q#0YVV_/hrDFKj#!Y]gmN[05AM2,+gR0ZE\,>hWuL"5edm?KEp=r]A!sSdg@^@o])Z6JE79^i@W-O47f$-j_6.r0k_,p>?UVB%gh21!BbKjb6>!q<E2Z0Blq9^q5l%WY=uFoW91inKepf.8A84Hr,UZT?)Ul%5H(LZ#n:edo$KIrXU:qP]-~>endstream
+endobj
+11 0 obj
+<<
+/BaseFont /Courier
+/Encoding /WinAnsiEncoding
+/Name /F4
+/Subtype /Type1
+/Type /Font
+>>
 endobj
 xref
-0 11
+0 12
 0000000000 65535 f 
-0000000061 00000 n 
-0000000122 00000 n 
-0000000229 00000 n 
-0000000341 00000 n 
-0000000418 00000 n 
-0000000523 00000 n 
-0000000727 00000 n 
-0000000795 00000 n 
-0000001075 00000 n 
-0000001134 00000 n 
+0000000015 00000 n 
+0000000054 00000 n 
+0000000113 00000 n 
+0000000162 00000 n 
+0000000439 00000 n 
+0000009973 00000 n 
+0000010080 00000 n 
+0000010187 00000 n 
+0000010299 00000 n 
+0000010411 00000 n 
+0000010489 00000 n 
 trailer
 <<
-/ID 
-[<a1254e51117db580d0e96631db45c5c9><a1254e51117db580d0e96631db45c5c9>]
-% ReportLab generated PDF document -- digest (opensource)
-
-/Info 8 0 R
-/Root 7 0 R
-/Size 11
+/Size 12
+/Root 3 0 R
+/Info 1 0 R
 >>
 startxref
-4326
+10595
 %%EOF

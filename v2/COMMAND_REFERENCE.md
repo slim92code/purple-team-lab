@@ -505,7 +505,7 @@ sudo sliver-server
 # mtls --lport 443
 ```
 
-### SMB share — port zauzet
+### SMB share — port already in use
 ```bash
 sudo kill -9 $(sudo lsof -t -i:445)
 mkdir -p /tmp/share
@@ -560,7 +560,7 @@ john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 
 ### reg save Access Denied
 ```
-# UAC mora biti isključen na THEPUNISHER
+# UAC must be disabled on THEPUNISHER
 # HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System → EnableLUA = 0
 # Reboot, then run the implant again
 ```
@@ -569,7 +569,7 @@ john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 
 ## LAB CONFIGURATION — NOTES
 
-### GPO koji mora biti konfigurisan
+### GPO that must be configured
 | Policy | Lokacija | Setting |
 |--------|----------|---------|
 | Kerberos Service Ticket Operations | Default Domain Controllers Policy | S&F |
