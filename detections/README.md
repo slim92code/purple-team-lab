@@ -150,7 +150,7 @@ owner instead of the encryption type, which is what survives a domain on AES. It
 and ships unscheduled in the Splunk pack until a per-environment SPN allowlist exists.
 
 Rule 2 is kept rather than deleted, and not only as a reference for older domains. RC4 is
-not blocked on `MARVEL.LOCAL` — the service account still holds an RC4 key, and the
+not blocked on `MARVEL.LOCAL`: the service account still holds an RC4 key, and the
 Pass-the-Ticket step of the v3 run obtained a `4768` TGT for it at `0x17`. The roast came
 back AES because `GetUserSPNs` requested no specific etype and the KDC issued the strongest
 one both sides shared. Rule 2 therefore still covers the explicit downgrade, which this
@@ -179,7 +179,7 @@ interval and jitter the Sigma form cannot express.
 
 `Purple - Telemetry Gap` watches the collection path rather than the attacker: it fires when a
 host is still sending data while its Windows event logs have gone stale. It exists because
-that failure happened here — every `WinEventLog` channel on THEPUNISHER stopped for 68 minutes
+that failure happened here. Every `WinEventLog` channel on THEPUNISHER stopped for 68 minutes
 while Perfmon kept arriving, and nothing noticed.
 
 The first version of it could not detect the worst case it was written for. It opened with
@@ -187,7 +187,7 @@ The first version of it could not detect the worst case it was written for. It o
 produced no `win` row at all, the `chart` left that column null, and `isnotnull(win)` dropped
 the host. The effective range was a gap between roughly 20 minutes and 4 hours old. A
 four-hour outage alerted; a five-hour one did not, and a host that had never sent a Windows log
-in the window — total silence, the most severe case there is — was filtered out rather than
+in the window, total silence and the most severe case there is, was filtered out rather than
 escalated.
 
 Modelled across scenarios before and after:
@@ -220,7 +220,7 @@ it was the only option available.
 rather than an omission. `Purple - Large Outbound Transfer` is a threshold over a sum across a
 time bucket; Sigma expresses single-event matches well and aggregations poorly, so writing it
 as Sigma would produce something that does not survive the conversion to any backend. The SPL
-is the honest form for that one.
+is the right form for that one.
 The Zeek deployment here is otherwise stock, which is why no sensor config ships in this
 repo; Suricata is stock too, and the Suricata evidence cited in v3 is its built-in protocol
 logging and anomaly events rather than signatures written for this lab.
@@ -306,7 +306,7 @@ Not covered: an LSASS read from code injected into an already-excluded signed pr
 That needs `CallTrace`, and this lab has no sample to test a pattern against.
 
 **Coverage limit, lifted 29 Oct 2026.** Wazuh originally received Sysmon from 1 of the lab's
-3 Windows agents, so `100200` could only fire on THEPUNISHER — the other two agents had no
+3 Windows agents, so `100200` could only fire on THEPUNISHER: the other two agents had no
 `Microsoft-Windows-Sysmon/Operational` block in `ossec.conf`. Adding it and restarting the
 agents produced the first `100200` alerts from SPIDERMAN and HYDRA-DC, both at level 12 on
 `powershell.exe` reading `lsass.exe` at `0x1f3fff`. The `4698` task rules were never affected,

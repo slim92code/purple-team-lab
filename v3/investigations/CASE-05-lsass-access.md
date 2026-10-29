@@ -112,8 +112,8 @@ The DC case was the sharpest: Sysmon was installed and running there and its own
 
 **Closed on 29 Oct 2026**, after this case file was written. The missing block is four lines;
 adding it to both agents and restarting them produced the first `100200` alerts the lab has
-had from anything but THEPUNISHER — SPIDERMAN and HYDRA-DC, both level 12, `powershell.exe`
-reading `lsass.exe` at `0x1f3fff`. Worth sitting with for a second: the rule had been written,
+had from anything but THEPUNISHER: SPIDERMAN and HYDRA-DC, both level 12, `powershell.exe`
+reading `lsass.exe` at `0x1f3fff`. Note what that means: the rule had been written,
 measured against 935 reads, tuned, deployed and verified. It was correct the whole time, and
 on two of the three hosts it was meant to protect it was worth nothing, because four lines of
 agent config were missing. The rule was never the problem.
@@ -186,7 +186,7 @@ Detection tuning:
    coverage.
 7. `CallTrace` is the field that separates injected code in a signed process from the
    signed process itself. Not used here because the lab has no sample to test a pattern
-   against, which is the honest reason rather than an oversight.
+   against, which is the reason rather than an oversight.
 
 Hardening:
 

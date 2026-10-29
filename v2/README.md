@@ -20,7 +20,7 @@ This page is the 2-minute scan and the full playbooks are linked below.
 
 [`Portfolio_OnePager_v2.pdf`](Portfolio_OnePager_v2.pdf) is a one-page summary **of v2 as it
 stood in June 2026**, kept with the rest of this version rather than updated. Its figures are
-v2 figures — 9 Sigma rules, an 18-entry Navigator layer, the eight-phase chain, Splunk and
+v2 figures: 9 Sigma rules, an 18-entry Navigator layer, the eight-phase chain, Splunk and
 Sysmon only — and they no longer match the repository, which now ships 13 Sigma rules across
 15 scored techniques and adds Zeek, Suricata and Wazuh. For the current state read the
 [root README](../README.md); for the full write-up, the
@@ -118,8 +118,8 @@ DCSync via a DA breaks. The durable fix is tiering, not AV signatures.
 > C2 beacon connections, Defender/AMSI blocks, attacker network logons), a MITRE ATT&CK
 > coverage bar chart by technique, and an attack timeline across all phases.
 >
-> Two things in this image are worth naming rather than hoping nobody notices. Every panel
-> carries a search warning, and the tiles and the bar chart do not agree — the
+> Two things in this image are wrong and I would rather say so than hope nobody looks. Every panel
+> carries a search warning, and the tiles and the bar chart do not agree: the
 > "Lateral Movement" tile reads 31, which is the same number the chart gives `T1071.001 C2
 > Beacon`, while the "C2 Beacon" tile reads 86 and matches nothing on the chart. The tiles and
 > the chart were written as separate searches counting different things under similar labels,
@@ -184,7 +184,7 @@ The prevention fixes, re-proven:
 - [AES-only Kerberos](screenshots/10_fix2_aes.png). `4769` for `SQLService` flips from
   `0x17` (RC4) to `0x12` (AES-256) across the timeline, so the *default* roast now comes back
   AES. Read carefully: this narrows the etype of the issued ticket, it does not prove RC4 is
-  blocked. v3 measured the difference — the account still held an RC4 key and a `4768` TGT
+  blocked. v3 measured the difference: the account still held an RC4 key and a `4768` TGT
   for it came back `0x17` on request, so an attacker who asks for the downgrade explicitly
   still gets it. Preferring AES and enforcing AES-only are different postures. Removing the
   RC4 key (`msDS-SupportedEncryptionTypes` set to AES-only) is what actually closes it.
@@ -227,12 +227,12 @@ This is a lab, not production.
   who then Kerberoasts a Domain Admin SPN 98 seconds later, which is a real escalation.
   [v4](../v4/) moves the service account to a gMSA.
 - **Defender is enabled, but three paths are excluded and UAC is off on one host.** The
-  exclusions are `C:\Temp`, `C:\Windows\` — the entire Windows folder — and
+  exclusions are `C:\Temp`, `C:\Windows\` (the entire Windows folder) and
   `C:\Windows\Tasks`, set by GPO ([`01_lab_setup.md` §7](01_lab_setup.md)), so payload
   delivery is reproducible on camera; the AppLocker fix in Segment 10 addresses the
   `C:\Temp` path. UAC is also disabled on THEPUNISHER (`EnableLUA=0`, `lab_issues.md` #5).
   Both make the attack easier, which makes the blue-team result below stronger rather than
-  weaker — but "Defender on, not staged" should be read as "Defender on, with these
+  weaker, but "Defender on, not staged" should be read as "Defender on, with these
   exclusions and UAC off", not as a hardened host. [v3](../v3/) removed the exclusions
   entirely.
 - Kali's SMB/RPC (445/135) is firewall-filtered from all three Windows hosts (see the

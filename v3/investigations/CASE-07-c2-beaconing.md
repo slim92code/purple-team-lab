@@ -102,7 +102,7 @@ True positive. Two endpoints beaconing to an internal non-domain host over HTTPS
 same C2 framework, for the duration of the run.
 
 **On the protocol, because the wording changed.** This run used Sliver's `https` listener
-with an `--http` implant — ordinary server-side TLS, which is what the JA4 ClientHello
+with an `--http` implant, ordinary server-side TLS, which is what the JA4 ClientHello
 fingerprint is taken from. v2 used Sliver's `mtls` listener, and any "mutual TLS" wording in
 this case file was carried over from there. The attack screenshot settles it: `https --lport
 443`, then `generate --http 192.168.182.133:443`. The distinction matters for recommendation
@@ -141,7 +141,7 @@ Hardening:
 8. Egress filtering. In this lab the C2 destination is internal, which a flat network
    permits and segmentation would not.
 9. TLS inspection at the perimeter. This channel is server-side HTTPS, not mutual TLS, so
-   it does not have the client-certificate barrier that mTLS puts in the way — but whether an
+   it does not have the client-certificate barrier that mTLS puts in the way, but whether an
    inline proxy can actually read it still depends on whether the implant validates or pins
    the server certificate. The listener choice decides how much this control can see, and it
    is not the automatic dead end that "mutual TLS" would have made it.

@@ -21,7 +21,7 @@ Suricata flagged `REQUEST_AUTH_UNRECOGNIZED` on the same exchange.
 ![Suricata anomalies](../screenshots/06_suricata_anomaly.png)
 
 **That Suricata event corroborates, it does not detect.** It is not a WinRM signature and
-nobody wrote it — it is Suricata's built-in HTTP anomaly for an `Authorization` header its
+nobody wrote it. It is Suricata's built-in HTTP anomaly for an `Authorization` header its
 parser does not recognise, which is what WS-Management's `Negotiate`/Kerberos auth looks
 like to it. Legitimate WinRM administration produces the same anomaly, so on its own it is a
 protocol-oddity note with no verdict in it. What makes this alertable is the `conn.log` pair:

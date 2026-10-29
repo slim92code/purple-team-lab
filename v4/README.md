@@ -26,7 +26,7 @@ output is a set of alert-triage case files rather than an attack narrative.
 
 v3 ran against a near-default Windows baseline, so no attack had to work through a control.
 That makes the detections easy and the result unrepresentative. v4 applies a hardened
-baseline first, then re-runs the same chain — so each phase either gets blocked by a
+baseline first, then re-runs the same chain, so each phase either gets blocked by a
 control, or gets through a gap that is documented and deliberate.
 
 ## Hardening baseline
@@ -41,7 +41,7 @@ Applied as five GPO bundles across one domain controller and two endpoints.
 | Account and Kerberos | Account lockout, 14-character minimum with complexity and history, AES-only Kerberos, `ms-DS-MachineAccountQuota=0`, LAPS, gMSA for service accounts (one legacy account excepted — see residual gaps) |
 | Execution controls | PowerShell script-block / module / transcription logging, Defender ASR rules, tamper protection, Print Spooler disabled on the DC |
 
-Plus a honeypot service account with an SPN that is never legitimately used — any Kerberos
+Plus a honeypot service account with an SPN that is never legitimately used: any Kerberos
 request for it is malicious by definition.
 
 Each control is recorded with what it was before, what it is now, and which detection it
@@ -49,7 +49,7 @@ enables or which attack phase it blocks.
 
 ## Firewall baseline (GPO)
 
-v3 blocked the attacker and east-west SMB with six per-host rules added by hand — accurate
+v3 blocked the attacker and east-west SMB with six per-host rules added by hand. Accurate
 in effect, but inconsistent: the DC defaulted inbound to `Allow` while the endpoints were
 `NotConfigured`, and only the DC blocked Kali on SMB (the endpoints blocked it on WMI only).
 v4 replaces the six rules with one GPO, `MARVEL-Firewall-Baseline`, on all three hosts:
@@ -96,8 +96,8 @@ v4 fixes it at the forwarder rather than in the rules:
 
 ## Calibrating the exfiltration threshold
 
-The two detections that ran in the v3 lab without becoming shipped content — the JA4 C2
-beacon and a large-outbound-transfer check — were written into the
+The two detections that ran in the v3 lab without becoming shipped content, the JA4 C2
+beacon and a large-outbound-transfer check, were written into the
 [Splunk app](../detections/splunk/purple_lab) after the run rather than being deferred to
 here, and the naming is settled on `Purple - …` across the app, the Sigma pack and the case
 files. What was not done is the part that needs data.

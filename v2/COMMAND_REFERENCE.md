@@ -286,7 +286,7 @@ reg save HKLM\SECURITY C:\Temp\security.hive /y  # succeeded
 ```
 
 The SYSTEM hive is denied while SAM and SECURITY save successfully from the same shell.
-Why only that one fails is not established — see the note in Phase 6 of
+Why only that one fails is not established. See the note in Phase 6 of
 [`02_attack_playbook.md`](02_attack_playbook.md). Without that hive there is no bootkey, so
 the SAM hashes cannot be decrypted.
 

@@ -12,13 +12,13 @@ unlogged until the `PurpleLab` rule was added. See the gap-and-fix pair in
 **Change 2 — `ProcessAccess` for `lsass.exe` (T1003.001).** The baseline ships this section
 as an `onmatch="include"` with no rule lines, and an include with no rules logs nothing. So
 the baseline produces **zero EID 10**, and the LSASS detections in
-[`detections/`](../detections/) — a Sigma rule, a Splunk search and three Wazuh rules, tuned
+[`detections/`](../detections/): a Sigma rule, a Splunk search and three Wazuh rules, tuned
 against 935 sampled reads — had nothing to match on a host running it unmodified. One
 `TargetImage` line for `lsass.exe` closes it. The benign readers are filtered in the
 detection rules rather than here, because excluding them at the sensor would also hide a
 process masquerading as one of them.
 
-That second one is worth being blunt about: the detection was built, tuned and documented
+The second one is the uncomfortable part. The detection was built, tuned and documented
 before anyone checked whether the shipped config could feed it. The rule was correct and the
 coverage was still zero.
 
@@ -70,8 +70,8 @@ Sysmon trace. See screenshot 12 in [`v3/README.md`](../v3/README.md).
 
 ### Re-deployed and re-proven, 25 Oct 2026
 
-The config above was applied with `sysmon64 -c` and the result measured in Splunk rather than
-assumed.
+I applied the config above with `sysmon64 -c` and measured the result in Splunk rather than
+assuming it.
 
 | Host | Before: EID 10 over 7 days | After: EID 10 in the first hour |
 | ---- | -------------------------- | ------------------------------- |
@@ -80,14 +80,14 @@ assumed.
 | HYDRA-DC | **0** | **49** |
 
 Two hosts that had produced nothing in a week started producing within minutes. The targeted
-trigger — a PowerShell handle to `lsass.exe` — came back as
+trigger (a PowerShell handle to `lsass.exe`) came back as
 `powershell.exe` → `lsass.exe` at `GrantedAccess 0x1F3FFF` on SPIDERMAN, which is the same
 mask SharpKatz used during the v3 run and is in the shipped detection mask list. So the
 telemetry the LSASS rules were written against now exists on the host that was blind to it.
 
 The benign traffic that came with it is worth reading too, because it is the exclusion list
 proving itself: `MsMpEng.exe`, `svchost.exe`, `vmtoolsd.exe` and `wmiprvse.exe` all appear,
-and all of them at `0x1000`, `0x1010`, `0x1400`, `0x1410` — masks that are not in the
+and all of them at `0x1000`, `0x1010`, `0x1400`, `0x1410`, masks that are not in the
 detection list at all. The rules would stay silent on every one of them without the
 exclusions even being consulted.
 
@@ -95,7 +95,7 @@ exclusions even being consulted.
 looked unexplained because the deployment was believed to have run on SPIDERMAN only. Reading
 the running config settled it: HYDRA-DC's `ProcessAccess` section held no rule at the first
 check and holds the `lsass` rule now, so the config had in fact been applied there. Recollection
-said one thing, `sysmon64 -c` said another, and the running config won — which is the same
+said one thing, `sysmon64 -c` said another, and the running config won, which is the same
 lesson as the rest of this directory, applied to the person doing the deploying rather than to
 the config.
 
@@ -141,7 +141,7 @@ attacker.
 **This fixes the sensor, not the EDR.** The events above reached Splunk, which is what the
 Sigma rule and the Splunk search need. They will still not reach Wazuh on SPIDERMAN or
 HYDRA-DC, because only THEPUNISHER has a `Microsoft-Windows-Sysmon/Operational` block in its
-`ossec.conf` — a separate gap, documented in [v3](../v3/README.md), and untouched by this
+`ossec.conf`: a separate gap, documented in [v3](../v3/README.md), and untouched by this
 change. One blind spot had two independent causes stacked on top of each other, and clearing
 the first did not clear the second.
 

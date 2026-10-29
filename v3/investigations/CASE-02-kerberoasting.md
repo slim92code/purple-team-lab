@@ -103,8 +103,8 @@ Detection tuning:
 
 4. The RC4 rule did not see this roast, and will not see one like it. Do not count it as
    Kerberoasting coverage for the default-etype case. Keep it anyway: RC4 is not blocked
-   here — `SQLService` still has an RC4 key and the KDC issued a `0x17` TGT for it during
-   Pass-the-Ticket ([CASE-03](CASE-03-pass-the-ticket.md)) — so an attacker who requests the
+   here: `SQLService` still has an RC4 key and the KDC issued a `0x17` TGT for it during
+   Pass-the-Ticket ([CASE-03](CASE-03-pass-the-ticket.md)), so an attacker who requests the
    downgrade explicitly would trip it. The etype-agnostic rule in
    [`detections/`](../../detections/sigma/sigma_rules.yml) is the one that catches this run.
    The durable fix is removing the account's RC4 key, which closes the downgrade path the

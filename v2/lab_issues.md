@@ -248,13 +248,13 @@ timestamp *parsing*, and `DATETIME_CONFIG = CURRENT` skips parsing entirely, so 
 nothing here.
 
 **What `DATETIME_CONFIG = CURRENT` costs.** It stamps events at index time, not event time,
-which is what makes the timeline usable when a resumed VM has a stale clock — but true event
+which is what makes the timeline usable when a resumed VM has a stale clock, but true event
 time is lost with it, so sub-second ordering inside a burst is gone. It is a lab workaround.
 In production, fix the clock.
 
 **Lesson learned:** Always run `w32tm /resync /force` before recording. Add to pre-flight
 checklist. And check that a config stanza matches something before believing it fixed
-anything — this one shipped unmatched for two lab versions.
+anything. This one shipped unmatched for two lab versions.
 
 ---
 

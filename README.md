@@ -1,13 +1,22 @@
 # Purple Team Home Lab — Active Directory Detection Engineering
 
-A self-built Active Directory lab (`MARVEL.LOCAL`) where each attacker technique is run,
-detected, and then stress-tested for what the default tooling misses. Gaps get closed and
-re-proven.
+I built an Active Directory lab (`MARVEL.LOCAL`) and ran each attacker technique against it,
+detected it, then stress-tested the detection for what the default tooling misses. Gaps get
+closed and re-proven.
 
 Detection-as-code lives at the repo root. Each lab iteration has its own folder.
 
 Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 [design document](v4/README.md) and not yet built.
+
+**On how this is written.** I built the lab, ran the chain, ran every query and deployed
+every fix, and the numbers here came out of that: 935 sampled LSASS reads, 1,649 service
+tickets over 30 days, 43,683 Sysmon events the DC's agent never read. The write-up was done
+with AI assistance, and so were several of the detection bugs recorded above. The Zeek filter
+that could never match, the correlation that split on an IPv6-mapped address, the empty
+`ProcessAccess` include: those came out of review, not out of me spotting them. They are
+documented as findings rather than quietly fixed, which is the useful part either way, but I
+am not going to claim I found them alone.
 
 **On the commit history.** The work came first and the repository second. The v2 detections
 are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
@@ -69,7 +78,7 @@ the warning the whole time. The replacement rules are tuned against 935 real LSA
 sampled from the host, which took a draft that would have alerted 90 times (89 benign) down
 to one. Each rule is verified by a targeted trigger, with two negative tests.
 
-Auditing the repo afterwards turned up three more of the same shape, this time in the
+Auditing the repo afterwards turned up three more of the same kind, this time in the
 shipped content rather than in the lab:
 
 - The [Sysmon config](config/) here shipped `ProcessAccess` as an empty `include`, which logs

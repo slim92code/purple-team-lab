@@ -79,7 +79,7 @@ The column is what *recorded* each phase, not what alerted on it. The distinctio
 because the two are not the same here:
 
 - **Windows, Sysmon and Wazuh rows are rule coverage.** The content is in
-  [`detections/`](../detections/) — Sigma, the Splunk app, `local_rules.xml`.
+  [`detections/`](../detections/): Sigma, the Splunk app, `local_rules.xml`.
 - **Zeek rows are rule coverage too**, via the three Zeek Sigma rules in
   [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml), but the Zeek deployment itself is stock:
   default scripts, default logs, no `local.zeek` customisation, so there is nothing sensor-side
@@ -107,8 +107,8 @@ run date returns 25 events:
 | 12:42:51 | 2 | `.138` → `.135` | WinRM pivot |
 
 **It fires during the Kerberoasting, even though that ticket was AES-256.** The reasonable
-guess — that an event named `weak_encryption` keys on the encryption type of the issued
-ticket, so an `0x12` roast cannot trip it — is wrong. Suricata raises it on a weak etype seen
+guess (that an event named `weak_encryption` keys on the encryption type of the issued
+ticket, so an `0x12` roast cannot trip it) is wrong. Suricata raises it on a weak etype seen
 anywhere in the Kerberos exchange, including the client's *proposed* etype list. `GetUserSPNs`
 offers RC4 among its supported types; the KDC picks AES and issues `0x12`. Windows `4769`
 records only the outcome, Suricata sees the negotiation.
@@ -118,7 +118,7 @@ reached from the network side: RC4 is still on the table in this domain. The hos
 the estate look AES-clean because it only ever shows what was issued.
 
 **And it is not high-fidelity.** Five of the 25 (11:19, 12:20, 12:31) fall on no attack step
-at all — ordinary domain traffic offering RC4. One in five is a false positive against a
+at all: ordinary domain traffic offering RC4. One in five is a false positive against a
 known-bad window, which is why this sits in a *recorded by* column rather than being written
 up as a detection.
 
@@ -233,22 +233,22 @@ has never had anything to match. The v3 roast against `SQLService` was issued as
 walked past it.
 
 **The reason is not that the domain refuses RC4.** `SQLService` still holds an RC4 key, and
-the KDC will hand one out — the Pass-the-Ticket step in this same run got a `4768` TGT for
+the KDC will hand one out: the Pass-the-Ticket step in this same run got a `4768` TGT for
 that account at `0x17` (screenshot 04). What happened is narrower: `GetUserSPNs` asked for
 no particular encryption type, the account has AES keys, and the KDC issues the strongest
 etype both sides share, so the roast came back AES-256 on its own.
 
 That changes what the rule is worth rather than retiring it. It covers the downgrade
-variant — an attacker who requests RC4 explicitly (`Rubeus kerberoast /rc4opsec`, or an
+variant: an attacker who requests RC4 explicitly (`Rubeus kerberoast /rc4opsec`, or an
 etype-restricted `TGS-REQ`) gets it on this domain, and that request is exactly what the
 rule is good at catching. What it cannot see is the roast that asks for nothing special,
 which is the one a modern toolchain produces by default and the one this lab ran.
 
 So two rules are needed, not one. The repo ships the etype-agnostic companion keyed on the
-SPN owner, which is noisier and needs a per-environment allowlist, and that is the honest
+SPN owner, which is noisier and needs a per-environment allowlist, and that is the
 trade: against a default-etype roast there is no cheap high-confidence Kerberoasting signal.
 Removing RC4 keys from the account would close the downgrade path as well, and the fact that
-the TGT above came back `0x17` says that has not been done here — AES is being *preferred*,
+the TGT above came back `0x17` says that has not been done here. AES is being *preferred*,
 not *enforced*, which is a different security posture than the AES-only ticket counts above
 suggest on their own.
 
@@ -275,12 +275,12 @@ would have alerted 90 times:
 Restricting to full and `MiniDumpWriteDump` masks and excluding the sources above brings the
 same sample to one alert, the `powershell.exe` read at `0x1f3fff`.
 
-### 7. The same mistake again, in the Zeek rule, found in a screenshot
+### 7. The same error again, in the Zeek rule, found in a screenshot
 
 The network Kerberoasting rule in [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) excluded
 machine accounts with `client|endswith: '$'`. Zeek writes the client as `principal/REALM`, so
 a machine account reads `THEPUNISHER$/MARVEL.LOCAL` and does not end in `$`. The exclusion
-matched nothing, and the rule alerted on every machine account's service ticket — which in a
+matched nothing, and the rule alerted on every machine account's service ticket, which in a
 real estate is most of Kerberos traffic.
 
 The evidence was already in this page. Screenshot 01 above shows the `client` column as
@@ -335,7 +335,7 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 [![Suricata anomaly](screenshots/06_suricata_anomaly.png)](screenshots/06_suricata_anomaly.png)
 > Suricata's built-in app-layer anomaly events, not written signatures: `weak_encryption`
 > across the Kerberos exchanges — spray, roast and Pass-the-Ticket alike, because it keys on
-> the etypes offered rather than on the ticket issued — and `REQUEST_AUTH_UNRECOGNIZED` during
+> the etypes offered rather than on the ticket issued, and `REQUEST_AUTH_UNRECOGNIZED` during
 > the 12:42–12:43 WinRM pivot. Both corroborate the Windows and Zeek evidence rather than
 > standing on their own. Measured false-positive rate for `weak_encryption` over the run
 > window is 5 in 25; `REQUEST_AUTH_UNRECOGNIZED` also fires on legitimate WinRM, since
@@ -410,9 +410,9 @@ Found afterwards, and it reverses the reading: the empty include is what
 repo's own baseline unmodified, and THEPUNISHER was the exception, because the `lsass` line
 had been added there by hand and never folded back into the file. Diffing both running
 configs against the baseline later showed THEPUNISHER had drifted in two sections rather than
-one — it also carried three hand-added `NetworkConnect` paths, two of which the baseline
+one. It also carried three hand-added `NetworkConnect` paths, two of which the baseline
 already covered. See [`config/`](../config/). So this was not one host
-drifting — it was the config, and any third host would have been blind too. The LSASS rules
+drifting. It was the config, and any third host would have been blind too. The LSASS rules
 were written, tuned against 935 sampled reads and documented before anyone checked that the
 shipped config emitted EID 10 at all. The config is fixed, and on 25 Oct 2026 it was deployed and
 measured: SPIDERMAN went from 0 EID 10 in seven days to 18 within minutes, HYDRA-DC from 0 to
@@ -490,8 +490,8 @@ reverted.
 ## Known gaps carried into v4
 
 Most of these are the starting point v4 rebuilds. Two were closed in place after the run
-instead of being carried forward — the Sysmon config blind spot on 25 Oct and the Wazuh
-ingestion gap on 29 Oct — and are marked where they appear below.
+instead of being carried forward: the Sysmon config blind spot on 25 Oct and the Wazuh
+ingestion gap on 29 Oct, and are marked where they appear below.
 
 **The hardening baseline is partial and inconsistent.** That is the starting point v4
 rebuilds: CIS-aligned SMB signing, LSA Protection, WDigest/LLMNR off, and a GPO firewall
@@ -511,7 +511,7 @@ clears the description.
 The rules in [`detections/`](../detections/wazuh/local_rules.xml) are deployed and verified,
 so `\Updater` now scores level 12 and a full-access LSASS handle alerts at all. Screenshot 13
 records the original behaviour, before the rules were written. The ingestion gap below was
-closed on 29 Oct 2026 — see the end of this section.
+closed on 29 Oct 2026. See the end of this section.
 
 **Wazuh received Sysmon from one of three Windows agents.** Across every archived alert file:
 
@@ -528,8 +528,8 @@ Wazuh-side Sysmon detection could fire on one host out of three. The `4698` task
 unaffected, since the Security channel is configured everywhere.
 
 **Closed, 29 Oct 2026.** The missing `localfile` block was added to `ossec.conf` on SPIDERMAN
-and HYDRA-DC and the agents restarted. A targeted trigger on each host — a PowerShell handle
-to `lsass.exe` — produced the first `100200` alerts the lab has ever seen from an agent other
+and HYDRA-DC and the agents restarted. A targeted trigger on each host (a PowerShell handle
+to `lsass.exe`) produced the first `100200` alerts the lab has ever seen from an agent other
 than THEPUNISHER:
 
 ```
@@ -579,8 +579,8 @@ all. Both are in the Splunk app now, the naming is settled on `Purple - …`, an
 files record the `V3 - …` name each alert carried at the time alongside it.
 
 What is still open is the byte-volume threshold. It ships at 10 MB per 10 minutes and
-unscheduled, because that number was never calibrated against this estate's normal egress —
+unscheduled, because that number was never calibrated against this estate's normal egress.
 Windows Update and OneDrive alone will cross it. Measuring a real baseline and setting the
 threshold from it is v4 work. An uncalibrated threshold shipped as an enabled alert is how a
-queue fills with noise, which is the same mistake as a rule that cannot fire, pointed the
+queue fills with noise, which is the same failure as a rule that cannot fire, pointed the
 other way.
