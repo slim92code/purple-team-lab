@@ -120,6 +120,25 @@ Attacker attempts the same password against multiple user accounts via Kerberos 
 
 ### Primary SPL Queries
 
+> **The three queries below cannot match on `4771`, and the screenshot beside them was
+> produced by a different query.** The rex requires a `::ffff:` prefix on `Client Address`.
+> This DC writes that prefix on `4769` and omits it on `4771`, so `src_ip` is never
+> extracted here, `stats ... by src_ip` drops every row, and all three return nothing as
+> written.
+>
+> Both halves are in this directory's own evidence.
+> [Screenshot 01](screenshots/01_password_spray.png), the one that produced the spray result,
+> ran a generic `(?<Client_Address>\S+)` instead and shows a bare `192.168.182.133`.
+> [Screenshot 02](screenshots/02_kerberoasting.png) keeps the `::ffff:` form on `4769` and
+> works. Re-measured against the v3 data on 29 Oct 2026: all nine `4771` carry the bare form,
+> and the two `4768` issued to one account from one host carry one form each.
+>
+> The queries are left as they were written. The shipped rule in
+> [`detections/`](../detections/splunk/purple_lab/default/savedsearches.conf) reads the
+> TA-extracted `Client_Address` field and never had this bug. This is the same failure as the
+> Zeek machine-account filter in [v3](../v3/README.md): the field format was sitting in a
+> screenshot in the write-up the whole time.
+
 **SPL 2.1 — Password spray detection (multiple users from the same IP in a short window)**
 
 ```spl
