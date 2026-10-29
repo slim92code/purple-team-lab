@@ -427,6 +427,29 @@ the same mask SharpKatz used in the attack run. The before/after is in
 > IEX download cradle inside `\Updater` (screenshot 08) is in the event body and is not
 > scored.
 
+### 14 — `100200` on all three agents, and a console that had stopped receiving
+[![Wazuh 100200 all agents](screenshots/14_wazuh_100200_all_agents.png)](screenshots/14_wazuh_100200_all_agents.png)
+> Taken 29 Oct 2026 after two fixes landed on the same evening. Eight alerts, all level 12,
+> all at `GrantedAccess 0x1f3fff` — the dump-capable mask the rule was tuned for, from
+> `powershell.exe` on SPIDERMAN, HYDRA-DC and THEPUNISHER. Before the `ossec.conf` fix only
+> THEPUNISHER could produce one.
+>
+> Read the histogram rather than the table. Over twelve weeks `100200` has fired on exactly
+> two days, and the taller bar is this one. That is not quiet telemetry: until 24 October the
+> rule was bound to a Wazuh group that does not exist, and until 29 October two of the three
+> agents never forwarded Sysmon at all.
+>
+> The single row from 25 October is the only survivor of the three alerts recorded that
+> week — the rest were on the shard discarded to recover the indexer, which had stopped
+> accepting documents entirely between 24 and 29 October. This view was empty for five days
+> while every service reported healthy; see
+> [CASE-05 §4.5](investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
+>
+> Two reading notes. The dashboard renders local time, so rows at `13:09` here are the
+> `12:09Z` alerts quoted elsewhere in this repo. And `C:\\Windows\\System32\\…` is JSON
+> escaping surfacing in the UI, which is the same doubling the Wazuh rules have to account
+> for in their own patterns.
+
 ## Alert triage — case files
 
 [`investigations/`](investigations/) holds a triage write-up for every phase of the run: the
