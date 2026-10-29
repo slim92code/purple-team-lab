@@ -9,6 +9,15 @@ Detection-as-code lives at the repo root. Each lab iteration has its own folder.
 Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 [design document](v4/README.md) and not yet built.
 
+**On the commit history.** The work came first and the repository second. The v2 detections
+are dated January 2026, the v3 kill chain was run on 20 October 2026, and this repository was
+published a day later — so the history starts at publication, not at the lab. The early bulk
+commit is that import. Everything after it is ordinary work, including the corrections, which
+are kept rather than squashed because several of them are the point.
+
+A [ten-part video walkthrough](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-)
+covers the v2 chain end to end.
+
 ## Detection-as-Code
 
 | Asset | What it is |

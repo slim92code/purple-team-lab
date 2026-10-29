@@ -1,0 +1,24 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+
+# Python used for building the report and modelling rule logic
+__pycache__/
+*.py[cod]
+
+# Splunk app: default/ is the shipped content and is committed.
+# local/ is per-instance override and must never be.
+detections/splunk/purple_lab/local/
+detections/splunk/purple_lab/metadata/local.meta
+
+# Raw lab output: kept out on purpose, the write-ups carry the measurements
+*.evtx
+*.pcap
+*.hive
+eve.json
+alerts.json
