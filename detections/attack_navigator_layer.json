@@ -6,7 +6,7 @@
     "layer": "4.5"
   },
   "domain": "enterprise-attack",
-  "description": "Detection coverage for the Purple Team Home Lab (MARVEL.LOCAL AD), covering both lab iterations: v2 (Sysmon + Splunk) and v3 (plus Zeek/Suricata NDR and Wazuh EDR). 15 techniques scored across 23 entries including tactic parents. Green = detected by shipped rule content. Yellow = attack attempted but blocked or failed, documented in v2/lab_issues.md. Scoring is about whether the technique was DETECTED, not whether the attack succeeded. Repo: github.com/slim92code/purple-team-lab",
+  "description": "Detection coverage for the Purple Team Home Lab (MARVEL.LOCAL AD), v2 (Sysmon + Splunk) and v3 (plus Zeek/Suricata NDR and Wazuh EDR). 15 techniques across 23 entries including tactic parents. Score 100 = exercised in the lab AND backed by shipped rule content in detections/. Score 75 = observed during the run with no rule committed for it (T1046, T1003.005, T1550.003). Score 50 = attempted but blocked or failed (v2/lab_issues.md). Scoring is about detection, not about whether the attack succeeded. Repo: github.com/slim92code/purple-team-lab",
   "filters": {
     "platforms": [
       "Windows"
@@ -27,9 +27,9 @@
     {
       "techniqueID": "T1046",
       "tactic": "discovery",
-      "score": 100,
+      "score": 75,
       "color": "",
-      "comment": "Detected — nmap network sweep + LDAP/Kerberos user enumeration. Sysmon EC3 + Security EC4625. Detection Card #1.",
+      "comment": "Detected — nmap network sweep + LDAP/Kerberos user enumeration. Sysmon EC3 + Security EC4625. Detection Card #1. [NOT SHIPPED AS A RULE: exercised and recorded during the run, but no rule for it exists in detections/. Scored 75 so the map does not show it as rule coverage.]",
       "enabled": true,
       "metadata": [
         {
@@ -158,7 +158,7 @@
       "tactic": "credential-access",
       "score": 100,
       "color": "",
-      "comment": "Detected — Kerberoasting via GetUserSPNs. Security EC4769 with RC4 (0x17) ticket encryption for SQLService SPN. Central segment (Seg 4). Detection Card #4.",
+      "comment": "Detected (v2 as RC4, v3 as AES) - Kerberoasting of the SQLService SPN via GetUserSPNs. The v2 roast came back RC4 (0x17) and the canonical rule caught it. The v3 roast came back AES-256 (0x12) and that same rule never fired: GetUserSPNs requested no etype and the KDC issued the strongest shared one (1,649 tickets over 30 days, all 0x12, zero 0x17). RC4 is not blocked on this domain - the Pass-the-Ticket step obtained an 0x17 TGT - the roast simply never asked for it. Shipped coverage for the AES case is the etype-agnostic companion (Sigma rule 10 / Purple - Kerberoasting User-SPN Ticket), which ships unscheduled pending a per-environment SPN allowlist. Detection Card #4.",
       "enabled": true,
       "metadata": [
         {
@@ -189,7 +189,7 @@
       "tactic": "credential-access",
       "score": 100,
       "color": "",
-      "comment": "Detected (v3) — LSASS handle with a dump-capable GrantedAccess mask. SharpKatz ran in memory inside a process named notepad.exe and read lsass.exe at 0x1F3FFF. The mask list and the benign-reader exclusions are measured, not guessed: against 935 real reads sampled from the host, an earlier draft would have alerted 90 times with 89 of them benign. Telemetry exists on one of three hosts — see the Wazuh ingestion gap in v3.",
+      "comment": "Detected (v3) — LSASS handle with a dump-capable GrantedAccess mask. SharpKatz ran in memory inside a process named notepad.exe and read lsass.exe at 0x1F3FFF. The mask list and the benign-reader exclusions are measured, not guessed: against 935 real reads sampled from the host, an earlier draft would have alerted 90 times with 89 of them benign. Telemetry was on one of three hosts during the v3 run; the Sysmon config gap was closed 25 Oct 2026 and the Wazuh ingestion gap 29 Oct 2026, so all three hosts now carry it - see config/README.md.",
       "enabled": true,
       "metadata": [
         {
@@ -227,9 +227,9 @@
     {
       "techniqueID": "T1003.005",
       "tactic": "credential-access",
-      "score": 100,
+      "score": 75,
       "color": "",
-      "comment": "Detected — cached domain credentials (SECURITY hive). Detection Card #6.",
+      "comment": "Detected — cached domain credentials (SECURITY hive). Detection Card #6. [NOT SHIPPED AS A RULE: exercised and recorded during the run, but no rule for it exists in detections/. Scored 75 so the map does not show it as rule coverage.]",
       "enabled": true,
       "metadata": [
         {
@@ -303,9 +303,9 @@
     {
       "techniqueID": "T1550.003",
       "tactic": "lateral-movement",
-      "score": 100,
+      "score": 75,
       "color": "",
-      "comment": "Detected (v3) — Pass-the-Ticket. Rubeus asktgt with the cracked SQLService key, run through Sliver execute-assembly, produced a Security EC4768 TGT at RC4 (0x17). That RC4 TGT is also the evidence that this domain prefers AES rather than enforcing it.",
+      "comment": "Detected (v3) — Pass-the-Ticket. Rubeus asktgt with the cracked SQLService key, run through Sliver execute-assembly, produced a Security EC4768 TGT at RC4 (0x17). That RC4 TGT is also the evidence that this domain prefers AES rather than enforcing it. [NOT SHIPPED AS A RULE: exercised and recorded during the run, but no rule for it exists in detections/. Scored 75 so the map does not show it as rule coverage.]",
       "enabled": true,
       "metadata": [
         {
@@ -403,7 +403,7 @@
       "tactic": "exfiltration",
       "score": 100,
       "color": "",
-      "comment": "Detected — exfiltration over the established Sliver C2 channel. Detection Card #8.",
+      "comment": "Detected — exfiltration over the established Sliver C2 channel. Detection Card #8. [Shipped as Purple - Large Outbound Transfer, but UNSCHEDULED with an uncalibrated 10 MB/10 min placeholder threshold - not an enabled detection until a baseline is measured; see v4.]",
       "enabled": true,
       "metadata": [
         {
@@ -431,11 +431,15 @@
   "legendItems": [
     {
       "color": "#8ec843ff",
-      "label": "Detected by shipped rule content (score 100)"
+      "label": "Detected in the lab AND shipped as a rule in detections/ (score 100)"
     },
     {
       "color": "#ffe766ff",
-      "label": "Attempted but blocked/failed — see v2/lab_issues.md (score 50)"
+      "label": "Attempted but blocked or failed - see v2/lab_issues.md (score 50)"
+    },
+    {
+      "color": "#bddb87ff",
+      "label": "Observed in the run, but NO rule shipped for it (score 75) - read the comment"
     }
   ],
   "metadata": [

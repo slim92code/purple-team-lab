@@ -99,11 +99,14 @@
 
 **Fix:** `/opt/splunk/etc/apps/Splunk_TA_windows/local/props.conf`
 ```ini
-[WinEventLog:Microsoft-Windows-Sysmon/Operational]
+# CORRECTED - see lab_issues.md #10. This was written as a [WinEventLog:...] SOURCETYPE
+# stanza and never matched a single event: this forwarder ships every Windows channel as a
+# bare `WinEventLog` sourcetype with the channel name only in `source`, so it has to be keyed
+# on source::. MAX_TIMESTAMP_LOOKAHEAD is dropped too - DATETIME_CONFIG=CURRENT skips
+# timestamp parsing entirely, so it did nothing. Deployed version: detections/.../props.conf
+[source::WinEventLog:Microsoft-Windows-Sysmon/Operational]
 DATETIME_CONFIG = CURRENT
-MAX_TIMESTAMP_LOOKAHEAD = 128
-KV_MODE = auto
-SHOULD_LINEMERGE = false
+TRUNCATE = 0
 ```
 
 ### 3.2 Forwarder connection drops on VM resume

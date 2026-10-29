@@ -21,10 +21,15 @@ title: Kerberoasting — Service Ticket for a User SPN (network, etype-agnostic)
 id: 3b8f0c21-6a4e-4d9b-9f2a-1c7e5d0a4411
 status: experimental
 description: >
-    Detects a Kerberos service-ticket request seen on the wire whose service principal
-    is neither krbtgt nor a machine account ($). It keys on the SPN pattern rather than
-    the ticket encryption type, so it catches AES (0x12) Kerberoasting that an RC4-only
-    (0x17) rule misses — the v3 roast used AES. Complements the host-side 4769 rule.
+    Detects a Kerberos service-ticket (TGS) request seen on the wire, excluding krbtgt
+    service tickets and requests made BY a machine account. It keys on the SPN pattern
+    rather than the ticket encryption type, so it catches AES (0x12) Kerberoasting that an
+    RC4-only (0x17) rule misses — the v3 roast used AES. Complements the host-side 4769
+    rule. The two filters act on different fields, which the earlier wording blurred:
+    filter_krbtgt is service-side (the SPN requested), filter_machine is client-side (the
+    principal requesting). It does NOT exclude machine-account services (host/, cifs/ …
+    SPNs), so like the host-side etype-agnostic rule it fires on routine user-to-service
+    traffic and needs a per-environment SPN allowlist before it is alertable.
 references:
     - https://attack.mitre.org/techniques/T1558/003/
 author: Purple Lab (MARVEL.LOCAL)

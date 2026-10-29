@@ -12,7 +12,7 @@ They chain. Each one hands off to the next in the order the attack actually ran.
 | [CASE-02](CASE-02-kerberoasting.md) | Kerberoasting | T1558.003 | True positive, Domain Admin credential cracked |
 | [CASE-03](CASE-03-pass-the-ticket.md) | Pass-the-Ticket | T1550.003 | True positive, stolen ticket in use |
 | [CASE-04](CASE-04-lateral-movement-winrm.md) | Lateral movement | T1021.006 | True positive, workstation-to-workstation pivot |
-| [CASE-05](CASE-05-lsass-access.md) | LSASS access | T1003.001 | True positive on one host, undetectable on another |
+| [CASE-05](CASE-05-lsass-access.md) | LSASS access | T1003.001 | True positive on one host, undetectable on the other at the time (both causes since closed — see the case) |
 | [CASE-06](CASE-06-persistence-scheduled-task.md) | Persistence | T1053.005 | True positive delivered at level 4 |
 | [CASE-07](CASE-07-c2-beaconing.md) | C2 beaconing | T1071.001 | True positive, two endpoints linked by one fingerprint |
 

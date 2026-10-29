@@ -432,7 +432,15 @@ detection:
     filter_krbtgt:
         ServiceName|startswith: 'krbtgt'
     filter_self:
-        TargetUserName|endswith: '$'
+        # 'contains', not 'endswith'. On 4769 the requesting account arrives as
+        # principal@REALM, so a machine account reads THEPUNISHER$@MARVEL.LOCAL and an
+        # endswith '$' test never matches it -- confirmed against this lab's screenshot 03,
+        # where the account is pparker@MARVEL.LOCAL. ServiceName above keeps endswith '$'
+        # because the SPN arrives unqualified (SQLService). Same wire-format trap as the
+        # Zeek machine filter in v3_ndr.yml, one field over. A machine account always
+        # contains '$' and an ordinary user account never does, so 'contains' is a safe
+        # superset here.
+        TargetUserName|contains: '$'
     condition: selection and not 1 of filter_*
 fields:
     - IpAddress

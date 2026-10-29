@@ -66,10 +66,10 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | | |
 | --- | --- |
 | Destination | `192.168.182.133`, the non-domain host from CASE-01 |
-| Protocol | TLS on 443, mutual TLS |
+| Protocol | HTTPS on 443 — Sliver `https` listener, implant built with `--http` (attack screenshot 04) |
 | JA4 | `t13i131000_f57a46bbacb6_e5728521abd4` on both hosts |
 | Volume | 96 sessions total |
-| Implant | Sliver, delivered as `GlobalProtect_Update.exe` |
+| Implant | Sliver, delivered as `MicrosoftEdgeUpdate.exe` (v2 used `GlobalProtect_Update.exe`) |
 
 **One fingerprint linked two separate compromises.** The two implants were delivered at
 different times through different routes, SPIDERMAN by payload delivery and THEPUNISHER by
@@ -98,8 +98,15 @@ never arrives in the shape it expects. It ships unscheduled with that written on
 
 ## 5. Verdict
 
-True positive. Two endpoints beaconing to an internal non-domain host over mutual TLS, from
-the same C2 framework, for the duration of the run.
+True positive. Two endpoints beaconing to an internal non-domain host over HTTPS, from the
+same C2 framework, for the duration of the run.
+
+**On the protocol, because the wording changed.** This run used Sliver's `https` listener
+with an `--http` implant — ordinary server-side TLS, which is what the JA4 ClientHello
+fingerprint is taken from. v2 used Sliver's `mtls` listener, and any "mutual TLS" wording in
+this case file was carried over from there. The attack screenshot settles it: `https --lport
+443`, then `generate --http 192.168.182.133:443`. The distinction matters for recommendation
+9 below.
 
 ## 6. Where this sits in the chain
 
@@ -133,6 +140,10 @@ Hardening:
 
 8. Egress filtering. In this lab the C2 destination is internal, which a flat network
    permits and segmentation would not.
-9. TLS inspection at the perimeter, with the limitation that mutual TLS resists it.
+9. TLS inspection at the perimeter. This channel is server-side HTTPS, not mutual TLS, so
+   it does not have the client-certificate barrier that mTLS puts in the way — but whether an
+   inline proxy can actually read it still depends on whether the implant validates or pins
+   the server certificate. The listener choice decides how much this control can see, and it
+   is not the automatic dead end that "mutual TLS" would have made it.
 10. Application allowlisting stops the implant before it beacons, which is the only control
     here that acts rather than observes.

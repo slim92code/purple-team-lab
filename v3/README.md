@@ -489,6 +489,10 @@ reverted.
 
 ## Known gaps carried into v4
 
+Most of these are the starting point v4 rebuilds. Two were closed in place after the run
+instead of being carried forward — the Sysmon config blind spot on 25 Oct and the Wazuh
+ingestion gap on 29 Oct — and are marked where they appear below.
+
 **The hardening baseline is partial and inconsistent.** That is the starting point v4
 rebuilds: CIS-aligned SMB signing, LSA Protection, WDigest/LLMNR off, and a GPO firewall
 baseline with a domain-isolation gate, with WinRM east-west left open as the monitored

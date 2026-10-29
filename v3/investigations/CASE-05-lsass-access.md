@@ -87,6 +87,14 @@ added the `lsass` line on the host and never put it back in the file. Every rule
 file was written and tuned against a config that could not produce its input, and the one
 host that worked was the accident.
 
+**Closed 25 Oct 2026.** The `ProcessAccess` rule was added to the shipped
+[`config/sysmonconfig.xml`](../../config/sysmonconfig.xml) and redeployed to all three hosts:
+SPIDERMAN went from 0 EID 10 in seven days to 60 in the first hour, HYDRA-DC from 0 to 49,
+with the targeted trigger landing as `powershell.exe` reading `lsass.exe` at `0x1F3FFF` — the
+mask this case file is about. The before/after is in
+[`config/README.md`](../../config/README.md). The verdict above is left as it was recorded on
+20 October; this note is what changed afterwards.
+
 ### 4.2 The EDR never received the event
 
 Wazuh is deployed on all three Windows hosts and reports healthy. Across every archived

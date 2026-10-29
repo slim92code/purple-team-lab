@@ -517,6 +517,15 @@ GUIDs are:
 
 **SPL 6.5 — LSASS access (Mimikatz signature)**
 
+> **This mask list is wrong and was corrected later — do not deploy it as written.** Measured
+> over seven days in this lab (v3 Appendix B), `0x1010` and `0x1410` are almost entirely
+> platform noise from WmiPrvSE and Defender, while the credential dump that actually ran read
+> LSASS at `0x1F3FFF`, which is **not** in this list. So the query below fires on roughly two
+> hundred benign reads and misses the dump. The shipped detection — Sigma rule 8, the Splunk
+> `Purple - LSASS Access` search and Wazuh `100200` — matches the dump-capable masks
+> (`0x1438`, `0x143a`, `0x1f0fff`–`0x1fffff`) and excludes measured platform readers by full
+> path. Kept here unedited to show the before.
+
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=10
 | rex field=Message "TargetImage:\s*(?<target>[^\r\n]+)"
@@ -903,6 +912,13 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=1
 ---
 
 ## DETECTION COVERAGE MATRIX
+
+> **The "Excellent / Low-FP" grades below are v2 self-assessment, and three of them were
+> overturned when the rules were measured in v3.** Kerberoasting (RC4) never had an input in
+> this environment — 1,649 `4769` over 30 days, zero `0x17`. The shipped spray filter dropped
+> real `0xE` attempts and did not reach its own threshold on its own run. The LSASS row
+> carries the access-mask bug noted above. Treat this table as the v2 claim; the measured
+> state is in [v3](../v3/README.md). Kept unedited on purpose.
 
 | MITRE Technique | Detection Source | SPL Status | False Positive Risk |
 |---|---|---|---|

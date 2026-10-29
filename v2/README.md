@@ -7,6 +7,15 @@ stress-tested for what default tooling misses. The gap is then closed and re-pro
 > in [v3](../v3/). [v4](../v4/), a rebuild on a hardened baseline, is scoped as a design
 > document and not yet built. Repo entry point: [root README](../README.md).
 
+> **This page is preserved as written, before the detections were measured against real
+> data.** Several queries here and in [`03_detection_playbook.md`](03_detection_playbook.md)
+> were later found wrong and corrected in [`detections/`](../detections/) and
+> [v3](../v3/): the LSASS access-mask list matched mostly benign masks and omitted
+> `0x1F3FFF`, the one the attack actually used; and the "Excellent / Low-FP" coverage grades
+> for Kerberoasting and spray did not survive measurement. The difference between this page
+> and v3 is the point, so the originals are left unedited and the corrections are marked
+> where they apply.
+
 This page is the 2-minute scan. The full playbooks are linked below, and
 [`Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf`](Stevan_Mrksic_Portfolio_PurpleTeamLab.pdf) is
 the same material as a single document.
@@ -158,8 +167,12 @@ The prevention fixes, re-proven:
 - [Account lockout](screenshots/10_fix1_lockout.png). With lockout enabled the spray trips
   `4740` (fcastle locked out) instead of running free.
 - [AES-only Kerberos](screenshots/10_fix2_aes.png). `4769` for `SQLService` flips from
-  `0x17` (RC4) to `0x12` (AES-256) across the timeline, so the RC4 roast is no longer
-  possible.
+  `0x17` (RC4) to `0x12` (AES-256) across the timeline, so the *default* roast now comes back
+  AES. Read carefully: this narrows the etype of the issued ticket, it does not prove RC4 is
+  blocked. v3 measured the difference — the account still held an RC4 key and a `4768` TGT
+  for it came back `0x17` on request, so an attacker who asks for the downgrade explicitly
+  still gets it. Preferring AES and enforcing AES-only are different postures. Removing the
+  RC4 key (`msDS-SupportedEncryptionTypes` set to AES-only) is what actually closes it.
 - [AppLocker deny `C:\Temp`](screenshots/10_fix3_applocker.png). AppLocker `8004`:
   `GLOBALPROTECT_UPDATE.EXE was prevented from running`.
 
@@ -198,8 +211,15 @@ This is a lab, not production.
   [v3](../v3/) fixes the entry point: the spray lands on `pparker`, a standard domain user,
   who then Kerberoasts a Domain Admin SPN 98 seconds later, which is a real escalation.
   [v4](../v4/) moves the service account to a gMSA.
-- `C:\Temp` is a Defender exclusion so payload delivery is reproducible on camera. In
-  production it would not be, and the AppLocker fix in Segment 10 addresses that path.
+- **Defender is enabled, but three paths are excluded and UAC is off on one host.** The
+  exclusions are `C:\Temp`, `C:\Windows\` — the entire Windows folder — and
+  `C:\Windows\Tasks`, set by GPO ([`01_lab_setup.md` §7](01_lab_setup.md)), so payload
+  delivery is reproducible on camera; the AppLocker fix in Segment 10 addresses the
+  `C:\Temp` path. UAC is also disabled on THEPUNISHER (`EnableLUA=0`, `lab_issues.md` #5).
+  Both make the attack easier, which makes the blue-team result below stronger rather than
+  weaker — but "Defender on, not staged" should be read as "Defender on, with these
+  exclusions and UAC off", not as a hardened host. [v3](../v3/) removed the exclusions
+  entirely.
 - Kali's SMB/RPC (445/135) is firewall-filtered from all three Windows hosts (see the
   connectivity matrix in `01_lab_setup.md`), so impacket attacks cannot run directly from the
   attacker and pivot through an endpoint's authenticated session instead. That is the
