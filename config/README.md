@@ -116,6 +116,12 @@ two lines, and both are the same field:
 Relative path before, absolute after: the same file, written differently depending on how it
 was invoked. Not one rule, filter or exclusion changed. **The prediction holds.**
 
+The diff against the hand-edited config still on that host was re-taken at the same time and
+accounts for every line: 18 differences, 11 of them only in this file (the two `PurpleLab`
+rules plus the nine comment lines that explain them) and 7 only in the hand-edit (the same
+two rules unnamed, the two redundant `NetworkConnect` paths, two comments and a blank). No
+unexplained drift in either direction, which is the claim above checked rather than repeated.
+
 The before-dump also settles something this page had wrong. It names the running config as
 `sysmonconfig_fixed_v3.xml` — the file shipped here — so by the time of the test THEPUNISHER
 was not running a hand-edit at all. The hand-edited `lsass` line is what produced the v3
