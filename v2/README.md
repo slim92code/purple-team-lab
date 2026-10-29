@@ -117,6 +117,15 @@ DCSync via a DA breaks. The durable fix is tiering, not AV signatures.
 > Splunk dashboard for the run: KPI tiles (password-spray events, Kerberoasting RC4 tickets,
 > C2 beacon connections, Defender/AMSI blocks, attacker network logons), a MITRE ATT&CK
 > coverage bar chart by technique, and an attack timeline across all phases.
+>
+> Two things in this image are worth naming rather than hoping nobody notices. Every panel
+> carries a search warning, and the tiles and the bar chart do not agree — the
+> "Lateral Movement" tile reads 31, which is the same number the chart gives `T1071.001 C2
+> Beacon`, while the "C2 Beacon" tile reads 86 and matches nothing on the chart. The tiles and
+> the chart were written as separate searches counting different things under similar labels,
+> which is exactly the sort of dashboard that looks authoritative and misleads. It is kept as
+> taken, like the rest of v2; the lesson is that a KPI tile needs the same scrutiny as a
+> detection rule, and it did not get it here.
 
 ### 01 — Password spray (T1110.003)
 
