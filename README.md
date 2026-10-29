@@ -100,14 +100,12 @@ predictions and the residual-gap list have to be on record first.
 
 ## Notes
 
-**On method.** I built the lab, ran the chain, ran every query and deployed every fix, and
-the numbers here came out of that: 935 sampled LSASS reads, 1,649 service tickets over 30
-days, 43,683 Sysmon events the DC's agent never read. The write-up was done with AI
-assistance, and so were several of the detection bugs recorded above. The Zeek filter that
-could never match, the correlation that split on an IPv6-mapped address, the empty
-`ProcessAccess` include: those came out of review, not out of me spotting them. They are
-documented as findings rather than quietly fixed, which is the useful part either way, but I
-am not going to claim I found them alone.
+**On method.** I built the lab, ran the chain, ran every query and deployed every fix.The 
+write-up was done with AI assistance, and so were several of the detection bugs recorded 
+above. The Zeek filter that could never match, the correlation that split on an IPv6-mapped 
+address, the empty `ProcessAccess` include: those came out of review, not out of me spotting 
+them. They are documented as findings rather than quietly fixed, which is the useful part 
+either way, but I am not going to claim I found them alone.
 
 **On the commit history.** The work came first and the repository second. The v2 detections
 are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
