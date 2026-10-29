@@ -100,11 +100,11 @@ predictions and the residual-gap list have to be on record first.
 
 ## Notes
 
-**On method.** I built the lab, ran the chain, ran every query and deployed every fix.The 
-write-up was done with AI assistance, and so were several of the detection bugs recorded 
-above. The Zeek filter that could never match, the correlation that split on an IPv6-mapped 
-address, the empty `ProcessAccess` include: those came out of review, not out of me spotting 
-them. They are documented as findings rather than quietly fixed, which is the useful part 
+**On method.** I built the lab, ran the chain, ran every query and deployed every fix. The
+write-up was done with AI assistance, and so were several of the detection bugs recorded
+above. The Zeek filter that could never match, the correlation that split on an IPv6-mapped
+address, the empty `ProcessAccess` include: those came out of review, not out of me spotting
+them. They are documented as findings rather than quietly fixed, which is the useful part
 either way, but I am not going to claim I found them alone.
 
 **On the commit history.** The work came first and the repository second. The v2 detections
