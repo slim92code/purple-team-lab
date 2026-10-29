@@ -305,9 +305,12 @@ Times UTC.
 Not covered: an LSASS read from code injected into an already-excluded signed process.
 That needs `CallTrace`, and this lab has no sample to test a pattern against.
 
-**Coverage limit:** Wazuh receives Sysmon from 1 of the lab's 3 Windows agents, so `100200`
-can only fire on THEPUNISHER. The `4698` task rules are unaffected, since the Security
-channel is configured on all three. Full write-up in
+**Coverage limit, lifted 29 Oct 2026.** Wazuh originally received Sysmon from 1 of the lab's
+3 Windows agents, so `100200` could only fire on THEPUNISHER — the other two agents had no
+`Microsoft-Windows-Sysmon/Operational` block in `ossec.conf`. Adding it and restarting the
+agents produced the first `100200` alerts from SPIDERMAN and HYDRA-DC, both at level 12 on
+`powershell.exe` reading `lsass.exe` at `0x1f3fff`. The `4698` task rules were never affected,
+since the Security channel was configured on all three. Full write-up in
 [`v3/README.md`](../v3/README.md#known-gaps-carried-into-v4).
 
 Two rules key on behaviour rather than an indicator. Rule 7 keys on

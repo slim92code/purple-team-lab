@@ -142,9 +142,13 @@ attacker.
 Sigma rule and the Splunk search need. They will still not reach Wazuh on SPIDERMAN or
 HYDRA-DC, because only THEPUNISHER has a `Microsoft-Windows-Sysmon/Operational` block in its
 `ossec.conf` — a separate gap, documented in [v3](../v3/README.md), and untouched by this
-change. The Wazuh LSASS rules therefore remain single-host until the agent config is fixed
-too. One blind spot had two independent causes stacked on top of each other, and clearing the
-first does not clear the second.
+change. One blind spot had two independent causes stacked on top of each other, and clearing
+the first did not clear the second.
+
+The second was closed separately on 29 Oct 2026 by adding the missing
+`Microsoft-Windows-Sysmon/Operational` block to `ossec.conf` on both agents and restarting
+them. `100200` then fired at level 12 on SPIDERMAN and HYDRA-DC for the first time. Two fixes,
+in two different files, on two different days, for what presented as a single symptom.
 
 Before reusing this file, compare it against what the host is actually running. The
 deployed config is the one that decides what gets logged.

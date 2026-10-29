@@ -98,9 +98,17 @@ alert file:
 | SPIDERMAN | 22,782 | 0 | 0 |
 | THEPUNISHER | 18,591 | 376 | 32 |
 
-Only THEPUNISHER carries a `Microsoft-Windows-Sysmon/Operational` block in its `ossec.conf`.
-The DC case is the sharpest: Sysmon is installed and running there and its own log holds
-43,683 events that the agent never reads.
+Only THEPUNISHER carried a `Microsoft-Windows-Sysmon/Operational` block in its `ossec.conf`.
+The DC case was the sharpest: Sysmon was installed and running there and its own log held
+43,683 events that the agent never read.
+
+**Closed on 29 Oct 2026**, after this case file was written. The missing block is four lines;
+adding it to both agents and restarting them produced the first `100200` alerts the lab has
+had from anything but THEPUNISHER — SPIDERMAN and HYDRA-DC, both level 12, `powershell.exe`
+reading `lsass.exe` at `0x1f3fff`. Worth sitting with for a second: the rule had been written,
+measured against 935 reads, tuned, deployed and verified. It was correct the whole time, and
+on two of the three hosts it was meant to protect it was worth nothing, because four lines of
+agent config were missing. The rule was never the problem.
 
 ### 4.3 The EDR's own LSASS rule is a 100% false positive
 

@@ -21,7 +21,7 @@ and each phase checked against every source.
 | SPIDERMAN | `.138` | Windows 10 endpoint |
 | THEPUNISHER | `.137` | Windows 10 endpoint |
 | Splunk | `.131` | Splunk 10.2 SIEM, Enterprise licence (v2 ran on Free, so its detections were run on demand; the six alerts in screenshot 11 fire on schedule because of this change) |
-| Wazuh | `.150` | Wazuh 4.12 manager, 3 Windows agents, Sysmon from 1 of them ([why](#known-gaps-carried-into-v4)) |
+| Wazuh | `.150` | Wazuh 4.12 manager, 3 Windows agents; during v3 it read Sysmon from 1 of them ([why](#known-gaps-carried-into-v4)) |
 | security-vm | `.151` | Zeek + Suricata |
 | Kali | `.133` | Attacker |
 
@@ -503,13 +503,13 @@ Domain Admin rather than to a low-privilege service account. Its password was al
 account's AD `Description` field (T1552.001), a second exposure. v4 moves it to a gMSA and
 clears the description.
 
-**The Wazuh gaps are fixed at the rule layer, not the telemetry layer.** The rules in
-[`detections/`](../detections/wazuh/local_rules.xml) are deployed and verified, so `\Updater`
-now scores level 12 and a full-access LSASS handle alerts at all. The ingestion gap below is
-not fixed: the LSASS rule has telemetry on one of three hosts. Screenshot 13 records the
-original behaviour, before the rules were written.
+**The Wazuh gaps were fixed at the rule layer first, and the telemetry layer afterwards.**
+The rules in [`detections/`](../detections/wazuh/local_rules.xml) are deployed and verified,
+so `\Updater` now scores level 12 and a full-access LSASS handle alerts at all. Screenshot 13
+records the original behaviour, before the rules were written. The ingestion gap below was
+closed on 29 Oct 2026 — see the end of this section.
 
-**Wazuh receives Sysmon from one of three Windows agents.** Across every archived alert file:
+**Wazuh received Sysmon from one of three Windows agents.** Across every archived alert file:
 
 | Agent | Alerts | From Sysmon | EID 10 |
 | ----- | ------ | ----------- | ------ |
@@ -517,11 +517,25 @@ original behaviour, before the rules were written.
 | SPIDERMAN | 22,782 | 0 | 0 |
 | THEPUNISHER | 18,591 | 376 | 32 |
 
-Only THEPUNISHER carries a `Microsoft-Windows-Sysmon/Operational` block in its `ossec.conf`.
-On the DC, Sysmon is installed and running and its log holds 43,683 events; the agent never
-reads the channel. The agent reports healthy and busy while the EDR sees none of it. Any
-Wazuh-side Sysmon detection can fire on one host out of three. The `4698` task rules are
+Only THEPUNISHER carried a `Microsoft-Windows-Sysmon/Operational` block in its `ossec.conf`.
+On the DC, Sysmon was installed and running and its log held 43,683 events; the agent never
+read the channel. The agent reported healthy and busy while the EDR saw none of it. Any
+Wazuh-side Sysmon detection could fire on one host out of three. The `4698` task rules were
 unaffected, since the Security channel is configured everywhere.
+
+**Closed, 29 Oct 2026.** The missing `localfile` block was added to `ossec.conf` on SPIDERMAN
+and HYDRA-DC and the agents restarted. A targeted trigger on each host — a PowerShell handle
+to `lsass.exe` — produced the first `100200` alerts the lab has ever seen from an agent other
+than THEPUNISHER:
+
+```
+2026-10-29T12:06:55  SPIDERMAN  100200  level 12  powershell.exe  0x1f3fff
+2026-10-29T12:09:28  HYDRA-DC   100200  level 12  powershell.exe  0x1f3fff
+```
+
+Wazuh-side Sysmon coverage went from one agent to three. Note what the fix was: four lines of
+agent config. The rule had been correct and verified for days, and was still worth nothing on
+two of the three hosts it was supposed to protect.
 
 **A custom rule that could not fire, twice.** The original LSASS rule was deployed against
 `<if_group>sysmon_event10</if_group>`. The real group is `sysmon_event_10`, one underscore

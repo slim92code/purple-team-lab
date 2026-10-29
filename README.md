@@ -48,7 +48,8 @@ Findings:
   attempt produces no `4771`.
 - One JA4 TLS fingerprint linked Sliver C2 beacons across both endpoints.
 - Three separate Wazuh problems: scheduled-task creation scored the same for a malicious and
-  a benign task; a Sysmon ingestion gap left the EDR blind on two of three hosts, one of them
+  a benign task; a Sysmon ingestion gap left the EDR blind on two of three hosts (since
+  closed), one of them
   a DC whose own Sysmon log holds 43,683 events the agent never reads; and the built-in
   credential-access rule fired 32 times at level 12 with all 32 benign.
 
