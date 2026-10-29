@@ -1,4 +1,4 @@
-# CASE-05 — LSASS access, and four layers of coverage that were not there
+# CASE-05 — LSASS access, and five layers of coverage that were not there
 
 | | |
 | --- | --- |
@@ -62,7 +62,8 @@ for (s, g), n in c.most_common(): print(n, g, s)
 ## 4. Findings
 
 The attack was caught on one host by one source. Everything else that should have covered
-it did not, for four different reasons.
+it did not, for five different reasons. The fifth was found four days after this file was
+written and is the one none of the others would have surfaced.
 
 ### 4.1 The other endpoint cannot produce the event
 
@@ -146,6 +147,70 @@ reporting the fault on every start:
 wazuh-analysisd: WARNING: (7610): Group 'sysmon_event10' was not found.
 Invalid 'if_group'. Rule '100200' will be ignored.
 ```
+
+### 4.5 And the alerts never reached the console
+
+Checked on 29 Oct 2026 by opening the dashboard rather than grepping the log. Threat Hunting
+returned **no results for the last 24 hours**, on an estate that had produced thousands of
+alerts that day.
+
+Everything that reports health reported healthy:
+
+| Check | Result |
+| ----- | ------ |
+| `wazuh-analysisd -t` | clean |
+| `filebeat test output` | `talk to server... OK` |
+| `systemctl is-active` manager / indexer / dashboard / filebeat | `active` four times |
+| Agents | reporting |
+| Disk | 56% used, 9.9 GB free |
+
+The indexer said otherwise. The newest `wazuh-alerts` index was `2026.10.24`, and it was
+`red`:
+
+```
+TranslogCorruptedException: translog ... is corrupted,
+checksum verification failed - expected: 0x62cc33c8, got: 0x0
+at: 2026-10-24T23:32:17Z, failed_allocation_attempts: 5
+```
+
+`got: 0x0` is a file that was mid-write when the power went. The VM was shut down at 23:32 on
+24 October with the indexer writing, one shard's translog was left truncated, recovery failed
+five times, and the `max_retry` decider stopped trying.
+
+What turned that into a five-day outage is what it did to delivery. Filebeat's log held one
+line, repeating every sixty seconds:
+
+```
+ERROR [publisher_pipeline_output] failed to publish events: temporary bulk send failure
+```
+
+Every bulk in the queue carried documents bound for the broken index, so every bulk failed,
+and filebeat retried the same batch rather than skipping it. Nothing behind it moved.
+**Between 24 and 29 October the console received nothing at all** — not the `100200` alerts
+this case file is about, not anything else.
+
+Which means the evidence for 4.2 being closed was read out of `alerts.json` with `grep`, and
+that was the only place it existed. An analyst watching the console on 29 October would have
+seen the same empty screen as on 25 October, with a level 12 credential-access alert sitting
+in a file on the same disk.
+
+**Closed the same evening.** `_cluster/reroute?retry_failed=true` was tried first and changed
+nothing, which is what should happen: retrying does not repair a truncated file.
+`allocate_empty_primary` with `accept_data_loss` on that one shard turned the cluster green,
+and the backlog drained in under two minutes — `2026.10.24` went from 6,333 documents to
+11,321, and `2026.10.29` was created with 13,962.
+
+The cost is recorded rather than rounded off. Ten `100200` alerts exist across the alert
+archives; eight are now searchable, seven in `2026.10.29` and one in `2026.10.24`. The two
+that are not were on the discarded shard, both from 24 October, both THEPUNISHER. The rule's
+own verification timestamp, `11:42:39` on 24 October, survives in the archive, which is where
+it was read from to begin with.
+
+**None of the five checks above would have caught this, and that is the part worth keeping.**
+`wazuh-analysisd -t` validates rules, not delivery. `filebeat test output` opens a connection
+and reports `OK`; it never tries to write a document. `systemctl is-active` reports that a
+process is running, which it was, in a retry loop. Service health and data arrival are
+different questions, and only the second one decides whether an analyst sees an alert.
 
 ## 5. Verdict
 

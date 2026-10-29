@@ -15,7 +15,7 @@ Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 Built and measured by me, written with AI assistance. Details in [Notes](#notes).
 
 **Short on time?** [CASE-05](v3/investigations/CASE-05-lsass-access.md) follows one alert to
-the end and finds four separate reasons the EDR stayed silent.
+the end and finds five separate reasons the EDR stayed silent.
 [The v3 findings](v3/README.md#findings) are the rules that did not work and how each was
 measured.
 
@@ -57,11 +57,12 @@ Findings:
 - Zeek recorded a spray attempt the Windows log never did, because an unknown-principal
   attempt produces no `4771`.
 - One JA4 TLS fingerprint linked Sliver C2 beacons across both endpoints.
-- Three separate Wazuh problems: scheduled-task creation scored the same for a malicious and
+- Four separate Wazuh problems: scheduled-task creation scored the same for a malicious and
   a benign task; a Sysmon ingestion gap left the EDR blind on two of three hosts (since
-  closed), one of them
-  a DC whose own Sysmon log holds 43,683 events the agent never reads; and the built-in
-  credential-access rule fired 32 times at level 12 with all 32 benign.
+  closed), one of them a DC whose own Sysmon log holds 43,683 events the agent never reads;
+  the built-in credential-access rule fired 32 times at level 12 with all 32 benign; and the
+  console itself indexed nothing for five days behind a single corrupted shard, while every
+  health check it has reported healthy.
 
 The custom rule written to close the second one bound to a Wazuh group that does not exist,
 so it loaded, reported as coverage, and was discarded. `wazuh-analysisd -t` had been printing
