@@ -47,6 +47,47 @@ cp detections/splunk/cim-acceleration/macros.conf     "$SPLUNK_HOME/etc/apps/Spl
 "$SPLUNK_HOME/bin/splunk" restart
 ```
 
+### This is the app, not what the lab's Splunk runs
+
+Read off the search head with `| rest /servicesNS/-/-/saved/searches` on 29 Oct 2026, the
+same way the Sysmon configs in [`config/`](../config/) were read off the hosts rather than
+assumed:
+
+| | Searches | Scheduled |
+| --- | --- | --- |
+| Shipped in this app | 16 | 11 |
+| Loaded in the lab's `purple_lab` | **12** | **10** |
+
+Four searches in `savedsearches.conf` have never been loaded into the running app:
+the etype-agnostic Kerberoasting companion, the JA4 C2 beacon, the large outbound transfer
+and the telemetry gap. Two of them do run, under other names in Splunk's default `search`
+app — `V3 - Sliver C2 (JA4)` and `V3 - Suspicious Large Outbound Transfer`, the ad hoc pair
+described above, still live where they were written. The telemetry-gap search runs in no
+instance at all, which is the same thing its own description says.
+
+The fourth is the one worth reading twice. The deployed Kerberoasting search is
+`Purple - Kerberoasting RC4 Service Ticket`, the rule
+[finding 5](../v3/README.md#findings) shows has never had an input on this domain, and the
+companion written to cover that is exactly the one that was not deployed. The live
+`V3 - Kerberoasting SQLService` does catch the AES case, but it hardcodes
+`host=HYDRA-DC` and the string `SQLService`, so it covers this lab's one roast rather than
+the technique.
+
+So this directory now carries the same caveat as [`config/`](../config/README.md), one layer
+up: the file is the intent, the instance decides. Both gaps come from editing the repo
+without redeploying, which is the undramatic way coverage gets lost.
+
+Two things were checked on the same pass and were fine, which is worth recording so the note
+is not read as worse than it is. The live searches key on `sourcetype=WinEventLog`, and that
+sourcetype does exist here with 981,067 events, so they match. They also use `src_ip`, which
+the Windows TA does alias from `Client_Address`, so that resolves too — and it carries both
+`192.168.182.133` and `::ffff:192.168.182.133` as separate values, which is the same
+inconsistency the
+[spray-success rule](splunk/purple_lab/default/savedsearches.conf) was corrected for, seen
+from a third direction. The one real defect in the live set is cosmetic:
+`V3 - Persistence Scheduled Task` ends `| table _time host user Messagee`, so the alert fires
+and its last column is always empty.
+
 The detections use `summariesonly=false`, so they return results immediately (raw scan)
 even before acceleration finishes building summaries, then speed up automatically once it does.
 
