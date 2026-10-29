@@ -1,6 +1,6 @@
 # Lab v3 — Network Detection and Host EDR Layers
 
-**Full technical report (English, 31 pages):**
+**Full technical report (English, 32 pages):**
 [`Purple_Team_Report_v3_EN.pdf`](Purple_Team_Report_v3_EN.pdf). All 26 screenshots, the seven
 findings with the measurements behind them, the rule verification log and the raw counts.
 
