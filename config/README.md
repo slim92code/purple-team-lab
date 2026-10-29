@@ -103,6 +103,32 @@ THEPUNISHER was not redeployed. The diff predicts the change would be a no-op th
 is already running the `lsass` line by hand, and that prediction is on record here before the
 test rather than after it.
 
+### The prediction, tested 29 Oct 2026
+
+Dumped the running config, applied this file, dumped again, diffed. `Compare-Object` returned
+two lines, and both are the same field:
+
+```
+- Config file:   .\sysmonconfig_fixed_v3.xml
+- Config file:   C:\Users\frankcastle\Desktop\UF_Sysmon\sysmon-config-master\sysmonconfig_fixed_v3.xml
+```
+
+Relative path before, absolute after: the same file, written differently depending on how it
+was invoked. Not one rule, filter or exclusion changed. **The prediction holds.**
+
+The before-dump also settles something this page had wrong. It names the running config as
+`sysmonconfig_fixed_v3.xml` — the file shipped here — so by the time of the test THEPUNISHER
+was not running a hand-edit at all. The hand-edited `lsass` line is what produced the v3
+evidence on 20 October, and that stands; but at some point after this file was written it was
+applied to that host too, and the table above kept describing a state that had already moved
+on. The prediction was right for a reason other than the one recorded next to it, which is
+worth more than being right for the stated one.
+
+One thing the dump prints that is not a defect: the config declares `schemaversion 4.50`
+while the installed Sysmon reports schema 4.90. Older schema on a newer binary is accepted
+and loads as written, which is why this file is portable across the three hosts without a
+per-host variant.
+
 ### What the redeployment turned up on the way
 
 THEPUNISHER did not appear in Splunk after its trigger, which looked at first like the
