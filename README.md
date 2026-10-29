@@ -87,9 +87,9 @@ Seven [alert-triage case files](v3/investigations/) cover the chain phase by pha
 alert, the questions asked, the queries run, the verdict, and the tuning that follows. Three
 of them are about detections that did not work.
 
-### v4 — planned, not yet built
+### v4 — planned
 
-[`v4/README.md`](v4/README.md) is a design document. It scopes a rebuild of the v3 stack on a
+[`v4/README.md`](v4/README.md) scopes a rebuild of the v3 stack on a
 hardened baseline (advanced audit policy, credential protection, network-protocol hardening,
 account and Kerberos policy, execution controls), after which the same kill chain is re-run
 to produce a before/after detection-coverage matrix. The deliverable is a set of alert-triage
@@ -102,10 +102,16 @@ predictions and the residual-gap list have to be on record first.
 
 **On method.** I built the lab, ran the chain, ran every query and deployed every fix. The
 write-up was done with AI assistance, and so were several of the detection bugs recorded
-above. The Zeek filter that could never match, the correlation that split on an IPv6-mapped
-address, the empty `ProcessAccess` include: those came out of review, not out of me spotting
-them. They are documented as findings rather than quietly fixed, which is the useful part
-either way, but I am not going to claim I found them alone.
+above: the Zeek filter that could never match, the correlation that split on an IPv6-mapped
+address, the empty `ProcessAccess` include. Review turned those up, not me, and I am not
+going to claim otherwise.
+
+Review also argued for things that were false. That an AES Kerberoast cannot trip an event
+named `weak_encryption`, and that one host's Sysmon events could not have come from a deploy
+that had not run. Both were well argued and both were wrong. What settled them was counting
+the events by timestamp and reading `sysmon64 -c` off the host, and both reversals are written
+up where they happened ([Suricata](v3/README.md#what-weak_encryption-actually-fires-on),
+[Sysmon](config/README.md)). A review is a hypothesis; the estate is what decides it.
 
 **On the commit history.** The work came first and the repository second. The v2 detections
 are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
