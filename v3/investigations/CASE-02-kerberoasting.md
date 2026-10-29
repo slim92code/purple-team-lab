@@ -55,9 +55,21 @@ filtered to service tickets whose SPN is neither `krbtgt` nor a machine account:
 | Requested by | `pparker`, the account compromised in CASE-01 |
 | Source | `192.168.182.133`, non-domain |
 | Encryption type | `0x12` (AES-256) |
-| `SQLService` group membership | **Domain Admins** |
+| `SQLService` group membership | **Domain Admins**, **Enterprise Admins**, **Schema Admins**, `Administrators`, `Group Policy Creator Owners` |
 | Password storage | also present in the account's AD `Description` field |
 | Outcome | hash cracked offline, hashcat mode 19700 |
+
+**That membership came off the DC, and the attack tool reported it wrong.** The
+`GetUserSPNs` output in
+[`v3/attack/`](../attack/02_kerberoast_request_getuserspns.png) shows a single group,
+`Group Policy Creator Owners`, which reads as a far weaker target: it grants the right to
+create GPOs, not to link them, so on its own it is a path to compromise rather than
+compromise. `Get-ADUser SQLService -Properties MemberOf` on HYDRA-DC returns five groups,
+and the three that matter are not the one the tool printed. Anyone scoping this from the
+screenshot alone would under-rate the account by two tiers.
+
+Worth taking as a rule rather than as a note about one tool: attacker tooling prints what
+it needs, not what is true. Enumerate privilege from the directory.
 
 Three things follow from this.
 

@@ -503,9 +503,12 @@ per account per window is how spraying evades lockout. The weaker control here i
 7-character minimum password length, which v4 raises.
 
 **`SQLService` is a human-managed Domain Admin with an SPN.** The roast cracks straight to
-Domain Admin rather than to a low-privilege service account. Its password was also in the
+Domain Admin rather than to a low-privilege service account. Read off the DC the account is
+in five groups, and `Enterprise Admins` and `Schema Admins` are both above the one named
+here, so the blast radius is the forest rather than the domain. Its password was also in the
 account's AD `Description` field (T1552.001), a second exposure. v4 moves it to a gMSA and
-clears the description.
+clears the description. The `GetUserSPNs` output names only one of the five and it is the
+weakest; see [CASE-02](investigations/CASE-02-kerberoasting.md#4-findings).
 
 **The Wazuh gaps were fixed at the rule layer first, and the telemetry layer afterwards.**
 The rules in [`detections/`](../detections/wazuh/local_rules.xml) are deployed and verified,
