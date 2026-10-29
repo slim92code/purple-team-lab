@@ -216,6 +216,33 @@ a time. Every other dead rule documented here looked correct under that kind of 
 what they needed was execution. The difference is that this search had never run, so modelling
 it was the only option available.
 
+**It was run for the first time on 29 Oct 2026, and the modelling held on its own terms while
+missing two other things.** Every row of the table above is still right. What the scenarios
+did not cover was the field the rule measures and the hosts it measures it on.
+
+*The field.* The search read `max(_time)`, the newest event timestamp. The incident it was
+written for is invisible in `_time`, because `Restart-Service SplunkForwarder` made the
+forwarder backfill from its checkpoint and backfilled events carry their original timestamps,
+so the gap closes retroactively. Reconstructed from `_indextime`, which a backfill cannot
+rewrite: the last Security event THEPUNISHER delivered arrived at `00:17:55`, nothing arrived
+for 67 minutes 22 seconds, and at `01:25:17` roughly 2,270 events landed at once with delivery
+lags of up to 61 minutes. Keyed on `_indextime` the rule returns that host at a 62-minute gap.
+Keyed on `_time` it returns nothing. For pipeline health the question was never how old the
+newest event is, it is when the host last delivered anything — and a rule that is only
+checkable while the failure is still running is a rule nobody can audit afterwards.
+
+*The hosts.* The null-`win` branch, the one the modelling added and scored above every
+measurable gap, cannot tell "this Windows host has gone silent" from "this is not a Windows
+host". The lab has two of the latter: `security-vm` carries 1,219 non-Windows sources and has
+never produced one `WinEventLog:` source, and `wazuh-vm` carries one and the same zero. Both
+sat permanently in the highest-scored branch and alerted whenever either had ingested in the
+previous ten minutes. Gating that branch on [`lookups/windows_hosts.csv`](splunk/purple_lab/lookups/windows_hosts.csv)
+drops both and keeps the real one.
+
+So the claim above is qualified rather than withdrawn. Modelling found the defect that reading
+a rule is capable of finding. Both of the ones it missed are about what the rule is pointed at
+rather than what it computes, and neither is visible without data.
+
 **There is no Sigma rule for the byte-volume exfiltration search**, and that is deliberate
 rather than an omission. `Purple - Large Outbound Transfer` is a threshold over a sum across a
 time bucket; Sigma expresses single-event matches well and aggregations poorly, so writing it
