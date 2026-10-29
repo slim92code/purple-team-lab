@@ -239,7 +239,16 @@ detection:
             - '\Users\Public\'
             - '\ProgramData\'
     suspect_priv:
-        TaskContent|contains: 'S-1-5-18'   # runs as SYSTEM
+        # <UserId> is not written in one form. Measured on this domain: the v3
+        # \Updater task carries the SID, Register-ScheduledTask -User SYSTEM
+        # carries the literal string, named principals carry DOMAIN\user. Testing
+        # for the SID alone misses a SYSTEM task created through PowerShell.
+        # On a backend that receives the task XML HTML-escaped, such as Wazuh here,
+        # the angle brackets need escaping too.
+        TaskContent|contains:
+            - 'S-1-5-18'
+            - '<UserId>SYSTEM</UserId>'
+            - '<UserId>NT AUTHORITY\SYSTEM</UserId>'
     filter_machine:
         SubjectUserName|endswith: '$'
     condition: selection and (suspect_path or suspect_priv) and not filter_machine
