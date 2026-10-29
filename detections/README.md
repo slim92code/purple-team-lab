@@ -175,6 +175,47 @@ Zeek field, so without the package `ssl.log` has no such column and the rule can
 Splunk counterpart is `Purple - Sliver C2 Beacon by JA4 Fingerprint`, which adds the beacon
 interval and jitter the Sigma form cannot express.
 
+### The pipeline-health search, and the one bug found by reading
+
+`Purple - Telemetry Gap` watches the collection path rather than the attacker: it fires when a
+host is still sending data while its Windows event logs have gone stale. It exists because
+that failure happened here — every `WinEventLog` channel on THEPUNISHER stopped for 68 minutes
+while Perfmon kept arriving, and nothing noticed.
+
+The first version of it could not detect the worst case it was written for. It opened with
+`index=main earliest=-4h`, so a host whose Windows logs had been dead longer than the window
+produced no `win` row at all, the `chart` left that column null, and `isnotnull(win)` dropped
+the host. The effective range was a gap between roughly 20 minutes and 4 hours old. A
+four-hour outage alerted; a five-hour one did not, and a host that had never sent a Windows log
+in the window — total silence, the most severe case there is — was filtered out rather than
+escalated.
+
+Modelled across scenarios before and after:
+
+| Scenario | First version | Shipped version |
+| -------- | ------------- | --------------- |
+| Windows logs 10 min stale | no alert (correct) | no alert (correct) |
+| 68 min — the real incident | alert | alert |
+| 3 hours | alert | alert |
+| 5 hours | **no alert** | alert |
+| 3 days | **no alert** | alert |
+| No Windows log at all | **no alert** | alert, ranked highest |
+| Host fully offline | no alert (correct) | no alert (correct) |
+
+Two changes. The window moved from raw events over 4 hours to `tstats` over index metadata
+across 7 days, which is both wider and cheaper because it never touches the raw events. And a
+null `win` is now scored as more severe than any measurable gap instead of being excluded,
+which is the part that mattered: widening the window alone would not have fixed total silence,
+because a host with no Windows log in the lookback has a null `win` whatever the lookback is.
+
+**This is the only defect in this repo that was found by reading a rule rather than by running
+it**, and it is worth being precise about why that worked here when it has not elsewhere. It
+was not spotted by reading the SPL for intent. It was spotted by asking what each command does
+when a value is missing, and walking the null through `chart`, `eval` and `where` one stage at
+a time. Every other dead rule documented here looked correct under that kind of reading too —
+what they needed was execution. The difference is that this search had never run, so modelling
+it was the only option available.
+
 **There is no Sigma rule for the byte-volume exfiltration search**, and that is deliberate
 rather than an omission. `Purple - Large Outbound Transfer` is a threshold over a sum across a
 time bucket; Sigma expresses single-event matches well and aggregations poorly, so writing it
