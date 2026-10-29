@@ -1,32 +1,23 @@
 # Purple Team Home Lab — Active Directory Detection Engineering
 
-I built an Active Directory lab (`MARVEL.LOCAL`) and ran each attacker technique against it,
-detected it, then stress-tested the detection for what the default tooling misses. Gaps get
-closed and re-proven.
+I built an Active Directory lab (`MARVEL.LOCAL`), ran each attacker technique against it, and
+then tested whether the detection could actually fire. Several could not. One was bound to a
+rule group that does not exist. One waited for an event this domain never produces. One
+filtered on a field whose format it had guessed wrong, and one correlated two event types
+whose address field is written two different ways. Each is written up as a finding rather
+than quietly fixed.
 
 Detection-as-code lives at the repo root. Each lab iteration has its own folder.
 
 Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
 [design document](v4/README.md) and not yet built.
 
-**On how this is written.** I built the lab, ran the chain, ran every query and deployed
-every fix, and the numbers here came out of that: 935 sampled LSASS reads, 1,649 service
-tickets over 30 days, 43,683 Sysmon events the DC's agent never read. The write-up was done
-with AI assistance, and so were several of the detection bugs recorded above. The Zeek filter
-that could never match, the correlation that split on an IPv6-mapped address, the empty
-`ProcessAccess` include: those came out of review, not out of me spotting them. They are
-documented as findings rather than quietly fixed, which is the useful part either way, but I
-am not going to claim I found them alone.
+Built and measured by me, written with AI assistance. Details in [Notes](#notes).
 
-**On the commit history.** The work came first and the repository second. The v2 detections
-are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
-created in June 2026 but the files were only uploaded that October, so the history begins at
-that import rather than at the lab, and the first bulk commit is it. Everything after it is
-ordinary work, including the corrections, which are kept rather than squashed because several
-of them are the point.
-
-A [ten-part video walkthrough](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-)
-covers the v2 chain end to end.
+**Short on time?** [CASE-05](v3/investigations/CASE-05-lsass-access.md) follows one alert to
+the end and finds four separate reasons the EDR stayed silent.
+[The v3 findings](v3/README.md#findings) are the rules that did not work and how each was
+measured.
 
 ## Detection-as-Code
 
@@ -106,6 +97,27 @@ case files rather than an attack narrative.
 
 The plan is committed before the work. The deliverable is a before/after comparison, so the
 predictions and the residual-gap list have to be on record first.
+
+## Notes
+
+**On method.** I built the lab, ran the chain, ran every query and deployed every fix, and
+the numbers here came out of that: 935 sampled LSASS reads, 1,649 service tickets over 30
+days, 43,683 Sysmon events the DC's agent never read. The write-up was done with AI
+assistance, and so were several of the detection bugs recorded above. The Zeek filter that
+could never match, the correlation that split on an IPv6-mapped address, the empty
+`ProcessAccess` include: those came out of review, not out of me spotting them. They are
+documented as findings rather than quietly fixed, which is the useful part either way, but I
+am not going to claim I found them alone.
+
+**On the commit history.** The work came first and the repository second. The v2 detections
+are dated January 2026 and the v3 kill chain was run on 20 October 2026. This repository was
+created in June 2026 but the files were only uploaded that October, so the history begins at
+that import rather than at the lab, and the first bulk commit is it. Everything after it is
+ordinary work, including the corrections, which are kept rather than squashed because several
+of them are the point.
+
+**Video.** A [ten-part walkthrough](https://www.youtube.com/playlist?list=PLL1zKaMLDyG24fX3g8Ck42y_e6nPrRU4-)
+covers the v2 chain end to end.
 
 ---
 
