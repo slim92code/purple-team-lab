@@ -162,3 +162,30 @@ v4/
 
 Each case file follows one format: what the alert showed, the questions asked, the queries
 run, the finding, the verdict, and the tuning or remediation recommendation.
+
+## Addendum — reconciled from the 30 Oct 2026 v3 re-run
+
+Everything above was written on 24 October, before the work, and is left unchanged so the
+predictions stay auditable. A full live re-run of the v3 chain on 30 October surfaced two
+things that change how v4 must start, neither of which is a v4 result — they are corrections
+to the starting state the plan assumed.
+
+**The NDR sensor is not reliably up, and that is a prerequisite, not a detail.** Zeek on
+`security-vm` had been dead since 24 October: its capture interface `ens37` comes up `DOWN`
+after a reboot, so Zeek crashes on start with `pcap_activate: device is not up`, while
+Suricata on another interface keeps the host looking healthy. v4 runs the kill chain twice,
+before and after hardening, and a dead NDR sensor during either run makes the coverage matrix
+worthless. So a **persistent `ens37` configuration (netplan, promiscuous) is step zero of
+v4**, ahead of any hardening, and the matrix build must verify all five sources are live at
+the start of each run rather than assuming it. The `Purple - Telemetry Gap` search does not
+cover this gap — it is gated to Windows hosts — so a cross-sensor liveness check that spans
+the Linux NDR hosts is added to v4's logging work.
+
+**The password-spray residual gap is sharper than "stays under the threshold."** The row above
+is about the *attack* staying under the lockout threshold, which remains true. But the 30 Oct
+re-run measured the *detection* side: this estate produces only four accounts that emit a
+`4771` on a spray (`jsmith` is an unknown principal and emits none; `Guest` is now disabled and
+emits none), and the rule needs five. So in v4 the spray case file's coverage cell is known in
+advance: the attack is viable and the detection does **not** fire, not because hardening broke
+it but because the lab is one account short of the threshold. That is recorded here so the
+before/after matrix reports it as a measured estate limitation rather than a hardening effect.
