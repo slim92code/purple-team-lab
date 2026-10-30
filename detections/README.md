@@ -123,6 +123,42 @@ That one is worth stating plainly because of when it happened: it was introduced
 deployment that existed to close this same class of defect, and it was caught by the same
 `| rest` check that found the original.
 
+#### The searches that were in no app at all
+
+The `| rest` check above reported six `V3 - …` searches in Splunk's default `search` app, and
+the section before this treated them as the ad hoc pair still living where they were written.
+Grepping the filesystem instead of asking Splunk found thirteen:
+
+| Location | Stanzas |
+| -------- | ------- |
+| `etc/users/admin/search/local/savedsearches.conf` | 5 |
+| `etc/users/splunk/search/local/savedsearches.conf` | 7 |
+| `etc/apps/search/local/savedsearches.conf` | 1 |
+
+Every one had `enableSched = 1`. Two accounts each held a private copy of nearly the same five
+detections, so LSASS access, Kerberoasting, scheduled-task persistence and the byte-volume
+check were each running twice on a five-minute cron, next to the sixteen the app had just
+gained.
+
+**`| rest` reported six because `| rest` answers as whoever asks it.** A saved search in a
+user's private namespace is invisible to every other user, an administrator reviewing coverage
+included. `V3 - Pass-the-Ticket EC4768` was scheduled, running, and absent from every listing
+made from the admin account. An inventory that changes with the login is not an inventory, and
+nothing about the lab looked wrong from either side of it.
+
+One duplicate matters more than the others. This app ships
+`Purple - Large Outbound Transfer` at a 10 MB threshold with `enableSched = 0`, and its own
+description says why: the threshold is an uncalibrated placeholder, and shipping one as an
+enabled alert is how a queue fills with noise. Two copies of
+`V3 - Suspicious Large Outbound Transfer` were running that check at **50 KB**, enabled, every
+five minutes. The decision not to ship it had been made, written down, and quietly overtaken
+by two copies that could not be seen from one account.
+
+All thirteen now carry `disabled = 1`. They are left on disk rather than deleted because the
+case files cite those names as what the analyst saw during the run, and that provenance is
+worth more than the tidiness. The lab now runs the eleven scheduled searches this app defines
+and nothing else.
+
 The detections use `summariesonly=false`, so they return results immediately (raw scan)
 even before acceleration finishes building summaries, then speed up automatically once it does.
 
