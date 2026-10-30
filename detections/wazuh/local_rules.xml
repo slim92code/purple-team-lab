@@ -149,28 +149,48 @@
     An alert about a broken indexer cannot be delivered through that indexer. This one is read
     by logcollector, written to alerts.json, and picked up from there by the Splunk forwarder,
     which kept delivering throughout the outage. The detection path and the failed path share
-    no component.
+    no component. wazuh-logcollector runs as root, which is why it can read a directory the
+    Splunk forwarder's own user cannot traverse at all.
+
+    THE WILDCARD IS LOAD-BEARING. filebeat.yml sets logging.files.name to "filebeat", so the
+    obvious location is /var/log/filebeat/filebeat. That file was 272 bytes and a day stale
+    while the running process held /var/log/filebeat/filebeat.2 open for writing - its own
+    rotate-on-startup had renamed the file out from under a live descriptor, and the name in
+    the config stayed frozen on an empty one. Confirmed by reading /proc/<pid>/fd rather than
+    the config. A rule pointed at the configured name watches nothing and reports as coverage.
+    The rule's own <location> is left as the prefix on purpose: Wazuh matches it as a
+    substring, so one line covers filebeat, filebeat.1 and every other rotated name the
+    wildcard feeds it.
+
+    THE LEVELS ARE MEASURED, NOT ASSUMED. Stopping wazuh-indexer and watching for eight
+    minutes produced exactly ONE log line, because filebeat backs off after a refused
+    connection. The broken-shard outage produced one line roughly every 60 seconds, 143 in
+    total. A frequency threshold cannot separate a blip from an outage when one real outage
+    emits a single line, so the single occurrence is what alerts, and the frequency rule is
+    an escalation for the mode that does repeat. The two failure texts differ - "temporary
+    bulk send failure" against "connect: connection refused" - and the match is deliberately
+    on the shared prefix.
 
     Requires this in the manager's ossec.conf:
 
       <localfile>
         <log_format>syslog</log_format>
-        <location>/var/log/filebeat/filebeat</location>
+        <location>/var/log/filebeat/filebeat*</location>
       </localfile>
 
-    wazuh-logcollector runs as root, which is why it can read a directory the Splunk
-    forwarder's own user (splunkfwd) cannot traverse at all.
+    Cost: one alert each time someone restarts the indexer. That is the correct behaviour
+    rather than noise - if alert delivery stops, an operator should be told it stopped.
   -->
-  <rule id="100300" level="3">
+  <rule id="100300" level="12">
     <location>/var/log/filebeat/filebeat</location>
     <match>failed to publish events</match>
-    <description>Filebeat could not deliver a batch to the Wazuh indexer</description>
-    <group>pipeline_health,</group>
+    <description>Filebeat cannot deliver to the Wazuh indexer - alerts are being written but may not be indexed</description>
+    <group>pipeline_health,pci_dss_10.6.1,</group>
   </rule>
 
-  <rule id="100301" level="12" frequency="5" timeframe="300">
+  <rule id="100301" level="14" frequency="5" timeframe="300">
     <if_matched_sid>100300</if_matched_sid>
-    <description>Wazuh indexer delivery failing for five minutes - alerts are being written but not indexed, and the console is blind</description>
+    <description>Wazuh indexer delivery has been failing for five minutes - the console is blind and the backlog is growing</description>
     <group>pipeline_health,pci_dss_10.6.1,</group>
   </rule>
 
