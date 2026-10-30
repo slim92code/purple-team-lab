@@ -132,3 +132,46 @@
   </rule>
 
 </group>
+
+<group name="wazuh,pipeline_health,">
+
+  <!--
+    Pipeline health, not a threat detection, and deliberately routed around the component it
+    watches.
+
+    On 25 Oct 2026 at 01:32 an unclean shutdown truncated a translog, one shard went
+    unassigned, and every filebeat bulk carrying a document for that index failed. The retry
+    loop held everything behind it and the console indexed nothing until the 29th - about ten
+    hours of running time - while wazuh-analysisd -t came back clean, filebeat test output
+    said OK, and all four services reported active. Nothing in the stack raised a word. Full
+    chain in v3/investigations/CASE-05-lsass-access.md.
+
+    An alert about a broken indexer cannot be delivered through that indexer. This one is read
+    by logcollector, written to alerts.json, and picked up from there by the Splunk forwarder,
+    which kept delivering throughout the outage. The detection path and the failed path share
+    no component.
+
+    Requires this in the manager's ossec.conf:
+
+      <localfile>
+        <log_format>syslog</log_format>
+        <location>/var/log/filebeat/filebeat</location>
+      </localfile>
+
+    wazuh-logcollector runs as root, which is why it can read a directory the Splunk
+    forwarder's own user (splunkfwd) cannot traverse at all.
+  -->
+  <rule id="100300" level="3">
+    <location>/var/log/filebeat/filebeat</location>
+    <match>failed to publish events</match>
+    <description>Filebeat could not deliver a batch to the Wazuh indexer</description>
+    <group>pipeline_health,</group>
+  </rule>
+
+  <rule id="100301" level="12" frequency="5" timeframe="300">
+    <if_matched_sid>100300</if_matched_sid>
+    <description>Wazuh indexer delivery failing for five minutes - alerts are being written but not indexed, and the console is blind</description>
+    <group>pipeline_health,pci_dss_10.6.1,</group>
+  </rule>
+
+</group>
