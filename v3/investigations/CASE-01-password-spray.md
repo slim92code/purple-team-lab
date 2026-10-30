@@ -2,8 +2,8 @@
 
 | | |
 | --- | --- |
-| Alert | `Purple - Password Spray (multi-user from one source)` (ran in the lab as `V3 - Password Spray EC4771`) (Splunk, scheduled) |
-| Fired | 20 Oct 2026, 11:31 |
+| Alert | `V3 - Password Spray EC4771` (Splunk) on 20 Oct; shipped as `Purple - Password Spray (multi-user from one source)`, which was not deployed until 30 Oct |
+| Fired | 20 Oct 2026, 11:31 (the ad-hoc search) |
 | Severity | High |
 | MITRE | [T1110.003 — Password Spraying](https://attack.mitre.org/techniques/T1110/003/) |
 | Verdict | True positive. One account compromised, used 98 seconds later. |
@@ -88,6 +88,14 @@ sent one attempt per account. That is what spraying is built to do.
 
 True positive. A spray from a non-domain host recovered valid credentials for `pparker`, a
 standard domain user. The lockout policy was not bypassed or broken, it was designed around.
+
+One limitation, surfaced when the shipped rule was re-run on 30 Oct and recorded in its own
+description: `Purple - Password Spray` counts distinct accounts that emit a `4771` and needs
+five, but this estate yields only four (`jsmith` is an unknown principal and emits none;
+`Guest` emits `0xE` only while enabled). On 20 Oct `Guest` supplied the fifth, so the
+detection was a clean true positive. With `Guest` since disabled, a repeat spray produced
+four and the rule stayed silent — it is validated in principle but not reliably exercisable in
+this lab. The threshold stays at five; detections are not tuned down to a lab's account count.
 
 ## 6. What the account did next
 
