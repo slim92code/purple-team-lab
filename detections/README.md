@@ -370,6 +370,28 @@ Times UTC.
 | negative | task running `defrag.exe` | stays `60228` level 4 |
 | negative | task running `powershell.exe -ExecutionPolicy Bypass -File …` | stays `60228` level 4 |
 
+#### Verification, 30 Oct 2026 — pipeline health
+
+| Rule | Trigger | Result |
+|---|---|---|
+| — | `wazuh-analysisd -t` | clean |
+| `100300` | `systemctl stop wazuh-indexer` | level 12 at 14:18:18.998, 0.5 s after the log line |
+| `100300` | localfile pointed at the configured name while filebeat wrote elsewhere | **0 alerts** — see below |
+| `100300` | localfile pointed at `filebeat*` | **196 alerts in one second**, all replayed from 6 Oct |
+
+Two of those rows are failures and they are the useful ones. The first version watched
+`/var/log/filebeat/filebeat` because that is what `filebeat.yml` configures, while the running
+process held `filebeat.2` open — rotate-on-startup had renamed the file out from under a live
+descriptor. `/proc/<pid>/fd` is the only thing that reports this; the config, the service
+status and `wazuh-analysisd -t` all look correct.
+
+The second version replaced the path with a glob, which produced no `Analyzing file` line in
+`ossec.log` and so read as silently ignored. It was not ignored. It was reading every rotated
+file from the start and raising a level 12 alert per historical error line: 196 of them in one
+second, each stamped with the current time and carrying its real 6 October date only inside
+`full_log`. Over the whole exercise the rule fired 197 times, 196 of them false, and all 196
+came from the glob. A wildcard over a rotated log directory is a replay, not a wider net.
+
 Not covered: an LSASS read from code injected into an already-excluded signed process.
 That needs `CallTrace`, and this lab has no sample to test a pattern against.
 

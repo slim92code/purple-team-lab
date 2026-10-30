@@ -152,34 +152,48 @@
     no component. wazuh-logcollector runs as root, which is why it can read a directory the
     Splunk forwarder's own user cannot traverse at all.
 
-    THE WILDCARD IS LOAD-BEARING. filebeat.yml sets logging.files.name to "filebeat", so the
+    VERIFIED BY TRIGGER, 30 Oct 2026. systemctl stop wazuh-indexer at 14:18:17; filebeat wrote
+    the failure at 14:18:18.471; 100300 fired at 14:18:18.998 at level 12 with location
+    /var/log/filebeat/filebeat. Half a second from log line to alert, and the indexer was back
+    two minutes later.
+
+    THE PATH IS THE WHOLE PROBLEM. filebeat.yml sets logging.files.name to "filebeat", so the
     obvious location is /var/log/filebeat/filebeat. That file was 272 bytes and a day stale
-    while the running process held /var/log/filebeat/filebeat.2 open for writing - its own
-    rotate-on-startup had renamed the file out from under a live descriptor, and the name in
-    the config stayed frozen on an empty one. Confirmed by reading /proc/<pid>/fd rather than
-    the config. A rule pointed at the configured name watches nothing and reports as coverage.
-    The rule's own <location> is left as the prefix on purpose: Wazuh matches it as a
-    substring, so one line covers filebeat, filebeat.1 and every other rotated name the
-    wildcard feeds it.
+    while the running process held /var/log/filebeat/filebeat.2 open for writing: its own
+    rotate-on-startup had renamed the file out from under a live descriptor and the configured
+    name stayed frozen on an empty one. Nothing reports this. It was found by reading
+    /proc/<pid>/fd, which is the only place that answers "which file is actually being written"
+    rather than "which file was configured". Before trusting this rule, check that the
+    descriptor and the location below still name the same file, and restart filebeat if they
+    do not.
 
-    THE LEVELS ARE MEASURED, NOT ASSUMED. Stopping wazuh-indexer and watching for eight
-    minutes produced exactly ONE log line, because filebeat backs off after a refused
-    connection. The broken-shard outage produced one line roughly every 60 seconds, 143 in
-    total. A frequency threshold cannot separate a blip from an outage when one real outage
-    emits a single line, so the single occurrence is what alerts, and the frequency rule is
-    an escalation for the mode that does repeat. The two failure texts differ - "temporary
-    bulk send failure" against "connect: connection refused" - and the match is deliberately
-    on the shared prefix.
+    A WILDCARD WAS TRIED AND IS WRONG, which is worth more than the rule. Setting the localfile
+    to /var/log/filebeat/filebeat* looked like the fix for the drift above. It produced no
+    "Analyzing file" line in ossec.log at all, so it read as silently ignored - and it was not.
+    It was working, and it read every rotated file from the beginning: 196 alerts at level 12
+    in one second, every one of them replaying a log line from 6 October, each carrying a
+    current alert timestamp with the real date buried in full_log. Measured over the whole
+    exercise: 196 false, 1 true. An analyst would have opened a catastrophic live outage that
+    had finished three weeks earlier. A glob over a rotated log directory is a replay, not a
+    wider net.
 
-    Requires this in the manager's ossec.conf:
+    THE LEVELS ARE MEASURED, NOT ASSUMED. Stopping the indexer and watching for eight minutes
+    produced exactly ONE log line, because filebeat backs off after a refused connection. The
+    broken-shard outage produced one line roughly every 60 seconds, 143 in total. A frequency
+    threshold cannot separate a blip from an outage when one real outage emits a single line,
+    so the single occurrence is what alerts and the frequency rule is an escalation for the
+    mode that does repeat. The two failure texts differ - "temporary bulk send failure" against
+    "connect: connection refused" - and the match keys on their shared prefix.
+
+    Requires this in the manager's ossec.conf, with no wildcard:
 
       <localfile>
         <log_format>syslog</log_format>
-        <location>/var/log/filebeat/filebeat*</location>
+        <location>/var/log/filebeat/filebeat</location>
       </localfile>
 
-    Cost: one alert each time someone restarts the indexer. That is the correct behaviour
-    rather than noise - if alert delivery stops, an operator should be told it stopped.
+    Cost: one alert each time someone restarts the indexer. That is correct behaviour rather
+    than noise - if alert delivery stops, an operator should be told it stopped.
   -->
   <rule id="100300" level="12">
     <location>/var/log/filebeat/filebeat</location>
