@@ -61,8 +61,8 @@ Findings:
   a benign task; a Sysmon ingestion gap left the EDR blind on two of three hosts (since
   closed), one of them a DC whose own Sysmon log holds 43,683 events the agent never reads;
   the built-in credential-access rule fired 32 times at level 12 with all 32 benign; and the
-  console itself indexed nothing for five days behind a single corrupted shard, while every
-  health check it has reported healthy.
+  console itself stopped indexing behind a single corrupted shard, and stayed blind for
+  about ten hours of running time while every health check it has reported healthy.
 
 The custom rule written to close the second one bound to a Wazuh group that does not exist,
 so it loaded, reported as coverage, and was discarded. `wazuh-analysisd -t` had been printing

@@ -382,11 +382,11 @@ since the Security channel was configured on all three. Full write-up in
 [`v3/README.md`](../v3/README.md#known-gaps-carried-into-v4).
 
 **And those alerts still did not reach anyone.** Checked the same evening from the dashboard
-rather than from `alerts.json`: the Wazuh console had indexed nothing since 24 October,
+rather than from `alerts.json`: the Wazuh console had indexed nothing since 25 October,
 because a corrupted translog left one shard unassigned and every filebeat bulk bound for that
 index failed in a retry loop that never drained. `wazuh-analysisd -t`, `filebeat test output`
 and `systemctl is-active` all reported healthy throughout. Fixed by reallocating the shard
-with accepted data loss, after which five days of backlog landed in under two minutes. See
+with accepted data loss, after which the whole backlog landed in under two minutes. See
 [CASE-05](../v3/investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
 
 Two rules key on behaviour rather than an indicator. Rule 7 keys on

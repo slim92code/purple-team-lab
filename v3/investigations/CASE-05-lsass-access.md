@@ -185,9 +185,20 @@ ERROR [publisher_pipeline_output] failed to publish events: temporary bulk send 
 ```
 
 Every bulk in the queue carried documents bound for the broken index, so every bulk failed,
-and filebeat retried the same batch rather than skipping it. Nothing behind it moved.
-**Between 24 and 29 October the console received nothing at all** — not the `100200` alerts
-this case file is about, not anything else.
+and filebeat retried the same batch rather than skipping it. Nothing behind it moved. **From
+01:32 on 25 October until it was repaired on the 29th the console indexed nothing at all** —
+not the `100200` alerts this case file is about, not anything else.
+
+Four days elapsed, and saying so would overstate it. The Wazuh VM is powered off between
+sessions, and Splunk, which reads `alerts.json` off that host and kept receiving throughout,
+records no Wazuh alerts at all on 26, 27 or 28 October. Counting only the time the system was
+running and blind gives eleven minutes on 25 October, from the corruption at 01:32 to the
+shutdown at 01:43, and nine and three quarter hours on 29 October, from 12:59 to the repair
+at roughly 22:45.
+
+Ten hours is the smaller number and the worse one, because the `100200` alerts that close 4.2
+were written at 13:09 on 29 October, inside the second window. The evidence that the EDR gap
+had been fixed was produced while the console meant to show it was blind.
 
 Which means the evidence for 4.2 being closed was read out of `alerts.json` with `grep`, and
 that was the only place it existed. An analyst watching the console on 29 October would have

@@ -183,10 +183,13 @@ them. `100200` then fired at level 12 on SPIDERMAN and HYDRA-DC for the first ti
 in two different files, on two different days, for what presented as a single symptom.
 
 There was a third, found the same evening by opening the Wazuh console instead of reading the
-log file. It had received nothing since 24 October: a corrupted translog had left one shard
-unassigned, every filebeat bulk carried a document bound for that index and failed, and the
-retry loop held five days of alerts behind it. The `100200` alerts above were real and were
-never visible to an analyst. The whole chain is in
+log file. It had indexed nothing since 25 October at 01:32: a corrupted translog had left one
+shard unassigned, every filebeat bulk carried a document bound for that index and failed, and
+the retry loop held everything behind it. Four days passed before the next document landed,
+but the VM was powered off for most of them; counting only the time the system was running
+and blind gives eleven minutes on 25 October and about nine and three quarter hours on 29
+October. The `100200` alerts above fall inside the second window, which is why they were read
+out of a file rather than seen in the console. The whole chain is in
 [CASE-05](../v3/investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
 
 Before reusing this file, compare it against what the host is actually running. The

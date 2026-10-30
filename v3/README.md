@@ -441,8 +441,8 @@ the same mask SharpKatz used in the attack run. The before/after is in
 >
 > The single row from 25 October is the only survivor of the three alerts recorded that
 > week — the rest were on the shard discarded to recover the indexer, which had stopped
-> accepting documents entirely between 24 and 29 October. This view was empty for five days
-> while every service reported healthy; see
+> accepting documents entirely between 25 and 29 October. This view was empty for about ten
+> hours of running time while every service reported healthy; see
 > [CASE-05 §4.5](investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
 >
 > Two reading notes. The dashboard renders local time, so rows at `13:09` here are the
