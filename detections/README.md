@@ -88,6 +88,41 @@ from a third direction. The one real defect in the live set is cosmetic:
 `V3 - Persistence Scheduled Task` ends `| table _time host user Messagee`, so the alert fires
 and its last column is always empty.
 
+#### Deployed and re-measured, 30 Oct 2026
+
+The gap was wider than the table above says, and the file dates gave it away. Every file in
+the running app was stamped `1 Jun 2026`, the day v2 was run, and its `savedsearches.conf` was
+7,808 bytes against this repo's 26,682. The app had been installed once, before v3 existed,
+and never again. The four missing searches were not drift. They were the whole of v3's
+detection-as-code never reaching the SIEM it was written for, while this repository described
+it as deployed.
+
+Installed from this repo and read back the same way:
+
+| | Searches | Scheduled |
+| --- | --- | --- |
+| Shipped here | 16 | 11 |
+| Loaded, 29 Oct | 12 | 10 |
+| Loaded, 30 Oct | **16** | **11** |
+
+The eleven that run are the eleven this file schedules and the five that do not are the five
+it leaves alone, `| inputlookup windows_hosts` returns its three rows so `transforms.conf`
+came with it, and running the telemetry-gap search by name completes against 537,698 events
+with no error. `splunk btool check` flagged nothing in this app.
+
+**One thing went wrong on the way and is worth more than the deployment.** The old app was
+backed up to `/opt/splunk/etc/apps/purple_lab.bak-20261030` — inside the apps directory.
+Splunk loads every directory under `etc/apps/` as an app, so the backup came up as a second
+live one and its twelve stale searches were scheduled alongside the sixteen new ones. `| rest`
+returned 28 rows: the June version of Spray Success and Scheduled Task Persistence firing on
+the exact logic this repo documents as broken, next to the corrected versions, both on
+schedule. A backup that stays inside the directory it is backing up is not a backup, it is a
+fork. Moving it out of `etc/apps/` and restarting returned the count to 16.
+
+That one is worth stating plainly because of when it happened: it was introduced during the
+deployment that existed to close this same class of defect, and it was caught by the same
+`| rest` check that found the original.
+
 The detections use `summariesonly=false`, so they return results immediately (raw scan)
 even before acceleration finishes building summaries, then speed up automatically once it does.
 
