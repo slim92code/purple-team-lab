@@ -175,11 +175,15 @@ to the starting state the plan assumed.
 after a reboot, so Zeek crashes on start with `pcap_activate: device is not up`, while
 Suricata on another interface keeps the host looking healthy. v4 runs the kill chain twice,
 before and after hardening, and a dead NDR sensor during either run makes the coverage matrix
-worthless. So a **persistent `ens37` configuration (netplan, promiscuous) is step zero of
-v4**, ahead of any hardening, and the matrix build must verify all five sources are live at
-the start of each run rather than assuming it. The `Purple - Telemetry Gap` search does not
-cover this gap — it is gated to Windows hosts — so a cross-sensor liveness check that spans
-the Linux NDR hosts is added to v4's logging work.
+worthless. So a **persistent `ens37` configuration is step zero of v4**, ahead of any
+hardening, and the matrix build must verify all five sources are live at the start of each run
+rather than assuming it. **Done and verified across a reboot on 30 Oct** — a netplan file for
+the interface plus a systemd unit for Zeek autostart, both reboot-tested, written up in
+[`infrastructure/logging-config.md`](infrastructure/logging-config.md). (The promiscuous part
+turned out not to need configuring: netplan 0.106 rejects the key, and Zeek sets promiscuous
+itself.) The `Purple - Telemetry Gap` search does not cover this gap — it is gated to Windows
+hosts — so a cross-sensor liveness check that spans the Linux NDR hosts is added to v4's
+logging work.
 
 **The password-spray residual gap is sharper than "stays under the threshold."** The row above
 is about the *attack* staying under the lockout threshold, which remains true. But the 30 Oct
