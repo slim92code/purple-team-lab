@@ -192,5 +192,24 @@ October. The `100200` alerts above fall inside the second window, which is why t
 out of a file rather than seen in the console. The whole chain is in
 [CASE-05](../v3/investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
 
+### The NDR sensor had the same failure mode
+
+Found on 30 Oct 2026 during a full re-run of the kill chain. The JA4 beacon rule returned
+nothing, and the cause was not the rule: Zeek on `security-vm` had been dead since 24 October,
+the same evening the Wazuh indexer's translog was corrupted. Its capture interface (`ens37`)
+was down, so Zeek crashed on every start with `pcap_activate: That device is not up`, and
+`zeekctl` had been logging that crash the whole time. Suricata, bound to a different interface,
+kept running and kept shipping, so the host looked healthy in Splunk throughout - same shape as
+THEPUNISHER's Perfmon masking its dead Windows channels, and as the EDR console indexing nothing
+behind a green service check. `ip link set ens37 up promisc on` plus `zeekctl deploy` brought it
+back, and the live beacon was fingerprinted within one 62-second cycle.
+
+The `Purple - Telemetry Gap` search does not cover this: it is gated to Windows hosts by
+`windows_hosts.csv`, deliberately, to stop it firing on the Linux sensor VMs - which is exactly
+why it cannot see a Linux sensor going dark. A per-sensor liveness check that spans the NDR hosts
+is scoped for v4, not bolted on here. The interface fix is also not persistent; it is lost on
+reboot, which is how it broke in the first place, and a netplan entry for `ens37` belongs in the
+v4 hardening pass.
+
 Before reusing this file, compare it against what the host is actually running. The
 deployed config is the one that decides what gets logged.
