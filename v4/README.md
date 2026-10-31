@@ -112,7 +112,33 @@ v4 fixes it on the ingest path, and the fix is larger than it first looked:
 - Re-run both `tstats` detections and record before and after, since "the data model is
   empty" and "the rule is wrong" look identical from the alert list.
 
-## Calibrating the exfiltration threshold
+### Canary on SPIDERMAN, 31 Oct 2026 — the fix is proven, and so is the regression
+
+`renderXml = 1` was applied to the Sysmon input on one host and measured before rolling it
+anywhere else. Every link in the chain was verified against the live index rather than
+assumed:
+
+- **It escapes the rename.** New Sysmon events arrive under `source` and `sourcetype`
+  `XmlWinEventLog:…`, not the `WinEventLog` the Windows add-on collapses everything else to.
+- **Fields still extract.** EID 10 events carry `SourceImage`, `TargetImage`, `GrantedAccess`
+  and `CallTrace`; `EventCode` resolves. The XML format is not a loss of fields.
+- **`Network_Traffic.All_Traffic` populates.** A deterministic EID 3 — a copy of PowerShell
+  run from `C:\Temp` connecting to an internal host — appeared in the data model as
+  `All_Traffic.app = C:\Temp\nettest.exe`. The C2-beacon CIM detection that held zero rows for
+  all of v3 can now return one. That is the whole point of the change.
+
+And the regression the canary existed to find:
+
+- **The `source` changes from `WinEventLog:…` to `XmlWinEventLog:…`.** Every shipped Sysmon
+  search filters on the old `source`, so after the switch they stop matching that host. This is
+  not a field problem — the fields are intact — it is a `source` filter that every Sysmon
+  search needs widened to match both forms. That is bounded and identifiable, but it is per
+  search and has to be regression-tested, which is why it is the dedicated v4 step and not a
+  tonight edit.
+
+The canary was reverted from its per-file `inputs.conf` backup so the lab stays on one
+consistent format; the proper rollout changes all three hosts, widens the `source` filters,
+and re-tests each search, as a single focused pass.
 
 The two detections that ran in the v3 lab without becoming shipped content, the JA4 C2
 beacon and a large-outbound-transfer check, were written into the
