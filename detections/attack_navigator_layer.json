@@ -209,12 +209,12 @@
       "tactic": "credential-access",
       "score": 100,
       "color": "",
-      "comment": "Detected — SAM dump via Impacket secretsdump through Sliver shell using RemoteRegistry. Detection Card #6.",
+      "comment": "Detected — SAM and SECURITY hives saved with reg.exe save through a Sliver shell (HKLM\\SYSTEM was denied). impacket-secretsdump against the DC was blocked at port 445 and the local attempt failed with no SYSTEM hive, so it never recovered hashes. Defender flagged the reg save in real time (EC1116/1117); the shipped SIEM detection is the reg-save EC4688 rule, Detection Card #6.",
       "enabled": true,
       "metadata": [
         {
           "name": "Detection",
-          "value": "Splunk: RemoteRegistry access + secretsdump behavioral pattern"
+          "value": "Splunk: reg.exe save of SAM/SECURITY hives (EC4688); Defender EC1116/1117"
         },
         {
           "name": "Data Source",

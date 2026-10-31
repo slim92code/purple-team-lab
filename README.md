@@ -24,7 +24,7 @@ measured.
 | Asset | What it is |
 | ----- | ---------- |
 | [`detections/sigma/`](detections/sigma) | 13 vendor-agnostic Sigma rules: 10 host, 3 network/Zeek |
-| [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | 5 Wazuh rules: LSASS detection, built-in false-positive tuning, scheduled-task gap |
+| [`detections/wazuh/local_rules.xml`](detections/wazuh/local_rules.xml) | 7 Wazuh rules: LSASS detection, built-in false-positive tuning, scheduled-task gap, and pipeline-health (alert-delivery) monitoring |
 | [`detections/splunk/purple_lab/`](detections/splunk/purple_lab) | Deployable Splunk app, 17 saved searches, 12 scheduled; 13 run on raw sourcetypes (11 Windows, 2 Zeek), 2 on CIM data models, 2 watch the collection pipeline itself ([one of which this lab's forwarder cannot populate](detections/README.md)) |
 | [`detections/attack_navigator_layer.json`](detections/attack_navigator_layer.json) | MITRE ATT&CK Navigator coverage layer, 15 techniques across v2 and v3 |
 | [`config/`](config/) | Sysmon config including the `NetworkConnect` gap fix, and what the hosts actually run |

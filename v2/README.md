@@ -188,7 +188,7 @@ purple-team-lab/
 ├── detections/                     <- repo root, shared across versions
 │   ├── sigma/sigma_rules.yml       <- 10 host rules, vendor-agnostic
 │   ├── sigma/v3_ndr.yml            <- 3 Zeek network rules, added in v3
-│   ├── wazuh/local_rules.xml       <- 5 Wazuh rules, added in v3
+│   ├── wazuh/local_rules.xml       <- 7 Wazuh rules, added in v3
 │   ├── splunk/purple_lab/          <- deployable Splunk app (+ cim-acceleration/)
 │   └── attack_navigator_layer.json <- MITRE ATT&CK coverage layer
 ├── config/sysmonconfig.xml         <- Sysmon config incl. the C:\Temp NetworkConnect fix

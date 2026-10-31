@@ -10,7 +10,7 @@ detections/
 │   ├── sigma_rules.yml              # 10 host rules (Windows/Sysmon), source of truth
 │   └── v3_ndr.yml                   # v3 — 3 network rules (Zeek: krb5, conn, ssl/JA4)
 ├── wazuh/
-│   └── local_rules.xml             # v3 — 5 rules: LSASS access + 92900 tuning + 60228 gap
+│   └── local_rules.xml             # v3 — 7 rules: LSASS access + 92900 tuning + 60228 gap + pipeline-health
 └── splunk/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
@@ -378,7 +378,7 @@ alerted on every machine account's service ticket. Caught by reading the lab's o
 suffix test because Windows supplies the bare account name; the same expression is wrong on
 the wire.
 
-**v3 — EDR tuning (Wazuh), `wazuh/local_rules.xml`**
+**v3 — Wazuh custom rules, `wazuh/local_rules.xml` (EDR tuning + pipeline health)**
 
 | id | Level | Rule | MITRE |
 |---|---|---|---|
@@ -387,6 +387,8 @@ the wire.
 | 100205 | 0 | Suppress the same readers under built-in `92900` directly | — |
 | 100210 | 12 | Scheduled task with a PowerShell download cradle | T1053.005 / T1059.001 |
 | 100211 | 10 | Scheduled task with obfuscated/hidden-window launcher | T1053.005 / T1027 |
+| 100300 | 12 | Filebeat → Wazuh indexer delivery failing (pipeline health, added 30 Oct) | — |
+| 100301 | 14 | Delivery failing for ≥5 min — console blind, escalation of `100300` | — |
 
 #### Why `100200` exists
 

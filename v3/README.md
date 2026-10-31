@@ -478,12 +478,17 @@ Committed as deployable rules in [`detections/`](../detections):
 - [`sigma/v3_ndr.yml`](../detections/sigma/v3_ndr.yml). Kerberoasting keyed on the user-SPN
   pattern, which is etype-agnostic and catches the AES roast an RC4-only rule misses; WinRM
   east-west lateral movement; the Sliver C2 JA4 fingerprint.
-- [`wazuh/local_rules.xml`](../detections/wazuh/local_rules.xml). Five rules.
+- [`wazuh/local_rules.xml`](../detections/wazuh/local_rules.xml). Seven rules.
   `100210`/`100211` read the scheduled task's definition and re-score a PowerShell download
   cradle or a hidden-window launcher. `100200` alerts on a dump-capable `GrantedAccess` mask
   against `lsass.exe`. `100201` and `100205` suppress the platform sources measured above;
   `100205` hangs off `92900` directly, so it also removes the 32-for-32 false positive the
-  built-in rule produces.
+  built-in rule produces. `100300` and `100301` are pipeline-health rules added 30 Oct:
+  `100300` fires when Filebeat cannot deliver to the Wazuh indexer, `100301` escalates once
+  delivery has failed for five minutes. Both are read off a log and shipped by the Splunk
+  forwarder, routed around the indexer they watch — see
+  [`detections/README.md`](../detections/README.md) and
+  [CASE-05 §4.5](investigations/CASE-05-lsass-access.md#45-and-the-alerts-never-reached-the-console).
 
 ### Rule verification, 24 Oct 2026
 
