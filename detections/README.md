@@ -61,7 +61,7 @@ assumed:
 Four searches in `savedsearches.conf` have never been loaded into the running app:
 the etype-agnostic Kerberoasting companion, the JA4 C2 beacon, the large outbound transfer
 and the telemetry gap. Two of them do run, under other names in Splunk's default `search`
-app — `V3 - Sliver C2 (JA4)` and `V3 - Suspicious Large Outbound Transfer`, the ad hoc pair
+app — `V3 - Sliver C2 JA4 Fingerprint` and `V3 - Suspicious Large Outbound Transfer`, the ad hoc pair
 described above, still live where they were written. The telemetry-gap search runs in no
 instance at all, which is the same thing its own description says.
 

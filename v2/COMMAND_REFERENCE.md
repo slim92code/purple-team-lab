@@ -26,7 +26,7 @@ sudo sliver-server
 # Inside the Sliver console
 mtls --lport 443
 
-# SMB share (novi terminal)
+# SMB share (new terminal)
 mkdir -p /tmp/share
 chmod 777 /tmp/share
 sudo impacket-smbserver share /tmp/share -smb2support -username kali -password kali

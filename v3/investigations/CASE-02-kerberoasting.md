@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| Alert | Suricata `krb5`, and the ad-hoc `V3 - Kerberoasting` search, which keyed on the issued `0x12` ticket. The shipped `Purple - Kerberoasting RC4 Service Ticket` did **not** fire and cannot on this AES domain — it is the subject of §4, not the detector here. The shipped pack was not deployed until 30 Oct. |
+| Alert | Suricata `krb5`, and the ad-hoc `V3 - Kerberoasting SQLService` search, which keyed on the issued `0x12` ticket. The shipped `Purple - Kerberoasting RC4 Service Ticket` did **not** fire and cannot on this AES domain — it is the subject of §4, not the detector here. The shipped pack was not deployed until 30 Oct. |
 | Fired | 20 Oct 2026, 11:32 (Suricata and the ad-hoc search) |
 | Severity | High |
 | MITRE | [T1558.003 — Kerberoasting](https://attack.mitre.org/techniques/T1558/003/) |
