@@ -101,14 +101,18 @@ Installed from this repo and read back the same way:
 
 | | Searches | Scheduled |
 | --- | --- | --- |
-| Shipped here | 16 | 11 |
+| Shipped here | 17 | 12 |
 | Loaded, 29 Oct | 12 | 10 |
-| Loaded, 30 Oct | **16** | **11** |
+| Loaded, 30 Oct | 16 | 11 |
+| Loaded, 31 Oct | **17** | **12** |
 
-The eleven that run are the eleven this file schedules and the five that do not are the five
+The twelve that run are the twelve this file schedules and the five that do not are the five
 it leaves alone, `| inputlookup windows_hosts` returns its three rows so `transforms.conf`
 came with it, and running the telemetry-gap search by name completes against 537,698 events
-with no error. `splunk btool check` flagged nothing in this app.
+with no error. `splunk btool check` flagged nothing in this app. The 31 Oct redeployment added
+`Purple - Sensor Feed Stale`, verified by trigger the same evening (fires at a 2-minute
+threshold with a stopped Zeek, empty at the shipped 20); `| rest` confirms 17 loaded with 12
+scheduled, and the identical query runs clean ad hoc against the current feeds.
 
 **One thing went wrong on the way and is worth more than the deployment.** The old app was
 backed up to `/opt/splunk/etc/apps/purple_lab.bak-20261030` — inside the apps directory.
