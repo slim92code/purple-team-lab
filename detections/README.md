@@ -184,22 +184,33 @@ that works in this lab was measured rather than assumed, and the answer is mixed
 | | State in this lab |
 | --- | --- |
 | `Endpoint.Processes` | populated; the LOLBin detection works against it |
-| `Network_Traffic.All_Traffic` | **empty**; the C2 beacon detection cannot return anything |
+| `Network_Traffic.All_Traffic` | was **empty**; **fixed 31 Oct 2026** (below), now populates |
 | Acceleration | **off** on both models, so `tstats` here is a raw scan |
 
-The cause is the forwarder's sourcetype. Every Windows channel arrives as a bare
-`WinEventLog`, with the channel name only in `source`:
+The cause was not the forwarder's configured sourcetype, which was the first guess. The
+forwarder assigns `WinEventLog:Microsoft-Windows-Sysmon/Operational` and `btool` confirms it
+sends that, but `Splunk_TA_windows` ships `rename = WinEventLog` on every `[WinEventLog:*]`
+props stanza and collapses them all to a bare `WinEventLog` at search time:
 
 ```
-sourcetype = WinEventLog
-source     = WinEventLog:Microsoft-Windows-Sysmon/Operational
+sourcetype = WinEventLog                                      (after the add-on's rename)
+source     = WinEventLog:Microsoft-Windows-Sysmon/Operational (the channel, preserved)
 ```
 
-The Splunk Add-on for Sysmon keys its CIM field aliases and eventtypes on the per-channel
-sourcetype (`XmlWinEventLog:Microsoft-Windows-Sysmon/Operational`). Under a bare
-`WinEventLog` none of that applies, so Sysmon EID 3 events carry no `app`, `src`, `dest` or
-`dest_port`, nothing tags them into `Network_Traffic`, and the model stays at zero. The
-events themselves are there: 444 EID 3 events across the three hosts in seven days.
+`TA-microsoft-sysmon` keys its CIM mappings on `XmlWinEventLog:Microsoft-Windows-Sysmon/Operational`,
+so under the renamed bare `WinEventLog` it never saw Sysmon as its own sourcetype, nothing
+tagged EID 3 into `Network_Traffic`, and the model stayed at zero even though the 444 EID 3
+events across the three hosts in seven days were in the index.
+
+**Fixed 31 Oct 2026** by switching the Sysmon input to `renderXml = 1` on all three hosts, so
+it arrives as `XmlWinEventLog:…`, escapes the Windows add-on's rename and reaches the Sysmon
+TA. Verified live: a OneDrive EID 3 from `C:\Users\…\AppData` mapped into
+`Network_Traffic.All_Traffic`, and the C2 beacon search ran against the populated model
+without error. The one shipped search that filtered the old Sysmon `source`,
+`Purple - LSASS Access`, was widened to match both forms; the fields extract identically from
+the XML format, so nothing else changed. The C2 beacon stays unscheduled pending a per-env
+AppData allowlist — the model is no longer the blocker, the false-positive calibration is.
+The full write-up is in [v4/README.md](../v4/README.md).
 
 The other eleven detections filter on `source=` rather than `sourcetype=`, which is why they
 work on this configuration. That was not a deliberate choice at the time; it is the reason

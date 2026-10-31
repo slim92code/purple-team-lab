@@ -138,9 +138,35 @@ And the regression the canary existed to find:
   and the `Purple - C2 Beacon` CIM search goes from unschedulable to enabled once
   `Network_Traffic` is populated.
 
-The canary was reverted from its per-file `inputs.conf` backup so the lab stays on one
-consistent format; the proper rollout changes all three hosts, widens the `source` filters,
-and re-tests each search, as a single focused pass.
+The canary was reverted from its per-file `inputs.conf` backup so the lab stayed on one
+consistent format while the search change was prepared.
+
+### Rolled out and verified, 31 Oct 2026 — the CIM gap is closed
+
+The full pass was done the same evening, in the order that leaves no blind window: the
+`Purple - LSASS Access` source filter was widened to
+`(source="WinEventLog:…" OR source="XmlWinEventLog:…")` and deployed first — a no-op against
+the then-current classic data, confirmed by re-running it to the same 19 historical hits —
+and only then was `renderXml = 1` applied to all three hosts.
+
+Verified against the live index afterwards:
+
+- All three hosts send Sysmon as `XmlWinEventLog:…`; the bare-`WinEventLog` Sysmon stream
+  stopped at the restart, a clean cutover.
+- `Purple - LSASS Access` catches both: the historical classic events and a freshly triggered
+  XML-format EID 10 at `GrantedAccess 0x1f3fff` on SPIDERMAN, with `SourceImage`,
+  `TargetImage` and `GrantedAccess` all intact in the XML format.
+- `Network_Traffic.All_Traffic` populates — a OneDrive EID 3 from `C:\Users\…\AppData` mapped
+  into the model — and the C2 beacon CIM search, dead for all of v3, runs against it without
+  error.
+
+What remains is calibration, not plumbing: the C2 beacon stays unscheduled until it has a
+per-environment allowlist for the legitimate software that also beacons from `AppData`
+(OneDrive, Teams, browsers), which is the same posture as the uncalibrated byte-volume
+threshold rather than a new blocker. Data-model acceleration is still off; the searches use
+`summariesonly=false`, so it is a performance item, not a correctness one. The forwarder
+`inputs.conf` change is the one line `renderXml = 1` on the Sysmon input, applied on each host
+and backed up to `inputs.conf.bak-cim` there.
 
 The two detections that ran in the v3 lab without becoming shipped content, the JA4 C2
 beacon and a large-outbound-transfer check, were written into the
