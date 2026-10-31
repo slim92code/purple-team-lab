@@ -102,12 +102,11 @@ v4 fixes it on the ingest path, and the fix is larger than it first looked:
 - Switch the Sysmon input to `renderXml = 1` so it arrives as
   `XmlWinEventLog:Microsoft-Windows-Sysmon/Operational`, which escapes the Windows add-on's
   `rename` and reaches `TA-microsoft-sysmon` for CIM mapping.
-- **This changes the on-the-wire format of every affected channel**, so the shipped searches
-  that parse the classic key/value Sysmon fields have to be re-verified or re-pointed at the
-  XML-extracted fields. The blast radius is the whole Windows detection set, not one search,
-  which is why it is a dedicated step with a before/after regression over every search rather
-  than a one-line edit. Change one host first, verify both the CIM model and the existing
-  searches, then roll out.
+- **This changes the on-the-wire `source` for Sysmon**, so any shipped search that filters on
+  `source="WinEventLog:Microsoft-Windows-Sysmon/Operational"` has to be widened to match the
+  new `XmlWinEventLog:…` form as well. Change one host first, verify both the CIM model and the
+  existing searches, then roll out. (Measured scope below: it is one search, not the whole set
+  the first draft of this paragraph assumed.)
 - Acceleration enabled with the shipped `detections/splunk/cim-acceleration/datamodels.conf`.
 - Re-run both `tstats` detections and record before and after, since "the data model is
   empty" and "the rule is wrong" look identical from the alert list.
@@ -129,12 +128,15 @@ assumed:
 
 And the regression the canary existed to find:
 
-- **The `source` changes from `WinEventLog:…` to `XmlWinEventLog:…`.** Every shipped Sysmon
-  search filters on the old `source`, so after the switch they stop matching that host. This is
-  not a field problem — the fields are intact — it is a `source` filter that every Sysmon
-  search needs widened to match both forms. That is bounded and identifiable, but it is per
-  search and has to be regression-tested, which is why it is the dedicated v4 step and not a
-  tonight edit.
+- **The `source` changes from `WinEventLog:…` to `XmlWinEventLog:…`.** A search that filters on
+  the old `source` stops matching the switched host. This is not a field problem — the fields
+  are intact — only the `source` filter. Grepping the shipped app for the Sysmon source put the
+  scope at exactly **one** search, `Purple - LSASS Access`, not the whole Windows set an earlier
+  draft of this section guessed: the Security-channel rules are untouched, and the two CIM
+  searches key on data models rather than `source`. That one filter is widened to
+  `(source="WinEventLog:…" OR source="XmlWinEventLog:…")` so it covers historical and new events,
+  and the `Purple - C2 Beacon` CIM search goes from unschedulable to enabled once
+  `Network_Traffic` is populated.
 
 The canary was reverted from its per-file `inputs.conf` backup so the lab stays on one
 consistent format; the proper rollout changes all three hosts, widens the `source` filters,
