@@ -72,24 +72,42 @@ the baseline rather than pretending it is a checkbox.
 ## Forwarder sourcetypes and CIM
 
 Measured on the v3 lab, so this is a known defect rather than a planned nicety. Every
-Windows channel arrives as a bare `WinEventLog` sourcetype, with the channel name only in
-`source`:
+Windows channel ends up under a single `WinEventLog` sourcetype at search time, with the
+channel name surviving only in `source`:
 
 ```
 sourcetype = WinEventLog
 source     = WinEventLog:Microsoft-Windows-Sysmon/Operational
 ```
 
-The Splunk add-ons key their CIM field aliases and eventtypes on the per-channel sourcetype,
-so under a bare `WinEventLog` the Sysmon mappings never apply. `Network_Traffic.All_Traffic`
-holds 0 events while 444 Sysmon EID 3 events sit in the index with no `app`, `src`, `dest`
-or `dest_port`. The C2 beacon detection, which is the showcase finding of v2, cannot return
-a row. Acceleration is also off on both data models, so the `tstats` detections are raw
-scans rather than the millisecond lookups the pack describes.
+**The cause is not the forwarder, which was the first guess and is wrong.** Diagnosed on 31
+October: the forwarder's `inputs.conf` already assigns the per-channel sourcetype
+(`WinEventLog:Microsoft-Windows-Sysmon/Operational`), and `splunk btool inputs list --debug`
+on the host confirms that is the effective value it sends. What collapses it is on the
+indexer: the Splunk Add-on for Windows ships
+`Splunk_TA_windows/default/props.conf` with a `rename = WinEventLog` directive on every
+`[WinEventLog:*]` stanza, so all Windows channels are renamed into one `WinEventLog`
+sourcetype by design — that add-on does its own CIM work keyed on `source` rather than on a
+per-channel sourcetype. The side effect is that `TA-microsoft-sysmon`, which maps Sysmon EID 3
+into `Network_Traffic` and keys on its own Sysmon sourcetype, never sees the events as that
+sourcetype. Two add-ons want the same data under two different sourcetypes, and the Windows
+one wins. So `Network_Traffic.All_Traffic` holds 0 events while 444 Sysmon EID 3 events sit in
+the index with no `app`, `src`, `dest` or `dest_port`. `Endpoint.Processes` is populated,
+because that one the Windows add-on fills from `4688`. Acceleration is also off on both data
+models, so the `tstats` detections are raw scans rather than the millisecond lookups the pack
+describes.
 
-v4 fixes it at the forwarder rather than in the rules:
+v4 fixes it on the ingest path, and the fix is larger than it first looked:
 
-- Per-channel sourcetypes in `inputs.conf` with `renderXml = 1`, so the add-ons apply.
+- Switch the Sysmon input to `renderXml = 1` so it arrives as
+  `XmlWinEventLog:Microsoft-Windows-Sysmon/Operational`, which escapes the Windows add-on's
+  `rename` and reaches `TA-microsoft-sysmon` for CIM mapping.
+- **This changes the on-the-wire format of every affected channel**, so the shipped searches
+  that parse the classic key/value Sysmon fields have to be re-verified or re-pointed at the
+  XML-extracted fields. The blast radius is the whole Windows detection set, not one search,
+  which is why it is a dedicated step with a before/after regression over every search rather
+  than a one-line edit. Change one host first, verify both the CIM model and the existing
+  searches, then roll out.
 - Acceleration enabled with the shipped `detections/splunk/cim-acceleration/datamodels.conf`.
 - Re-run both `tstats` detections and record before and after, since "the data model is
   empty" and "the rule is wrong" look identical from the alert list.
