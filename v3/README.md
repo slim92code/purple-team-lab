@@ -93,8 +93,11 @@ because the two are not the same here:
 ### What `weak_encryption` actually fires on
 
 That row appears three times above, and getting it right took a measurement that overturned
-the obvious reading. Counting every Suricata `WEAK_ENCRYPTION` between 11:00 and 13:00 on the
-run date returns 25 events:
+the obvious reading. Counting every Suricata record carrying `WEAK_ENCRYPTION` between 11:00
+and 13:00 on the run date returns 25 events — 21 in `krb5` logs and 4 as `event_type=anomaly`.
+[Screenshot 06](screenshots/06_suricata_anomaly.png) filters to `event_type=anomaly`, so it
+shows those 4 and not the 25; the table below is the full `WEAK_ENCRYPTION` count across both
+event types:
 
 | Time | Count | Direction | Chain step |
 | ---- | ----- | --------- | ---------- |
@@ -337,8 +340,10 @@ log structure; in production the Zeek TA extracts these fields (see v4).
 > across the Kerberos exchanges — spray, roast and Pass-the-Ticket alike, because it keys on
 > the etypes offered rather than on the ticket issued, and `REQUEST_AUTH_UNRECOGNIZED` during
 > the 12:42–12:43 WinRM pivot. Both corroborate the Windows and Zeek evidence rather than
-> standing on their own. Measured false-positive rate for `weak_encryption` over the run
-> window is 5 in 25; `REQUEST_AUTH_UNRECOGNIZED` also fires on legitimate WinRM, since
+> standing on their own. This view is `event_type=anomaly`, so it shows 4 `weak_encryption`
+> events; the 5-in-25 false-positive rate measured over the run window counts every
+> `WEAK_ENCRYPTION` record (21 `krb5` + 4 anomaly = 25), 5 of which tie to no chain step — see
+> the table above. `REQUEST_AUTH_UNRECOGNIZED` also fires on legitimate WinRM, since
 > `Negotiate` is an `Authorization` header Suricata's HTTP parser does not recognise.
 
 ### 07 — LSASS access (T1003.001)
