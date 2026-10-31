@@ -392,7 +392,12 @@ alert is how an alert queue fills with noise.
 
 The naming is settled on the app's `Purple - …`, which is what a reader can deploy. The case
 files still record the `V3 - …` name the alert carried during the run, alongside the shipped
-one, because the point of a case file is what the analyst actually saw.
+one, because the point of a case file is what the analyst actually saw. Those run-time names
+are as recalled from the run and need not match any single title found in the later audit: the
+ad-hoc searches were duplicated and renamed across user namespaces, so the JA4 alert, for
+instance, appears as `V3 - JA4 C2 Beacon` in CASE-07 but as `V3 - Sliver C2 (JA4)` and
+`V3 - Sliver C2 JA4 Fingerprint` in the 30 Oct instance inventory. The shipped `Purple - …`
+name is the stable one; the `V3 - …` names are a record of a messy live run, not an index.
 
 ### 12 — The SPIDERMAN LSASS blind spot
 [![Blind spot](screenshots/12_spiderman_lsass_blindspot.png)](screenshots/12_spiderman_lsass_blindspot.png)
