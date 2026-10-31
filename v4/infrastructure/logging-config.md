@@ -116,10 +116,37 @@ and cannot see a Linux sensor going dark — which is exactly how this stayed hi
 for six days. A cross-sensor liveness check that spans the NDR hosts is the next
 logging item.
 
+## Cross-sensor liveness check — covers the Linux sensors
+
+**Status: written, verified by trigger, and deployed 31 Oct 2026.**
+
+The `Purple - Telemetry Gap` search is gated to Windows hosts, so it is blind to a Linux
+sensor going dark — the exact gap that hid the six-day Zeek outage. Its sibling,
+`Purple - Sensor Feed Stale (NDR/EDR host, cross-feed)`, watches the sensor feeds instead: it
+fires when a host sends two or more of `{zeek, suricata, wazuh}` and one feed has delivered
+nothing for over 20 minutes while another from the same host is fresh under 10 — which proves
+the host and forwarder are up and one sensor specifically stopped. Keyed on `_indextime`, like
+Telemetry Gap, so a forwarder backfill cannot erase the gap retroactively.
+
+Verified the same way the EDR rules were: baseline empty with both `security-vm` feeds at
+`0.0m`; `systemctl stop zeek`, and at a 2-minute threshold the rule returned `security-vm`
+with `stale_feeds=zeek` (3.1m) against Suricata still at `0.0m`, while at the shipped
+20-minute threshold it stayed empty — a 3-minute gap is not an outage; `systemctl start zeek`
+cleared it within a minute.
+
+It covers `security-vm` because that host has two independent feeds (Zeek and Suricata) to
+cross-check. It does **not** cover `wazuh-vm`, which sends only `wazuh` alerts and only when
+an alert fires — a single, event-driven feed cannot be told apart from a dead host from the
+indexer alone. Closing that needs a second heartbeat feed on `wazuh-vm`; scoped below.
+
 ## Pending
 
-- **Cross-sensor liveness check** — covers the Linux NDR/EDR hosts the telemetry-gap
-  search does not.
+- **A second heartbeat feed on `wazuh-vm`** so the cross-feed check can cover it too — it
+  currently sends only the event-driven `wazuh` alert feed, which the liveness rule cannot use.
+- **Forwarder hygiene on `security-vm`** — the Splunk forwarder monitors all of
+  `/opt/zeek/logs/current/` and ingests Zeek's internal bookkeeping (`.pid`, `.env_vars`,
+  `.rotated.*`, `.archive-log.running.*.tmp`) as if they were logs; it should match `*.log`
+  only. Found while measuring the feeds for the liveness check.
 - **Zeek JSON output** via the Splunk Add-on for Zeek, so fields are TA-extracted
   rather than parsed positionally from `_raw`. (v4 README, "Logging improvement".)
 - **Per-channel Windows sourcetypes** in the forwarder so the Sysmon add-on's CIM
