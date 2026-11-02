@@ -306,10 +306,41 @@ of them measures a change to it:
    and interrogate the chain as it fires against the un-hardened baseline, so the "before"
    story is on record before anything changes. Neither waits on hardening.
 3. **Hardening is applied afterwards, bundle by bundle** — the five GPO bundles above, not all
-   at once. Each bundle is followed by a kill-chain re-run, a snapshot, and one column in
-   `coverage-matrix.md`: what still fires, what the bundle blocked for the attacker, and what it
-   broke for detection. A bundle that corrupts the baseline is rolled back to
-   `v4-pre-hardening`.
+   at once. Each bundle is followed by a snapshot, a **targeted re-run of only the kill-chain
+   phases that bundle plausibly affects**, and one column in `coverage-matrix.md`: what still
+   fires, what the bundle blocked for the attacker, and what it broke for detection. A bundle
+   that corrupts the baseline is rolled back to `v4-pre-hardening`.
+4. **One full kill-chain re-run at the end**, with all five bundles in place. That is the clean
+   "after" state, and it is the column the before/after comparison actually rests on.
+
+### Why the per-bundle runs are targeted, and what that costs
+
+A full kill chain after every bundle would mean five full runs. The cheaper scheme — targeted
+runs per bundle, one full run at the end — produces the same final comparison and still
+attributes which bundle moved which cell, so the extra four full runs buy very little. But it
+costs two things, and both are recorded here rather than discovered later:
+
+**Un-run cells are unmeasured, not unchanged.** This is the part that matters. If a phase was
+not re-run after a bundle, its cell in that column is not evidence that the bundle left it
+alone — it is simply not measured. The matrix therefore uses two marks:
+
+| Mark | Meaning |
+| ---- | ------- |
+| **M** | Measured — the phase was re-run after this bundle and the result recorded |
+| **→** | Not re-measured; the value is carried forward from the previous column |
+
+Every cell in the final full-run column is measured. A phase that no bundle plausibly touches
+reads `→ → → → →  M`, which says on its face that its only post-hardening measurement is the
+final run. Without this distinction the matrix would claim more than was measured, which for a
+before/after artefact is the one failure that voids it.
+
+**Targeted runs miss cross-bundle regressions.** The most interesting result in work like this
+is a bundle breaking a detection it has no obvious relationship to — SMB signing or NTLMv2-only
+changing what Zeek can parse, or an ASR rule suppressing a process-creation event a rule keys
+on. A targeted run does not look there, so it will not see it. The final full run does catch it,
+but without attribution: the regression shows up against the baseline and has to be bisected
+back to its bundle by re-running candidates. That is an accepted cost of the cheaper scheme, not
+an oversight.
 
 The coverage matrix is the only artefact that spans before and after, and it is built
 incrementally rather than written at the end.
@@ -374,9 +405,10 @@ answers "is this real." The IR report answers "how far did it go."
 ### Layer 3 — detection engineering
 
 Unchanged in content. `detections/` and the Sigma pack stay as they are; `coverage-matrix.md` is
-produced by the hardening phase in step 3 above, not before it, since the before/after columns
-cannot exist until the bundles have been applied and the chain re-run against each. No CI
-pipeline — the matrix carries the argument on its own.
+produced by steps 3 and 4 above, not before them, since the before/after columns cannot exist
+until the bundles have been applied and the chain re-run. It carries the `M` / `→` marks so a
+reader can tell a measured cell from a carried-forward one. No CI pipeline — the matrix carries
+the argument on its own.
 
 ### Current structure
 
