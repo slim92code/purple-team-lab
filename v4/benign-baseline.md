@@ -214,8 +214,8 @@ is extended deliberately — which is the correct failure direction.
 
 ### 3. How a false positive is counted — firings are not the unit
 
-No search in the pack sets `alert.suppress`; nine run every 10 minutes, five every 15, one every
-5, all over `-24h@h`. A single benign event therefore satisfies its rule again at **every**
+No search in the pack sets `alert.suppress`. The thirteen scheduled searches run eight every 10
+minutes, four every 15, one every 5; the detection rules look back over `-24h@h`. A single benign event therefore satisfies its rule again at **every**
 subsequent run for a full 24 hours — roughly 144 times for a 10-minute schedule.
 
 So the false-positive rate is counted as **distinct events, or distinct result groups**, never as
@@ -226,6 +226,25 @@ The absence of any throttling is itself a finding about this pack, and belongs i
 rather than in a footnote: as shipped, one benign event does not produce one alert, it produces a
 day of them. Whatever the measured rates turn out to be, `alert.suppress` is a change every
 scheduled rule here needs.
+
+### 4. Measured during the window, 2 Nov 2026
+
+**`tstark`'s password was unknown and was reset inside the window.** `v2/01_lab_setup.md` lists
+it as unknown, and `runas` failed with `1326`. It was reset from HYDRA-DC by `Administrator`,
+which writes one `4724` into the window: benign administrative activity, recorded here so it is
+not mistaken for anything else. The new password is outside the spray's pattern, so the
+before-run cannot recover `tstark` and turn the legitimate principal into a compromised one.
+
+**The first benign request arrived as intended:** `4769`, `tstark@MARVEL.LOCAL`,
+`Service_Name=SQLService`, `Client_Address=::ffff:192.168.182.138`, at 17:06:42. The same query
+widened to 15:50 returned the `pparker` row from 15:59:49, so the query is proven to see these
+events and the in-window zero before 17:06 is a real zero.
+
+**Kali stayed off, with a control.** A search for `192.168.182.133` inside the window returns
+nothing; the same search over the preceding seven days returns rows. Those rows are all
+HYDRA-DC `EventCode=47` — its time service has `192.168.182.133` configured as a manual NTP peer
+and logs that it is unreachable. So a mention of that address in a DC log is **not** evidence
+that Kali is up; traffic sourced from it in `zeek` or `suricata` is.
 
 ---
 

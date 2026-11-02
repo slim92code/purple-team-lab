@@ -453,6 +453,19 @@ attempts the spray is invisible and at N the account locks and `4740` fires — 
 carries the boundary rather than a blank. The under-threshold case stays exactly as predicted:
 viable and undetected.
 
+> **Measured, 2 Nov 2026 — the lockout is already in force, so it is not a hardening change.**
+> A fine-grained password policy, `Strong-Users`, has existed since 4 June 2026 (v2 era) and
+> applies to `Domain Users`: minimum length 14, lockout after 5 failures in 30 minutes for 30
+> minutes, maximum password age 42 days. So the over-threshold burst would lock the account and
+> write `4740` in the **before**-run too. The lockout cell does not move between the columns,
+> `Purple - Verify Account Lockout (post FGPP)` is mis-described as "absent pre-hardening", and
+> the register's "lockout enforced" row is the current state rather than a planned one. The
+> burst stays in both runs, as a measured boundary, not as a hardening effect.
+>
+> The 42-day maximum age was checked against every account the chain depends on: `SQLService`,
+> `pparker` and `fcastle` all have `PasswordNeverExpires`, so no attack step can fail on an
+> expired password mid-v4.
+
 The dropped controls are all prevention whose effect no shipped rule measures. They are correct
 hardening in a real estate; here they would cost the most, carry the most risk, and change
 nothing that can be shown. This cuts the hardening work from roughly 10–14 hours to about 6
