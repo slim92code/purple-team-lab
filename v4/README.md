@@ -459,18 +459,21 @@ Three things about that middle row are easy to get wrong:
   the event looks like when they do — and not on a rate threshold. `benign-baseline.md` records
   that those tickets were generated rather than observed, because citing a self-chosen number as
   an environment's normal rate is the error this section exists to prevent.
-- **The honeypot SPN is the documented exception.** The hardening baseline above adds a service
-  account "with an SPN that is never legitimately used: any Kerberos request for it is malicious
-  by definition." For a rule keyed on that SPN an unexercised zero **is** the measurement, not a
-  gap — its whole premise is that no legitimate traffic exists. The zero/unmeasured convention
-  must not be applied mechanically there.
+- **Noted ahead, for step 4 and not for this window:** the honeypot SPN will be the one
+  documented exception to the zero/unmeasured convention. The honeypot account does not exist
+  during the benign window — it is created with the hardening baseline — so nothing about it
+  constrains this measurement. But once the rule over it is written, an unexercised zero **is**
+  its measurement rather than a gap, because its whole premise is that no legitimate traffic
+  exists. The convention must not be applied mechanically there. See
+  [the honeypot rule](#the-honeypot-needs-a-rule-or-it-is-just-an-account) below.
 
 What runs during the window is recorded in `benign-baseline.md` next to the counts, because the
 counts only mean something in terms of what was exercised.
 
 This is not a side quest; it is the input three shipped rules are already waiting on. The app
-ships 17 searches with 12 scheduled, and **all five unscheduled ones are blocked on a
-measurement rather than on a missing idea**:
+ships 17 searches with 12 scheduled, and **none of the five unscheduled ones is blocked on a
+missing idea** — each is blocked on a measurement or on a setting. A sixth is missing entirely
+and is added below:
 
 | Unscheduled rule | Blocked on | Unblocked by |
 | ---------------- | ---------- | ------------ |
@@ -479,11 +482,13 @@ measurement rather than on a missing idea**:
 | `Purple - Large Outbound Transfer` | a measured byte threshold, not the placeholder 10 MB | benign baseline |
 | `Purple - Verify Account Lockout (post FGPP)` | the lockout policy not being applied yet | hardening (lockout) |
 | `Purple - RC4 Anomaly (post AES enforcement)` | RC4 still being permitted | hardening (AES-only) |
+| `Purple - Honeypot SPN Ticket Request` | the rule does not exist yet, and neither does the account | hardening (honeypot) — see below |
 
 The benign baseline calibrates the first three; the two cheap Kerberos/account settings unblock
-the last two. Taken together the target for v4 is explicit and measurable: **17 searches
-shipped, 17 scheduled**, with none left in the ship-but-never-fire state that v3 produced two
-examples of. Each rule ends in one of three states, not two:
+the next two; the last is written with the honeypot it watches. Taken together the target for v4
+is explicit and measurable: **18 searches shipped, 18 scheduled**, with none left in the
+ship-but-never-fire state that v3 produced two examples of. Each rule ends in one of three
+states, not two:
 
 | End state | Meaning |
 | --------- | ------- |
@@ -493,6 +498,36 @@ examples of. Each rule ends in one of three states, not two:
 
 The middle state exists on purpose. Deleting a conceptually sound detection because a seven-VM
 lab could not calibrate it would be a loss dressed up as discipline.
+
+#### The honeypot needs a rule, or it is just an account
+
+The hardening baseline above adds "a honeypot service account with an SPN that is never
+legitimately used: any Kerberos request for it is malicious by definition." **No such rule
+exists** — `detections/` has nothing keyed on a honeypot or decoy SPN, in any of the three rule
+formats. Creating the account without writing the rule produces a decoy nobody is watching,
+which is worse than not setting the trap: it reads as coverage and provides none.
+
+So it is scoped now rather than discovered after the hardening run, and it is the eighteenth
+search:
+
+```
+[Purple - Honeypot SPN Ticket Request]
+  4769 where Service_Name = <the honeypot SPN>
+```
+
+Three things make it unlike every other rule in the pack, and all three are the point of it:
+
+- **No threshold.** One hit is the alert. There is no rate to calibrate because the legitimate
+  rate is zero by construction.
+- **No exclusions.** The Kerberoasting rule above filters machine requestors, because there a
+  machine asking for a service ticket is ordinary. Here it is not: a computer account requesting
+  the honeypot SPN is as suspect as a user doing it, so the rule excludes nothing.
+- **An unexercised zero is its measurement.** Silence over the benign window is exactly the
+  expected result, which is why the zero/unmeasured convention does not apply to it.
+
+It cannot be written or scheduled until the honeypot account exists, so it belongs to step 4 and
+not to the benign window. The account and the rule are created together, in that order, and
+neither ships without the other.
 
 #### What this measurement cannot claim
 
@@ -651,6 +686,6 @@ v4/
 ```
 
 Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
-layers beat three half-finished ones; once these exist, all 17 searches have reached one of the
+layers beat three half-finished ones; once these exist, all 18 searches have reached one of the
 three end states above, and the matrix is filled through the hardening run,
 v4 is closed.
