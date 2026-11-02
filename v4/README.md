@@ -16,6 +16,11 @@
 > on record first. The residual gaps below work the same way: committing to them in advance
 > is what makes them a risk register instead of a list written around whatever got through.
 >
+> Structured to be read at three levels: **L1 triage** (`investigations/`), **L2 hunting and
+> incident response** (`hunts/`, `incident-report.md`), and **detection engineering**
+> (`coverage-matrix.md`, `detections/`), so a reader can enter at whichever level matches
+> their role. The layer breakdown is in [Revision, 2 Nov 2026](#revision-2-nov-2026--three-readable-layers-and-the-build-sequence) at the end of this page.
+>
 > Repo entry point: [root README](../README.md).
 
 v4 keeps the [v3](../v3/) five-layer detection stack and changes two things: the Windows
@@ -214,6 +219,11 @@ register, and are what the kill chain works through:
 None of the files below exist yet. This is the target structure, listed so the scope is
 explicit.
 
+> **Superseded, 2 Nov 2026.** This tree is the 24 October target and is left as written. Two of
+> its files now exist, and the scope has since gained two artefacts. The current structure is in
+> [Revision, 2 Nov 2026](#revision-2-nov-2026--three-readable-layers-and-the-build-sequence) at
+> the end of this page.
+
 ```
 v4/
 ├── README.md                      <- this page (the only file that exists)
@@ -265,3 +275,129 @@ emits none), and the rule needs five. So in v4 the spray case file's coverage ce
 advance: the attack is viable and the detection does **not** fire, not because hardening broke
 it but because the lab is one account short of the threshold. That is recorded here so the
 before/after matrix reports it as a measured estate limitation rather than a hardening effect.
+
+## Revision, 2 Nov 2026 — three readable layers and the build sequence
+
+A scope revision, written after the 31 October ingest work closed the CIM gap and the
+pre-hardening baseline was captured. It changes how v4 is organised and adds two artefacts; it
+does not revise any prediction above, which stay as written on 24 October. It replaces a
+short-lived separate `v4/PLAN.md`, which duplicated this page and is removed — one page, one
+source of truth.
+
+The reason for the change: the plan above is a single flat scope, but the work it produces is
+read by three different roles, and a reader could not tell which part was addressed to them.
+v4 is therefore organised into three layers, each with its own artefacts.
+
+### Build sequence
+
+The artefacts have a dependency order, because two of them describe the same attack run and one
+of them measures a change to it:
+
+1. **The pre-hardening baseline is captured.** All five sources were verified live —
+   `WinEventLog`, `XmlWinEventLog` (Sysmon), `zeek`, `suricata`, `wazuh`, each under 15 minutes
+   stale — with `Network_Traffic` populated and 17 searches loaded / 12 scheduled. Snapshotted
+   as `v4-pre-hardening` across all seven VMs. This is the clean "before" state, and it answers
+   the Addendum's requirement that all five sources be verified at the start of a run rather
+   than assumed.
+2. **The IR report and the hunts are written against that pre-hardening run.** They describe
+   and interrogate the chain as it fires against the un-hardened baseline, so the "before"
+   story is on record before anything changes. Neither waits on hardening.
+3. **Hardening is applied afterwards, bundle by bundle** — the five GPO bundles above, not all
+   at once. Each bundle is followed by a kill-chain re-run, a snapshot, and one column in
+   `coverage-matrix.md`: what still fires, what the bundle blocked for the attacker, and what it
+   broke for detection. A bundle that corrupts the baseline is rolled back to
+   `v4-pre-hardening`.
+
+The coverage matrix is the only artefact that spans before and after, and it is built
+incrementally rather than written at the end.
+
+### Layer 1 — triage (`investigations/`)
+
+The case-file format above stands, with three elements made mandatory in every file:
+
+| Element | What goes in it |
+| ------- | --------------- |
+| TP/FP decision | True positive or false positive, with the evidence that decided it |
+| Severity | The severity assigned, and why it was raised or lowered from the alert default |
+| Escalation | What L1 hands to L2: the open questions, the artefacts collected, the scope still unknown |
+
+The Escalation section is the one that matters. The format above ends at the verdict and the
+remediation recommendation, which is where most written triage stops; what it does not show is
+the handoff, and the handoff is the part of the L1 role that is hardest to demonstrate on paper.
+
+The existing case count does not change. No new cases are added.
+
+### Layer 2 — hunting and incident response
+
+The layer the plan above does not cover at all. Two new artefacts.
+
+**`v4/hunts/` — two to three hunt files.** Hypothesis-driven, not alert-driven: the hunt starts
+from a claim about attacker behaviour that can be proven or disproven, not from an alert that
+already fired. Each file states the hypothesis, the query and why that data source, the finding
+including a negative one, and the recommendation — a detection rule, a hardening change, or "no
+action, hypothesis disproven."
+
+**The selection rule is to hunt the gaps, not the wins.** A hunt that re-describes an alert
+which already fired is triage in reverse. Kerberoasting and the JA4 C2 fingerprint both fired
+in v3 and are already written up as case files, so re-running them as hunts would prove nothing.
+The two gaps this page has already measured are the real hunt material:
+
+- **Spray detection by a signal other than the `4771` count.** The Addendum establishes that the
+  shipped rule cannot fire here — the estate is one account short of the threshold — so that
+  question is closed and is not the hunt. The open question is whether the spray is detectable
+  at all by a different signal: source-address correlation across multiple accounts within a
+  window, or `4625` failure patterns, neither of which depends on the account count. If a signal
+  exists, it is a rule; if none does, the negative result is what makes the matrix cell honest.
+- **C2 beaconing from an allowlisted path.** `Purple - C2 Beacon` ships unscheduled because
+  legitimate software beacons from `AppData` too. The hypothesis is that a beacon there is
+  separable from OneDrive, Teams and browser traffic by behaviour rather than by location —
+  JA4 fingerprint rarity, connection-interval regularity, bytes-out to bytes-in ratio. The
+  finding is the allowlist the rule needs before it can be scheduled.
+
+A hunt that disproves its hypothesis, or that proves a gap is real, is a complete hunt file. A
+negative result that names a concrete detection gap is worth more than a positive result that
+repeats a rule already known to work.
+
+**`v4/incident-report.md` — one IR timeline for the pre-hardening run.** One narrative, not a
+set of alerts: an executive summary written for someone who will not read the rest; a timeline
+correlated across all five sources into a single sequence; blast radius, separating what was
+compromised from what was reached but not compromised and what was never touched; which single
+source would have been insufficient alone; containment, in the order it was done and what that
+order cost; and the detection gaps found, including the two hunted above.
+
+This is incident scoping, not alert triage, and it must not restate the case files. A case file
+answers "is this real." The IR report answers "how far did it go."
+
+### Layer 3 — detection engineering
+
+Unchanged in content. `detections/` and the Sigma pack stay as they are; `coverage-matrix.md` is
+produced by the hardening phase in step 3 above, not before it, since the before/after columns
+cannot exist until the bundles have been applied and the chain re-run against each. No CI
+pipeline — the matrix carries the argument on its own.
+
+### Current structure
+
+Replaces the 24 October tree above. Two files exist; the rest is still the target.
+
+```
+v4/
+├── README.md                      <- this page
+├── infrastructure/
+│   ├── topology.md
+│   ├── hardening-baseline.md      <- before / after / why, per control
+│   └── logging-config.md          <- exists (sensor persistence, cross-sensor liveness)
+├── investigations/                <- L1: the triage deliverable
+│   ├── CASE-01-password-spray.md
+│   ├── CASE-02-kerberoasting.md
+│   ├── CASE-03-lateral-movement.md
+│   ├── CASE-04-lsass-false-positive.md
+│   ├── CASE-05-persistence.md
+│   └── CASE-06-c2-beaconing.md
+├── hunts/                         <- L2: hypothesis-driven, 2-3 files
+├── incident-report.md             <- L2: one correlated IR timeline
+├── coverage-matrix.md             <- L3: before / after hardening, per phase
+└── risk-register.md               <- the residual gaps above, with rationale
+```
+
+Two to three hunt files and one IR report. Three clean layers beat three half-finished ones;
+once these exist and the matrix is filled through the hardening run, v4 is closed.
