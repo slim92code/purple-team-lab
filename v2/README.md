@@ -4,8 +4,8 @@ A self-built Active Directory lab where every attack is run, detected in Splunk,
 stress-tested for what default tooling misses. The gap is then closed and re-proven.
 
 > This documents **Lab v2**, the Sysmon + Splunk baseline. The NDR and EDR layers were added
-> in [v3](../v3/). [v4](../v4/), a rebuild on a hardened baseline, is scoped as a design
-> document and not yet built. Repo entry point: [root README](../README.md).
+> in [v3](../v3/). [v4](../v4/), a rebuild on a hardened baseline, is in progress. Repo entry
+> point: [root README](../README.md).
 
 > The queries and screenshots are as they were when v2 ran; the prose has been edited since,
 > and where a claim did not survive later measurement it is flagged on the spot. [v3](../v3/)
@@ -201,7 +201,7 @@ purple-team-lab/
 │   ├── COMMAND_REFERENCE.md        <- command quick-reference
 │   └── screenshots/                <- 12 detection screenshots + ATT&CK Navigator layer (SVG)
 ├── v3/                             <- NDR + EDR layers, 7 case files, technical report
-└── v4/                             <- design document only, not yet built
+└── v4/                             <- hardened-baseline rebuild, in progress
 ```
 
 ## Scope and caveats
