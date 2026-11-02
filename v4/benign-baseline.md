@@ -177,8 +177,21 @@ klist get HYDRA-DC/SQLService.MARVEL.local:60111
 alone. A stolen credential used from another host should not inherit the allowance.
 
 The one request made from `pparker` at 15:59:49 was a mechanism check taken **before** the window
-opened at 16:19:07, so it is outside the measured period. Any `SQLService` request from `pparker`
-or `fcastle` inside the window is excluded from the allowlist and the exclusion is recorded.
+opened at 16:19:07, so it falls outside the measured period. **Verified: zero `SQLService`
+requests of any kind inside the window at the time the correction was made**, so nothing has to be
+excluded and the allowlist starts clean. Had any arrived from `pparker` or `fcastle`, they would
+have been set aside with the exclusion recorded rather than quietly dropped.
+
+That zero covers only the first twenty minutes of the window, so it is re-checked twice before any
+result is computed:
+
+1. **Over the whole window, once it closes** — the same query bounded
+   `earliest="11/02/2026:16:19:00" latest="11/03/2026:16:19:00"`.
+2. **With a positive control, because a bare zero proves nothing.** The same query widened to
+   `earliest="11/02/2026:15:50:00"` must return the `pparker` row from 15:59:49. If it does not,
+   the zero was an artefact of the query — wrong field, wrong sourcetype, wrong bound — and not a
+   fact about the window. This is the same discipline the Zeek filter check needed: there, two
+   absent junk files meant nothing until a control file proved the forwarder was still scanning.
 
 ### 2. The C2 allowlist pins filenames; a folder wildcard would be a hole
 
