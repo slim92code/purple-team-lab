@@ -420,10 +420,17 @@ Every detection in this repo has been tested against an attack. **None has been 
 against normal activity**, which is the first question anyone running a SOC asks, because alert
 fatigue is what kills detection programmes.
 
-So before the hardening work: let the lab run **24–48 hours with no attack at all** — ordinary
-use, Office and browser activity, OneDrive sync, logons, file-share traffic — then run all
-scheduled searches over that window and count how many times each fired. The output is a
+So before the hardening work: let the lab run **24–48 hours with no attack at all** — then run
+all scheduled searches over that window and count how many times each fired. The output is a
 false-positive rate per rule, which is a table this kind of portfolio almost never has.
+
+**The benign activity has to be generated, not waited for.** Seven VMs left powered on and idle
+produce near-silence, and a window of silence measures nothing — it just returns zero for every
+rule and invites exactly the wrong conclusion. So the window is driven deliberately: OneDrive
+sync, opening and saving files from the share, browsing, Office documents, logon and logoff
+cycles on all three Windows hosts, scheduled-task and update activity left enabled. What runs
+during the window is recorded in `benign-baseline.md` next to the counts, because the counts
+only mean something in terms of what was exercised.
 
 This is not a side quest; it is the input three shipped rules are already waiting on. The app
 ships 17 searches with 12 scheduled, and **all five unscheduled ones are blocked on a
@@ -439,8 +446,42 @@ measurement rather than on a missing idea**:
 
 The benign baseline calibrates the first three; the two cheap Kerberos/account settings unblock
 the last two. Taken together the target for v4 is explicit and measurable: **17 searches
-shipped, 17 scheduled** — every rule either enabled against a measured threshold or deleted,
-with none left in the ship-but-never-fire state that v3 produced two examples of.
+shipped, 17 scheduled**, with none left in the ship-but-never-fire state that v3 produced two
+examples of. Each rule ends in one of three states, not two:
+
+| End state | Meaning |
+| --------- | ------- |
+| Scheduled, threshold measured | the benign window exercised this rule's false-positive source and the number holds |
+| Scheduled, threshold lab-specific | calibrated here, but the window could not represent a real estate — carries a note saying so, and saying what to re-measure |
+| Deleted | the rule is wrong, not merely uncalibrated |
+
+The middle state exists on purpose. Deleting a conceptually sound detection because a seven-VM
+lab could not calibrate it would be a loss dressed up as discipline.
+
+#### What this measurement cannot claim
+
+A false-positive rate measured here is **not** a false-positive rate in production, and the
+reason is specific rather than a general disclaimer: this lab has three Windows hosts and a
+handful of accounts, so the benign noise that drives most of these rules is a fraction of what
+a real estate generates. `Purple - C2 Beacon from User-Writable Path` is the clearest case —
+its false positives come from legitimate `AppData` egress (OneDrive, Teams, browsers), and with
+few users and almost no SaaS traffic an allowlist derived from this window is **incomplete by
+construction**. The same applies to `Purple - Large Outbound Transfer`, whose byte threshold
+reflects this segment's traffic and nothing else.
+
+So **a zero in the table means one of two different things**, and they must not be collapsed:
+either the rule had the opportunity to fire on benign activity and did not, or nothing in the
+window exercised its false-positive source at all. The second is not a clean rule — it is an
+unmeasured one, the same distinction the coverage matrix draws with `M` and `→`. The baseline
+table therefore records, per rule, whether the window actually exercised what the rule keys on;
+a rule whose source was never exercised is reported as unmeasured and does not graduate to
+"threshold measured" on the strength of a zero.
+
+This is the same discipline the Addendum applies to the spray rule, which it reports as "a
+measured estate limitation rather than a hardening effect": the number is real, but the process
+that produced it does not support every conclusion that could be drawn from it. Stating the
+limit next to the table rather than after it is the difference between a measurement and a
+claim.
 
 No new attack techniques are added in v4. The chain already covers spray, Kerberoasting, LSASS
 access, lateral movement, persistence, C2 and exfil; another technique would add volume, not
@@ -561,12 +602,12 @@ v4/
 │   └── CASE-05-persistence.md
 ├── hunts/                         <- L2: hypothesis-driven, 2-3 files
 ├── incident-report.md             <- L2: one correlated IR timeline
-├── benign-baseline.md             <- FP rate per rule over 24-48h with no attack
+├── benign-baseline.md             <- FP rate per rule, what the window exercised, what it cannot claim
 ├── coverage-matrix.md             <- L3: before / after hardening, per phase
 └── risk-register.md               <- the residual gaps above, with rationale
 ```
 
 Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
-layers beat three half-finished ones; once these exist, all 17 searches are either scheduled
-against a measured threshold or deleted, and the matrix is filled through the hardening run,
+layers beat three half-finished ones; once these exist, all 17 searches have reached one of the
+three end states above, and the matrix is filled through the hardening run,
 v4 is closed.
