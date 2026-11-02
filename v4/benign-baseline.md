@@ -16,6 +16,8 @@ section is empty until the window closes.
 that is the one hard condition.
 
 **Opened:** 2026-11-02 16:19 CET (15:19 UTC). **Closes:** 2026-11-03 16:19 CET.
+**Superseded — the window was restarted at 2026-11-02 17:45 CET (16:45 UTC) and closes
+2026-11-03 17:45 CET.** See section 5 below.
 
 The timestamp is the indexer's own clock, not a host's, so the window boundaries and the
 `_indextime` values the results are drawn from come from the same source.
@@ -245,6 +247,29 @@ nothing; the same search over the preceding seven days returns rows. Those rows 
 HYDRA-DC `EventCode=47` — its time service has `192.168.182.133` configured as a manual NTP peer
 and logs that it is unreachable. So a mention of that address in a DC log is **not** evidence
 that Kali is up; traffic sourced from it in `zeek` or `suricata` is.
+
+### 5. Window restarted, 2 Nov 2026 17:45 CET
+
+**The first window had two ~20-minute gaps, one on each workstation.** Bucketing the window by
+host in ten-minute steps showed SPIDERMAN with no data from 16:19 to about 16:40, and THEPUNISHER
+with none from about 16:50 to 17:10. The other hosts kept reporting through both gaps, so it was
+not the hypervisor host going to sleep. Neither workstation logged a shutdown (`1074`, `6008`,
+`41`) or a sleep (`42`/`107`) inside the window; both had slept earlier the same day, and both
+were on the Windows 10 default of sleeping after 30 minutes idle (`STANDBYIDLE` AC = `0x708`).
+The cause is therefore probable rather than proven: idle sleep, or the VM being paused, in a way
+whose timestamps the guest's own clock does not show.
+
+**Sleep was disabled on all three Windows hosts** (`standby-timeout` AC and DC = 0, hibernate
+off) and continuity was then checked before restarting: every five-minute bucket from 17:10
+carried data for all five reporting hosts — HYDRA-DC, SPIDERMAN, THEPUNISHER, security-vm and
+wazuh-vm.
+
+Restarting cost one hour of calendar time and buys a window with no gap to explain. It also
+moves the setup noise out of the measurement: the `tstark` password reset (`4724`) and the
+17:06:42 `tstark` request now fall **before** the window. The benign `tstark` requests are
+therefore made again inside it, and the clean-window check and its `pparker` positive control
+run against the new bounds:
+`earliest="11/02/2026:17:45:00" latest="11/03/2026:17:45:00"`.
 
 ---
 
