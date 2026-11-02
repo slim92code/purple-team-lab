@@ -10,8 +10,8 @@
 > | | |
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, `wazuh-vm` liveness gap closed with a heartbeat feed and an 18th search verified by trigger (2 Nov) |
-> | Next | the Zeek `*.log` forwarder filter, then the benign baseline — the false-positive rate per rule |
+> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov) |
+> | Next | the benign baseline — 24-48h with no attack, the false-positive rate per rule |
 > | Not yet done | the before-run, the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
@@ -632,10 +632,17 @@ worse than not having found them:
   manager stopped (which is the proof it separates a dead manager from a dead host), clear again
   on restart. Its `alerts_age_sec` branch is deliberately **not** a firing condition: one sample
   is not a threshold, so the benign window measures the natural quiet distribution first.
-- **The `security-vm` forwarder ingests Zeek's bookkeeping files** — it monitors all of
-  `/opt/zeek/logs/current/` and takes `.pid`, `.env_vars`, `.rotated.*` and
-  `.archive-log.running.*.tmp` as logs; the stanza should match `*.log` only. Lower stakes, as
-  no shipped rule keys on those files, but done in the same pass to keep the index clean.
+- **~~The `security-vm` forwarder ingests Zeek's bookkeeping files.~~ Closed, 2 Nov 2026.**
+  Measured before touching it: 141 distinct sources in 24 hours, about **70 of them not logs**
+  — under 1% of events but half the source cardinality. And `*.log` alone was **not** the right
+  filter: `.rotated.*` carry no extension so a whitelist drops them, but `stdout.log` and
+  `stderr.log` do end in `.log` and are process output, so the stanza needs a blacklist too.
+  `stderr.log` is routed to its own `zeek:stderr` sourcetype rather than discarded — it is where
+  the `pcap_activate` message from the six-day Zeek outage sat unread. **Verified by probe with
+  a positive control:** of three files written at once, `probe_control.log` arrived and the two
+  junk-pattern files did not; without that control two absences would equally have meant the
+  forwarder had stopped scanning. Details in
+  [`infrastructure/logging-config.md`](infrastructure/logging-config.md).
 
 Both are configuration changes inside the VMs, so they are made **before** `v4-post-logging`.
 Made after it, a rollback would silently undo them.

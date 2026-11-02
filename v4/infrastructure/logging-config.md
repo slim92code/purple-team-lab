@@ -141,14 +141,128 @@ indexer alone. Closing that needs a second heartbeat feed on `wazuh-vm`; scoped 
 
 ## Pending
 
-- **A second heartbeat feed on `wazuh-vm`** so the cross-feed check can cover it too — it
-  currently sends only the event-driven `wazuh` alert feed, which the liveness rule cannot use.
-- **Forwarder hygiene on `security-vm`** — the Splunk forwarder monitors all of
-  `/opt/zeek/logs/current/` and ingests Zeek's internal bookkeeping (`.pid`, `.env_vars`,
-  `.rotated.*`, `.archive-log.running.*.tmp`) as if they were logs; it should match `*.log`
-  only. Found while measuring the feeds for the liveness check.
+- ~~**A second heartbeat feed on `wazuh-vm`**~~ — **done 2 Nov 2026**, and the remedy as
+  written here was wrong. See "Single-feed sensor host" below.
+- ~~**Forwarder hygiene on `security-vm`**~~ — **done 2 Nov 2026**. See "Zeek log filter" below.
 - **Zeek JSON output** via the Splunk Add-on for Zeek, so fields are TA-extracted
   rather than parsed positionally from `_raw`. (v4 README, "Logging improvement".)
 - **Per-channel Windows sourcetypes** in the forwarder so the Sysmon add-on's CIM
   mappings apply and `Network_Traffic` populates. (v4 README, "Forwarder sourcetypes
   and CIM".)
+
+## Single-feed sensor host — a heartbeat for `wazuh-vm` (2 Nov 2026)
+
+`Purple - Sensor Feed Stale` needs two independent feeds per host to cross-check one against
+the other. `wazuh-vm` sends one (`wazuh`, from `alerts.json`), so from the indexer alone a quiet
+sensor and a dead one are indistinguishable.
+
+**The remedy first written down was wrong, and measuring it is what showed that.** Both this
+file and the rule's own description said: add a second heartbeat feed so the cross-check covers
+that host. It does not work, because `alerts.json` is event-driven and bursty. With
+`wazuh-manager` active and healthy, it was measured going **431 seconds** with no write,
+against readings of 0–8 seconds minutes earlier. Cross-checking a 60-second timer feed against a
+feed that behaves like that turns legitimate quiet into an outage alert. The feed was the right
+idea; the cross-check was the wrong instrument.
+
+So the heartbeat got its own search instead — `Purple - Wazuh Sensor Health (single-feed host)`
+— and `Purple - Sensor Feed Stale` stays scoped to hosts with two real sensor feeds.
+
+`/opt/splunkforwarder/bin/scripts/wazuh_heartbeat.sh`, mode `755`:
+
+```sh
+#!/bin/sh
+m=$(systemctl is-active wazuh-manager 2>/dev/null); [ -n "$m" ] || m=unknown
+f=/var/ossec/logs/alerts/alerts.json
+if [ -f "$f" ]; then age=$(( $(date +%s) - $(stat -c %Y "$f") )); else age=-1; fi
+printf '%s host=%s heartbeat=1 manager=%s alerts_age_sec=%s\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(hostname)" "$m" "$age"
+```
+
+Added to `/opt/splunkforwarder/etc/apps/search/local/inputs.conf`:
+
+```
+[script:///opt/splunkforwarder/bin/scripts/wazuh_heartbeat.sh]
+disabled = false
+interval = 60
+index = main
+sourcetype = wazuh:heartbeat
+```
+
+Two details that cost a round of debugging each:
+
+- **`systemctl is-active X || echo unknown` is a trap.** `is-active` prints the state *and*
+  exits non-zero when the unit is inactive, so the fallback runs as well and the input emits two
+  lines — the second with no timestamp, indexed as its own event. The script tests for an empty
+  value instead.
+- **The trailing `Z` on the timestamp matters.** With it, Splunk parses the time as UTC and
+  renders it in the viewer's zone; without it, it guesses.
+
+Verified by trigger, all three states: empty on a healthy stack; `systemctl stop wazuh-manager`
+returned `wazuh-vm` with `manager=inactive` at `hb_age_min=0.7`, which is the proof it separates
+a dead manager from a dead host rather than only reporting staleness; `systemctl start` cleared
+it on the next run. `alerts_age_sec` ships as a field but is deliberately **not** a firing
+condition — one sample is not a threshold, so the benign-baseline window measures the natural
+quiet distribution before it is set.
+
+## Zeek log filter — the forwarder was ingesting bookkeeping files (2 Nov 2026)
+
+The stanza monitored the whole directory with no filter:
+
+```
+[monitor:///opt/zeek/logs/current]
+disabled = false
+index = main
+sourcetype = zeek
+```
+
+**Before, measured over 24 hours:** 141 distinct `source` values from `security-vm`, of which
+roughly **70 were not logs** — about 47 `.archive-log.running.*.tmp`, 22 `.rotated.*`, plus
+`stderr.log`. They account for only ~92 events, under 1% of the 11,303 in that window, so this
+was never a volume problem: it doubled the cardinality of every `stats count by source` while
+hiding in the noise of a byte count.
+
+**`*.log` alone is not the right filter**, which the file listing showed before anything was
+changed. The `.rotated.*` files carry no extension (`.rotated.conn`, `.rotated.dns`) and a
+`\.log$` whitelist excludes them correctly — but `stdout.log` and `stderr.log` do end in `.log`
+and are Zeek's process output, not Zeek logs, so they would have passed straight through. A
+whitelist alone would have left the second half of the problem in place.
+
+`stderr.log` is also where the *reason* for a Zeek failure is written — the
+`pcap_activate: device is not up` that kept the sensor dead for six days was sitting in it the
+whole time. So it is routed to its own sourcetype rather than discarded, which keeps it
+searchable without feeding non-TSV lines to the two searches that parse Zeek positionally.
+
+```
+[monitor:///opt/zeek/logs/current]
+disabled = false
+index = main
+sourcetype = zeek
+whitelist = \.log$
+blacklist = (stdout|stderr)\.log$
+
+[monitor:///opt/zeek/logs/current/stderr.log]
+disabled = false
+index = main
+sourcetype = zeek:stderr
+```
+
+Deliberately **not** added to the sourcetype list in `Purple - Sensor Feed Stale`: `zeek:stderr`
+is written only when Zeek has something to say, so as a third feed it would look permanently
+stale and fire the rule — the same trap the `wazuh-vm` heartbeat would have sprung, avoided in
+advance this time.
+
+**Verified by probe, and the control is the part that makes it a proof.** Three files were
+written into the log directory at once: `.rotated.TESTPROBE`, `.archive-log.running.99999.tmp`,
+and `probe_control.log`. Querying on `_index_earliest` — delivery time, not `_time`, since the
+question is what *arrived* — returned `probe_control.log` under `zeek` and nothing from the
+other two. Without the positive control, two absences would equally have meant "the forwarder
+stopped scanning the directory". A line appended to `stderr.log` arrived under `zeek:stderr`,
+confirming that route as well. Legitimate traffic was unaffected across a five-minute window
+after the restart: `conn.log` 197 events, `dns.log` 313, plus `files.log`, `http.log`,
+`kerberos.log` and the rest.
+
+The first attempt at this check queried on `_time` and proved nothing — a `.rotated.conn` from
+before the restart still fell inside the window. That is the same `_time`-versus-`_indextime`
+distinction `Purple - Telemetry Gap` was corrected for, walked into again here.
+
+Previous config backed up to `inputs.conf.bak-zeekfilter` on the host.
