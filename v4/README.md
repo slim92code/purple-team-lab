@@ -564,7 +564,7 @@ The hardening baseline above adds "a honeypot service account with an SPN that i
 legitimately used: any Kerberos request for it is malicious by definition." **No such rule
 exists** — `detections/` has nothing keyed on a honeypot or decoy SPN, in any of the three
 formats. An account created without the rule is a decoy nobody watches, which is worse than not
-setting the trap: it reads as coverage and provides none. So it is scoped now as the eighteenth
+setting the trap: it reads as coverage and provides none. So it is scoped now as the nineteenth
 search, `4769` where `Service_Name` is the honeypot SPN, and three things make it unlike every
 other rule in the pack:
 
@@ -716,7 +716,7 @@ files — a case file answers "is this real," the IR report answers "how far did
 
 ### Layer 3 — detection engineering
 
-Unchanged in content. `detections/` and the Sigma pack stay as they are, plus the eighteenth
+Unchanged in content. `detections/` and the Sigma pack stay as they are, plus the nineteenth
 search below. `coverage-matrix.md` is produced by steps 4, 6 and 7, not before them, and carries
 the `M` / `→` marks so a reader can tell a measured cell from a carried-forward one. No CI
 pipeline — the matrix carries the argument on its own.

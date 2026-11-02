@@ -147,6 +147,75 @@ taken from the **95th** percentile with the sample count recorded beside it, and
 
 ---
 
+## Method revision, 2 Nov 2026 — two corrections made after the window opened
+
+Both were found by review against the repo, before any result was computed. They are recorded
+here rather than silently applied, because the method was committed first precisely so that
+changes to it would be visible.
+
+### 1. The Kerberos requestor must be `tstark`, not `pparker` or `fcastle`
+
+The method as committed said to generate the benign `4769` from `MARVEL\pparker` on SPIDERMAN and
+`MARVEL\fcastle` on THEPUNISHER. **Those are the attack's own credentials.**
+`v2/02_attack_playbook.md` runs `impacket-GetUserSPNs MARVEL.LOCAL/fcastle:Password1 -request`,
+and `v3/attack/README.md` records the roast as made "with the `pparker` credential".
+
+An allowlist built on either principal would have suppressed the Kerberoasting detection in the
+before-run and the after-run alike — the measurement `CASE-02` exists to make. The benign window
+would have quietly disarmed the rule it was meant to calibrate.
+
+`tstark` is the only enabled domain principal the attack never uses, so the benign requests come
+from there:
+
+```
+runas /user:MARVEL\tstark cmd
+klist purge
+klist get HYDRA-DC/SQLService.MARVEL.local:60111
+```
+
+**And the allowlist keys on `Client_Address` as well as principal and SPN**, not on the principal
+alone. A stolen credential used from another host should not inherit the allowance.
+
+The one request made from `pparker` at 15:59:49 was a mechanism check taken **before** the window
+opened at 16:19:07, so it is outside the measured period. Any `SQLService` request from `pparker`
+or `fcastle` inside the window is excluded from the allowlist and the exclusion is recorded.
+
+### 2. The C2 allowlist pins filenames; a folder wildcard would be a hole
+
+The method called for `*\AppData\Local\Microsoft\OneDrive\*`, chosen to survive the version
+number embedded in the path. It solves that and creates something worse: it trusts **anything** in
+a directory the user can write to, so an implant dropped beside OneDrive would be allowlisted into
+invisibility — by the very rule whose whole premise is that user-writable paths are suspicious.
+
+The filenames are pinned and the wildcard is confined to the version folder:
+
+```
+*\AppData\Local\Microsoft\OneDrive\OneDrive.exe
+*\AppData\Local\Microsoft\OneDrive\OneDriveStandaloneUpdater.exe
+*\AppData\Local\Microsoft\OneDrive\*\OneDrive.Sync.Service.exe
+```
+
+Version drift is still handled, and a new binary appearing in that folder alerts instead of
+inheriting trust. If OneDrive later ships a fourth binary, the rule fires once and the allowlist
+is extended deliberately — which is the correct failure direction.
+
+### 3. How a false positive is counted — firings are not the unit
+
+No search in the pack sets `alert.suppress`; nine run every 10 minutes, five every 15, one every
+5, all over `-24h@h`. A single benign event therefore satisfies its rule again at **every**
+subsequent run for a full 24 hours — roughly 144 times for a 10-minute schedule.
+
+So the false-positive rate is counted as **distinct events, or distinct result groups**, never as
+firings. Counting firings would inflate every number by two orders of magnitude and make the
+table meaningless.
+
+The absence of any throttling is itself a finding about this pack, and belongs in the results
+rather than in a footnote: as shipped, one benign event does not produce one alert, it produces a
+day of them. Whatever the measured rates turn out to be, `alert.suppress` is a change every
+scheduled rule here needs.
+
+---
+
 ## Results
 
 _Empty until the window closes._
