@@ -1,14 +1,17 @@
 # Lab v4 — Hardened Baseline and Alert Triage Case Files
 
-> ## Status: design document, not yet built
+> ## Status: predictions written 24 Oct 2026, build in progress
 >
-> This page is the plan for v4, written before the work starts. It is not a results page and
-> nothing here is a finding. Last updated 24 Oct 2026.
+> The plan below was written before the work started and its predictions are left unchanged, so
+> they stay auditable. **Nothing in the plan is a result.** What has been measured since is in
+> dated sections, each carrying the date it was measured — those are results. The distinction
+> between the two is the point of this page. Last updated 2 Nov 2026.
 >
 > | | |
 > | --- | --- |
-> | Written | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | Not yet done | applying the baseline, re-running the kill chain, the coverage matrix, the case files |
+> | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
+> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs |
+> | Not yet done | applying the hardening bundles, re-running the kill chain, the coverage matrix, the case files, the hunts, the IR report |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
 > It is published first on purpose. v4's deliverable is a before/after detection-coverage

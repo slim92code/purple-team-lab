@@ -9,8 +9,9 @@ than quietly fixed.
 
 Detection-as-code lives at the repo root. Each lab iteration has its own folder.
 
-Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) is a
-[design document](v4/README.md) and not yet built.
+Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) in progress — its
+[predictions are on record](v4/README.md), the pre-hardening baseline is captured, the
+hardening run itself is not done yet.
 
 Built and measured by me, written with AI assistance. Details in [Notes](#notes).
 
@@ -35,7 +36,7 @@ measured.
 | ------- | --------------- | ------ |
 | [v2](v2/) | Sysmon + Splunk SIEM | Complete. [Playbooks and screenshots](v2/README.md) |
 | [v3](v3/) | + Zeek/Suricata NDR, Wazuh EDR | Complete. [Summary](v3/README.md), [technical report, 32 pp. (EN)](v3/Purple_Team_Report_v3_EN.pdf) |
-| [v4](v4/) | v3 stack on a hardened, CIS-aligned baseline | Planned. [Design document](v4/README.md), not yet built |
+| [v4](v4/) | v3 stack on a hardened, CIS-aligned baseline | In progress. [Plan and measurements](v4/README.md) — baseline captured, hardening run pending |
 
 ### v2 — baseline
 
@@ -88,7 +89,7 @@ Seven [alert-triage case files](v3/investigations/) cover the chain phase by pha
 alert, the questions asked, the queries run, the verdict, and the tuning that follows. Three
 of them are about detections that did not work.
 
-### v4 — planned
+### v4 — in progress
 
 [`v4/README.md`](v4/README.md) scopes a rebuild of the v3 stack on a
 hardened baseline (advanced audit policy, credential protection, network-protocol hardening,
@@ -98,6 +99,12 @@ case files rather than an attack narrative.
 
 The plan is committed before the work. The deliverable is a before/after comparison, so the
 predictions and the residual-gap list have to be on record first.
+
+What is done so far is the "before" half: the NDR sensor made reboot-durable, a CIM
+sourcetype defect found and fixed on the ingest path, and the pre-hardening baseline verified
+across all five sources and snapshotted. The hardening bundles, the re-run and the matrix are
+still ahead. Each measurement is in its own dated section on that page, kept separate from the
+24 October predictions.
 
 ## Notes
 
