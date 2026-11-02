@@ -10,8 +10,8 @@
 > | | |
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs |
-> | Next | closing the two logging gaps, then the benign baseline — the false-positive rate per rule |
+> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, `wazuh-vm` liveness gap closed with a heartbeat feed and an 18th search verified by trigger (2 Nov) |
+> | Next | the Zeek `*.log` forwarder filter, then the benign baseline — the false-positive rate per rule |
 > | Not yet done | the before-run, the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
@@ -531,7 +531,7 @@ set from the **95th** percentile with the sample count beside it, shipping in th
 "threshold lab-specific" state. A week would give a defensible p99 and is not worth five more
 days ahead of the first artefact.
 
-The app ships 17 searches with 12 scheduled, and **none of the five unscheduled ones is blocked
+The app ships 18 searches with 13 scheduled, and **none of the five unscheduled ones is blocked
 on a missing idea** — each is blocked on a measurement or a setting. A sixth is missing entirely:
 
 | Unscheduled rule | Blocked on | Unblocked by |
@@ -545,7 +545,7 @@ on a missing idea** — each is blocked on a measurement or a setting. A sixth i
 
 The benign baseline calibrates the first three; the two cheap Kerberos/account settings unblock
 the next two; the last is written with the honeypot it watches. Taken together the target for v4
-is explicit and measurable: **18 searches shipped, 18 scheduled**, with none left in the
+is explicit and measurable: **19 searches shipped, 19 scheduled**, with none left in the
 ship-but-never-fire state that v3 produced two examples of. Each rule ends in one of three
 states, not two:
 
@@ -617,13 +617,21 @@ so it ranks below everything above.
 Both are defects this repo found and recorded itself, and leaving them recorded-but-open is
 worse than not having found them:
 
-- **`wazuh-vm` is not covered by the cross-sensor liveness rule.** `Purple - Sensor Feed Stale`
-  needs two independent feeds per host to cross-check and that host sends only one
-  (`wazuh` alerts.json), which is event-driven and can be legitimately quiet. A second heartbeat
-  feed — a scripted input or a Perfmon equivalent — brings it under the rule. **This gates the
-  benign window:** a 48-hour measurement is only worth the wait if a sensor going dark inside it
-  is noticed while it happens, and `wazuh-vm` is the one host where it would not be. Same
-  reasoning the Addendum applies to `ens37` in making it step zero.
+- **~~`wazuh-vm` is not covered by the cross-sensor liveness rule.~~ Closed, 2 Nov 2026 — and the
+  remedy written here was wrong.** This gap gated the benign window: a 48-hour measurement is
+  only worth the wait if a sensor going dark inside it is noticed while it happens, and
+  `wazuh-vm` was the one host where it would not be. The fix prescribed above was "a second
+  heartbeat feed brings it under the rule." **It does not.** A 60-second timer feed cross-checked
+  against an event-driven one makes legitimate quiet look like an outage, and the measurement is
+  concrete: with `wazuh-manager` active and healthy, `alerts.json` was observed going **431
+  seconds** without a write, against readings of 0–8 seconds minutes earlier. At the shipped
+  20-minute threshold a longer quiet stretch would eventually fire that rule with nothing wrong.
+  The feed was the right idea and the cross-check the wrong instrument. So the heartbeat got its
+  own search, `Purple - Wazuh Sensor Health (single-feed host)`, **verified by trigger across all
+  three states** — empty on a healthy stack, `manager=inactive` at `hb_age_min=0.7` with the
+  manager stopped (which is the proof it separates a dead manager from a dead host), clear again
+  on restart. Its `alerts_age_sec` branch is deliberately **not** a firing condition: one sample
+  is not a threshold, so the benign window measures the natural quiet distribution first.
 - **The `security-vm` forwarder ingests Zeek's bookkeeping files** — it monitors all of
   `/opt/zeek/logs/current/` and takes `.pid`, `.env_vars`, `.rotated.*` and
   `.archive-log.running.*.tmp` as logs; the stanza should match `*.log` only. Lower stakes, as
@@ -715,5 +723,5 @@ timeline) and `benign-baseline.md` (the FP rate per rule, what the window exerci
 cannot claim). Everything else in that tree stands as written.
 
 Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
-layers beat three half-finished ones; once these exist, all 18 searches have reached one of the
+layers beat three half-finished ones; once these exist, all 19 searches have reached one of the
 three end states above, and the matrix is filled through the hardening run, v4 is closed.

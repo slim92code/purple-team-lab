@@ -15,7 +15,7 @@ detections/
     ├── purple_lab/                  # deployable Splunk app -> copy to etc/apps/
     │   ├── default/
     │   │   ├── app.conf
-    │   │   ├── savedsearches.conf   # 17 searches, macro-free (2 CIM, 11 Windows, 2 Zeek, 2 pipeline health)
+    │   │   ├── savedsearches.conf   # 18 searches, macro-free (2 CIM, 11 Windows, 2 Zeek, 3 pipeline health)
     │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
@@ -31,7 +31,7 @@ own. That is the difference between the two lab versions: v2 ran on Free and is 
 as queries, v3 runs on Enterprise and its alerts fire on schedule. Check which you have
 with `| rest /services/licenser/groups | table title, is_active`.
 
-This app ships 17 searches, 12 of them scheduled. It now covers every alert that ran in the
+This app ships 18 searches, 13 of them scheduled. It now covers every alert that ran in the
 v3 lab: the JA4 C2 beacon and the large-outbound-transfer check were written ad hoc during
 the run and had no Splunk search here until they were added afterwards. Screenshot 11 in
 [`v3/README.md`](../v3/README.md) maps the lab's six against what ships.
@@ -112,7 +112,7 @@ came with it, and running the telemetry-gap search by name completes against 537
 with no error. `splunk btool check` flagged nothing in this app. The 31 Oct redeployment added
 `Purple - Sensor Feed Stale`, verified by trigger the same evening (fires at a 2-minute
 threshold with a stopped Zeek, empty at the shipped 20); `| rest` confirms 17 loaded with 12
-scheduled, and the identical query runs clean ad hoc against the current feeds.
+scheduled, and the identical query runs clean ad hoc against the current feeds. The 2 Nov pass added `Purple - Wazuh Sensor Health (single-feed host)` with its own scripted-input heartbeat on wazuh-vm, verified by trigger across all three states (empty on a healthy stack; `manager=inactive` at `hb_age_min=0.7` with wazuh-manager stopped, which is what separates a dead manager from a dead host; clear again on restart), taking the app to 18 loaded with 13 scheduled.
 
 **One thing went wrong on the way and is worth more than the deployment.** The old app was
 backed up to `/opt/splunk/etc/apps/purple_lab.bak-20261030` — inside the apps directory.
