@@ -302,15 +302,20 @@ of them measures a change to it:
    as `v4-pre-hardening` across all seven VMs. This is the clean "before" state, and it answers
    the Addendum's requirement that all five sources be verified at the start of a run rather
    than assumed.
-2. **The IR report and the hunts are written against that pre-hardening run.** They describe
+2. **A benign baseline is measured — 24 to 48 hours with no attack.** The false-positive rate
+   per rule, against normal activity. It comes before hardening because three of the five
+   unscheduled searches are blocked on this measurement and nothing else. See
+   [Benign baseline](#benign-baseline--the-measurement-that-comes-first).
+3. **The IR report and the hunts are written against that pre-hardening run.** They describe
    and interrogate the chain as it fires against the un-hardened baseline, so the "before"
    story is on record before anything changes. Neither waits on hardening.
-3. **Hardening is applied afterwards, bundle by bundle** — the five GPO bundles above, not all
-   at once. Each bundle is followed by a snapshot, a **targeted re-run of only the kill-chain
-   phases that bundle plausibly affects**, and one column in `coverage-matrix.md`: what still
-   fires, what the bundle blocked for the attacker, and what it broke for detection. A bundle
-   that corrupts the baseline is rolled back to `v4-pre-hardening`.
-4. **One full kill-chain re-run at the end**, with all five bundles in place. That is the clean
+4. **Hardening is applied afterwards, bundle by bundle** — the controls that survive the
+   criterion below, not the full CIS sweep, and not all at once. Each bundle is followed by a
+   snapshot, a **targeted re-run of only the kill-chain phases that bundle plausibly affects**,
+   and one column in `coverage-matrix.md`: what still fires, what the bundle blocked for the
+   attacker, and what it broke for detection. A bundle that corrupts the baseline is rolled
+   back to `v4-pre-hardening`.
+5. **One full kill-chain re-run at the end**, with the hardening in place. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
 
 ### Why the per-bundle runs are targeted, and what that costs
@@ -345,6 +350,120 @@ an oversight.
 The coverage matrix is the only artefact that spans before and after, and it is built
 incrementally rather than written at the end.
 
+### Which hardening controls stay, and the rule that decides it
+
+The five bundles above were scoped on 24 October by what a CIS-aligned baseline contains. That
+is the right way to describe a baseline and the wrong way to decide what this lab should spend
+time on, because the residual-gap register is deliberately built so that every kill-chain phase
+stays viable. The effect of hardening here lands on **telemetry**, not on whether the attack
+succeeds — so a control earns its place only if it changes what a detection sees.
+
+**The criterion: a control stays if a rule can be named whose before/after cell it moves.**
+
+| Control | Rule whose cell it moves | Stays |
+| ------- | ------------------------ | ----- |
+| Advanced audit policy | all of them — it generates the events the rules key on | yes |
+| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | yes |
+| Account lockout / FGPP | `Purple - Verify Account Lockout (post FGPP)` | yes |
+| `RunAsPPL` + Credential Guard split | the LSASS access rules — `CASE-04` | yes |
+| PowerShell script-block / module logging | the PowerShell execution rules | yes |
+| Defender ASR rules | the persistence cell, one of two with no residual-gap row | yes |
+| `ms-DS-MachineAccountQuota=0` | none — kept only because it is one setting | no cell |
+| Firewall GPO (`MARVEL-Firewall-Baseline`) | none — the lateral path is deliberately unchanged | no cell |
+| LLMNR / NBT-NS / mDNS / WPAD disabled | none — no Responder step in this chain, no rule for it | dropped |
+| LDAP signing and channel binding | none | dropped |
+| SMB signing required, SMBv1 removed | none | dropped |
+| IPsec domain isolation (Connection Security Rules) | none — prevention only | dropped |
+| LAPS | none — local-admin reuse is not a path this chain takes | dropped |
+| gMSA for service accounts | none — the legacy SPN account is a documented exception anyway | dropped |
+
+Two entries are kept despite moving no cell, and both are labelled as such rather than quietly
+counted: `MachineAccountQuota=0` because it is a single setting and leaving a known privilege-
+escalation path open to save thirty seconds would be silly, and the firewall GPO because the
+[Firewall baseline](#firewall-baseline-gpo) section above records the v3 per-host rules as an
+inconsistency, and dropping the GPO would leave that defect standing. Neither produces a column
+in the matrix.
+
+**Why the dropped controls were dropped, stated plainly:** they are prevention whose effect no
+shipped rule measures. LLMNR poisoning, LDAP relay and SMB relay are real attacks and hardening
+against them is correct in a real estate; this lab has no step that exercises them and no rule
+that would show the difference, so applying them here would produce an unmeasurable change at
+the highest cost and risk in the plan. IPsec domain isolation is the clearest case: the section
+above already concedes it is "a real project, not one switch," and it is prevention with no
+telemetry consequence. LAPS needs a schema extension and gMSA needs a KDS root key, for cells
+the register already commits to leaving unchanged.
+
+This cuts the hardening work from roughly 10–14 hours to about 6, and nothing that moves a
+matrix cell is given up.
+
+**One claim corrected while writing this.** An earlier draft of this section said AES-only
+Kerberos turns the RC4 rule "from a present-but-unremarkable signal into an anomaly by
+definition." That overstates it for Sigma rule 2, which is already a clean anomaly detector:
+over 30 days this domain issued 1,649 service tickets, every one of them `0x12` (AES-256), and
+zero RC4 — so the rule already fires on nothing benign. What AES-only actually changes is
+narrower and worth stating exactly:
+
+- **Prevention:** an explicit RC4 downgrade currently succeeds — the v3 Pass-the-Ticket step
+  obtained a `4768` TGT at `0x17`. Under AES-only it is refused everywhere except the legacy
+  account.
+- **Detection:** rule 2's zero-false-positive property moves from accidental to enforced. Today
+  nothing happens to use RC4; afterwards policy forbids it. A baseline can drift, a policy
+  cannot.
+- **And one rule becomes schedulable at all:** `Purple - RC4 Anomaly (post AES enforcement)`
+  counts every `0x17` regardless of SPN ownership, which is not a usable alert while RC4 is
+  permitted. Its own description is "after AES enforcement every `0x17` is an anomaly —
+  threshold inverts." That rule is the one the original phrasing was true of.
+
+### Benign baseline — the measurement that comes first
+
+Every detection in this repo has been tested against an attack. **None has been measured
+against normal activity**, which is the first question anyone running a SOC asks, because alert
+fatigue is what kills detection programmes.
+
+So before the hardening work: let the lab run **24–48 hours with no attack at all** — ordinary
+use, Office and browser activity, OneDrive sync, logons, file-share traffic — then run all
+scheduled searches over that window and count how many times each fired. The output is a
+false-positive rate per rule, which is a table this kind of portfolio almost never has.
+
+This is not a side quest; it is the input three shipped rules are already waiting on. The app
+ships 17 searches with 12 scheduled, and **all five unscheduled ones are blocked on a
+measurement rather than on a missing idea**:
+
+| Unscheduled rule | Blocked on | Unblocked by |
+| ---------------- | ---------- | ------------ |
+| `Purple - C2 Beacon from User-Writable Path` | an allowlist of legitimate `AppData` egress | benign baseline |
+| `Purple - Kerberoasting User-SPN Ticket (etype-agnostic)` | an allowlist of routinely requested SPNs | benign baseline |
+| `Purple - Large Outbound Transfer` | a measured byte threshold, not the placeholder 10 MB | benign baseline |
+| `Purple - Verify Account Lockout (post FGPP)` | the lockout policy not being applied yet | hardening (lockout) |
+| `Purple - RC4 Anomaly (post AES enforcement)` | RC4 still being permitted | hardening (AES-only) |
+
+The benign baseline calibrates the first three; the two cheap Kerberos/account settings unblock
+the last two. Taken together the target for v4 is explicit and measurable: **17 searches
+shipped, 17 scheduled** — every rule either enabled against a measured threshold or deleted,
+with none left in the ship-but-never-fire state that v3 produced two examples of.
+
+No new attack techniques are added in v4. The chain already covers spray, Kerberoasting, LSASS
+access, lateral movement, persistence, C2 and exfil; another technique would add volume, not
+argument. One item is noted as optional and last: `T1003.006` (DCSync) sits at score 50 in the
+[ATT&CK layer](../detections/attack_navigator_layer.json) because the SharpKatz attempt failed
+at the DRS bind with RPC 1825, and the `4662` detection for it is already written in
+[v2's playbook](../v2/03_detection_playbook.md). Making that attempt succeed would convert a
+scored-50 cell to a measured one, but it is RPC troubleshooting rather than new detection work,
+so it ranks below everything above.
+
+### Logging gaps to close in the same pass
+
+Both are defects this repo found and recorded itself, and leaving them recorded-but-open is
+worse than not having found them:
+
+- **`wazuh-vm` is not covered by the cross-sensor liveness rule.** `Purple - Sensor Feed Stale`
+  needs two independent feeds per host to cross-check, and that host sends only one
+  (`wazuh` alerts.json), which is event-driven and can be legitimately quiet. A second heartbeat
+  feed there — a scripted input or a Perfmon equivalent — brings it under the rule.
+- **The `security-vm` forwarder ingests Zeek's bookkeeping files.** It monitors all of
+  `/opt/zeek/logs/current/` and takes `.pid`, `.env_vars`, `.rotated.*` and
+  `.archive-log.running.*.tmp` in as if they were logs; the stanza should match `*.log` only.
+
 ### Layer 1 — triage (`investigations/`)
 
 The case-file format above stands, with three elements made mandatory in every file:
@@ -359,7 +478,22 @@ The Escalation section is the one that matters. The format above ends at the ver
 remediation recommendation, which is where most written triage stops; what it does not show is
 the handoff, and the handoff is the part of the L1 role that is hardest to demonstrate on paper.
 
-The existing case count does not change. No new cases are added.
+**Three case files, not six.** The 24 October tree above lists `CASE-01` to `CASE-06`, which
+would be six new narratives about a kill chain [v3](../v3/) already documents in seven. The
+Escalation format is a different demonstration from the v3 case files, not a duplicate of them,
+but it is demonstrated in full by three. The three are chosen for having the richest
+before/after, and they are named here so the scope is not left to interpretation:
+
+| File | Why this one |
+| ---- | ------------ |
+| `CASE-02-kerberoasting.md` | AES-only Kerberos plus the legacy-account exception — the clearest policy-driven change in the set |
+| `CASE-04-lsass-false-positive.md` | Credential Guard on one endpoint and not the other is a measurable split — blocked on one host, viable on the other — and the LSASS rule's benign reads are already measured (`WmiPrvSE.exe`, `wazuh-agent.exe`), so the TP/FP decision has real evidence behind it rather than a staged one |
+| `CASE-05-persistence.md` | ASR rules, and persistence is one of only two phases with no row in the residual-gap register, so the cell is genuinely uncertain |
+
+Dropped: password spray (the Addendum establishes its detection outcome in advance, so there is
+nothing to find), lateral movement (deliberately unchanged — WinRM stays open), and C2
+beaconing, whose interesting work is the benign-baseline calibration below rather than a triage
+narrative.
 
 ### Layer 2 — hunting and incident response
 
@@ -405,7 +539,7 @@ answers "is this real." The IR report answers "how far did it go."
 ### Layer 3 — detection engineering
 
 Unchanged in content. `detections/` and the Sigma pack stay as they are; `coverage-matrix.md` is
-produced by steps 3 and 4 above, not before them, since the before/after columns cannot exist
+produced by steps 4 and 5 above, not before them, since the before/after columns cannot exist
 until the bundles have been applied and the chain re-run. It carries the `M` / `→` marks so a
 reader can tell a measured cell from a carried-forward one. No CI pipeline — the matrix carries
 the argument on its own.
@@ -421,18 +555,18 @@ v4/
 │   ├── topology.md
 │   ├── hardening-baseline.md      <- before / after / why, per control
 │   └── logging-config.md          <- exists (sensor persistence, cross-sensor liveness)
-├── investigations/                <- L1: the triage deliverable
-│   ├── CASE-01-password-spray.md
+├── investigations/                <- L1: the triage deliverable, 3 files not 6
 │   ├── CASE-02-kerberoasting.md
-│   ├── CASE-03-lateral-movement.md
 │   ├── CASE-04-lsass-false-positive.md
-│   ├── CASE-05-persistence.md
-│   └── CASE-06-c2-beaconing.md
+│   └── CASE-05-persistence.md
 ├── hunts/                         <- L2: hypothesis-driven, 2-3 files
 ├── incident-report.md             <- L2: one correlated IR timeline
+├── benign-baseline.md             <- FP rate per rule over 24-48h with no attack
 ├── coverage-matrix.md             <- L3: before / after hardening, per phase
 └── risk-register.md               <- the residual gaps above, with rationale
 ```
 
-Two to three hunt files and one IR report. Three clean layers beat three half-finished ones;
-once these exist and the matrix is filled through the hardening run, v4 is closed.
+Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
+layers beat three half-finished ones; once these exist, all 17 searches are either scheduled
+against a measured threshold or deleted, and the matrix is filled through the hardening run,
+v4 is closed.
