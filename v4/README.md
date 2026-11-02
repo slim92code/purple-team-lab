@@ -302,21 +302,38 @@ of them measures a change to it:
    as `v4-pre-hardening` across all seven VMs. This is the clean "before" state, and it answers
    the Addendum's requirement that all five sources be verified at the start of a run rather
    than assumed.
-2. **A benign baseline is measured — 24 to 48 hours with no attack.** The false-positive rate
+2. **The two logging gaps are closed, before the benign window and not after it.** Both are
+   listed under [Logging gaps](#logging-gaps-to-close-before-the-benign-window-step-2) below.
+   The `wazuh-vm` one is the reason this is its own step rather than housekeeping: that host is
+   the one sensor the cross-feed liveness rule cannot see, so if it goes dark at hour 20 of a
+   48-hour window, nothing says so and the window has to be run again. This is the same
+   argument the Addendum makes for `ens37` being step zero, applied to the next measurement.
+   Snapshot afterwards as `v4-post-logging`.
+3. **A benign baseline is measured — 24 to 48 hours with no attack.** The false-positive rate
    per rule, against normal activity. It comes before hardening because three of the five
    unscheduled searches are blocked on this measurement and nothing else. See
    [Benign baseline](#benign-baseline--the-measurement-that-comes-first).
-3. **The IR report and the hunts are written against that pre-hardening run.** They describe
+   **Results are written into `benign-baseline.md` as they are measured, not at the end.** The
+   repo lives outside the VMs and survives any rollback; the Splunk index does not. Snapshot
+   afterwards as `v4-post-benign`, and that — not `v4-pre-hardening` — is the rollback target
+   for the hardening work, because rolling back past the benign window would erase the
+   measurement and cost another 48 hours. `v4-pre-hardening` stays as the deeper fallback.
+4. **The IR report and the hunts are written against that pre-hardening run.** They describe
    and interrogate the chain as it fires against the un-hardened baseline, so the "before"
    story is on record before anything changes. Neither waits on hardening.
-4. **Hardening is applied afterwards, bundle by bundle** — the controls that survive the
+5. **Hardening is applied afterwards, bundle by bundle** — the controls that survive the
    criterion below, not the full CIS sweep, and not all at once. Each bundle is followed by a
    snapshot, a **targeted re-run of only the kill-chain phases that bundle plausibly affects**,
    and one column in `coverage-matrix.md`: what still fires, what the bundle blocked for the
    attacker, and what it broke for detection. A bundle that corrupts the baseline is rolled
-   back to `v4-pre-hardening`.
-5. **One full kill-chain re-run at the end**, with the hardening in place. That is the clean
+   back to `v4-post-benign`. The honeypot account and
+   [the rule that watches it](#the-honeypot-needs-a-rule-or-it-is-just-an-account) are created
+   in this step, together.
+6. **One full kill-chain re-run at the end**, with the hardening in place. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
+
+Snapshots, in the order they are taken: `v4-pre-hardening` (done) → `v4-post-logging` →
+`v4-post-benign` → one per hardening bundle.
 
 ### Why the per-bundle runs are targeted, and what that costs
 
@@ -459,7 +476,7 @@ Three things about that middle row are easy to get wrong:
   the event looks like when they do — and not on a rate threshold. `benign-baseline.md` records
   that those tickets were generated rather than observed, because citing a self-chosen number as
   an environment's normal rate is the error this section exists to prevent.
-- **Noted ahead, for step 4 and not for this window:** the honeypot SPN will be the one
+- **Noted ahead, for step 5 and not for this window:** the honeypot SPN will be the one
   documented exception to the zero/unmeasured convention. The honeypot account does not exist
   during the benign window — it is created with the hardening baseline — so nothing about it
   constrains this measurement. But once the rule over it is written, an unexercised zero **is**
@@ -525,7 +542,7 @@ Three things make it unlike every other rule in the pack, and all three are the 
 - **An unexercised zero is its measurement.** Silence over the benign window is exactly the
   expected result, which is why the zero/unmeasured convention does not apply to it.
 
-It cannot be written or scheduled until the honeypot account exists, so it belongs to step 4 and
+It cannot be written or scheduled until the honeypot account exists, so it belongs to step 5 and
 not to the benign window. The account and the rule are created together, in that order, and
 neither ships without the other.
 
@@ -570,18 +587,29 @@ at the DRS bind with RPC 1825, and the `4662` detection for it is already writte
 scored-50 cell to a measured one, but it is RPC troubleshooting rather than new detection work,
 so it ranks below everything above.
 
-### Logging gaps to close in the same pass
+### Logging gaps to close before the benign window (step 2)
 
 Both are defects this repo found and recorded itself, and leaving them recorded-but-open is
-worse than not having found them:
+worse than not having found them. They are scheduled before the benign window rather than
+alongside the hardening work, for the reason given in step 2:
 
 - **`wazuh-vm` is not covered by the cross-sensor liveness rule.** `Purple - Sensor Feed Stale`
   needs two independent feeds per host to cross-check, and that host sends only one
   (`wazuh` alerts.json), which is event-driven and can be legitimately quiet. A second heartbeat
   feed there — a scripted input or a Perfmon equivalent — brings it under the rule.
+  **This one gates the benign window.** A 24-to-48-hour measurement is only worth the wait if a
+  sensor going dark inside it is noticed while it happens; `wazuh-vm` is the one host where it
+  would not be. Closing this first is the same reasoning the Addendum applies to `ens37`, which
+  it makes step zero of v4 precisely because a dead sensor during a measured run makes the
+  measurement worthless.
 - **The `security-vm` forwarder ingests Zeek's bookkeeping files.** It monitors all of
   `/opt/zeek/logs/current/` and takes `.pid`, `.env_vars`, `.rotated.*` and
   `.archive-log.running.*.tmp` in as if they were logs; the stanza should match `*.log` only.
+  Lower stakes than the first — no shipped rule keys on those files, so it does not distort any
+  false-positive count — but it is done in the same pass to keep the window's index clean.
+
+Both are configuration changes inside the VMs, so they are made **before** `v4-post-logging` is
+taken. Made after it, a rollback would silently undo them.
 
 ### Layer 1 — triage (`investigations/`)
 
@@ -658,7 +686,7 @@ answers "is this real." The IR report answers "how far did it go."
 ### Layer 3 — detection engineering
 
 Unchanged in content. `detections/` and the Sigma pack stay as they are; `coverage-matrix.md` is
-produced by steps 4 and 5 above, not before them, since the before/after columns cannot exist
+produced by steps 5 and 6 above, not before them, since the before/after columns cannot exist
 until the bundles have been applied and the chain re-run. It carries the `M` / `→` marks so a
 reader can tell a measured cell from a carried-forward one. No CI pipeline — the matrix carries
 the argument on its own.
