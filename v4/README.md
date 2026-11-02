@@ -11,7 +11,8 @@
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
 > | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs |
-> | Not yet done | applying the hardening bundles, re-running the kill chain, the coverage matrix, the case files, the hunts, the IR report |
+> | Next | closing the two logging gaps, then the benign baseline — the false-positive rate per rule |
+> | Not yet done | the before-run, the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
 > It is published first on purpose. v4's deliverable is a before/after detection-coverage
@@ -204,6 +205,14 @@ positionally from `_raw`. v3 queries parse the raw TSV with `rex` to show log st
 v4 queries run against TA-extracted fields, which is the production form and survives empty
 or shifted columns.
 
+> **Deferred, 2 Nov 2026.** This is not done in v4. By the criterion below it moves no
+> matrix cell — it is pipeline robustness, not a measurement — and inserting a second
+> canary-and-rollout exercise ahead of the first delivered artefact is the wrong trade. The
+> **unnamed risk it leaves** is recorded instead: `Purple - Sliver C2 Beacon by JA4` (scheduled)
+> and `Purple - Large Outbound Transfer` both extract Zeek fields with a **positional** `rex`
+> over raw TSV, so a change in Zeek's column order or output format breaks them silently rather
+> than loudly. They work today and the dependency is deliberate, but it is a dependency.
+
 ## Deliberate residual gaps
 
 Real environments are hardened unevenly. These gaps are chosen, documented as a risk
@@ -216,6 +225,23 @@ register, and are what the kill chain works through:
 | WinRM left reachable east-west between workstations | the deliberate, monitored pivot the lateral-movement detection watches | Lateral movement |
 | Credential Guard on one endpoint, not both | Uneven rollout is the norm | LSASS access |
 | PowerShell logging on, application allowlisting off | Extremely common combination | PowerShell execution |
+
+> **Measured, 2 Nov 2026 — the Credential Guard row cannot be built as written, and the reason
+> is the one the row itself gives.** Both Windows endpoints were checked before scoping the
+> control: both run **Windows 10 Pro**, and Credential Guard ships only on Enterprise and
+> Education, which settles it on its own. The firmware confirms it twice over — one host is UEFI
+> with Secure Boot disabled and reports `AvailableSecurityProperties {4,5,6}`, the other is on
+> legacy BIOS (`Confirm-SecureBootUEFI` → `0xC0000002`) and reports `{0}`. Neither exposes
+> property `1` (hypervisor support) or `2` (Secure Boot), so VBS — which Credential Guard
+> requires — is unavailable on both without an edition change and a firmware conversion.
+>
+> The row above stands unchanged, because this is evidence **for** it rather than against it:
+> Pro editions and legacy firmware are precisely why Credential Guard is not rolled out evenly
+> in real estates. What changes is which control produces the split. **`RunAsPPL` (LSA
+> Protection) replaces it** — a registry and GPO setting that works on Pro and on BIOS, needing
+> only a restart. `CASE-04` keeps the same design, one endpoint protected and one not, and the
+> question it asks gets sharper: on the protected host, does the LSASS rule still see the
+> attempt, or does the attack fail while the alert stays silent?
 
 ## Planned contents
 
@@ -283,9 +309,7 @@ before/after matrix reports it as a measured estate limitation rather than a har
 
 A scope revision, written after the 31 October ingest work closed the CIM gap and the
 pre-hardening baseline was captured. It changes how v4 is organised and adds two artefacts; it
-does not revise any prediction above, which stay as written on 24 October. It replaces a
-short-lived separate `v4/PLAN.md`, which duplicated this page and is removed — one page, one
-source of truth.
+does not revise any prediction above, which stay as written on 24 October.
 
 The reason for the change: the plan above is a single flat scope, but the work it produces is
 read by three different roles, and a reader could not tell which part was addressed to them.
@@ -318,10 +342,24 @@ of them measures a change to it:
    afterwards as `v4-post-benign`, and that — not `v4-pre-hardening` — is the rollback target
    for the hardening work, because rolling back past the benign window would erase the
    measurement and cost another 48 hours. `v4-pre-hardening` stays as the deeper fallback.
-4. **The IR report and the hunts are written against that pre-hardening run.** They describe
-   and interrogate the chain as it fires against the un-hardened baseline, so the "before"
-   story is on record before anything changes. Neither waits on hardening.
-5. **Hardening is applied afterwards, bundle by bundle** — the controls that survive the
+4. **The full kill chain is run against the un-hardened estate. This is the "before" column.**
+   The first draft of this sequence left it out, assuming the 30 October v3 re-run could serve
+   as "before" — it cannot. That run predates the 31 October CIM fix, so `Purple - C2 Beacon`
+   could not fire then (`Network_Traffic` held zero events) and can now; comparing it against a
+   post-hardening run would credit hardening with a change the ingest fix made, the attribution
+   error this page exists to avoid. So the before-run happens **here**: after the logging
+   changes, to use the same pipeline as the "after" run, and after the benign window, so no
+   implant beacons while false positives are counted.
+   **Two consequences.** The Windows hosts now carry attack artefacts — the persistence task
+   among them — and a scheduled task left in place would make `CASE-05` measure a pre-existing
+   task rather than whether ASR blocks persistence. So the three Windows hosts are reverted to
+   `v4-post-benign` before hardening begins. **Rollback scope is three hosts, never seven:**
+   reverting Splunk or the sensors would erase the benign measurement and this run's own
+   evidence. From the moment a measurement exists, the SIEM and the sensors are not rolled back.
+5. **The IR report and the hunts are written against that before-run.** They describe and
+   interrogate the chain as it fires against the un-hardened baseline, so the "before" story is
+   on record before anything changes. Neither waits on hardening.
+6. **Hardening is applied afterwards, bundle by bundle** — the controls that survive the
    criterion below, not the full CIS sweep, and not all at once. Each bundle is followed by a
    snapshot, a **targeted re-run of only the kill-chain phases that bundle plausibly affects**,
    and one column in `coverage-matrix.md`: what still fires, what the bundle blocked for the
@@ -329,32 +367,28 @@ of them measures a change to it:
    back to `v4-post-benign`. The honeypot account and
    [the rule that watches it](#the-honeypot-needs-a-rule-or-it-is-just-an-account) are created
    in this step, together.
-6. **One full kill-chain re-run at the end**, with the hardening in place. That is the clean
+7. **One full kill-chain re-run at the end**, with the hardening in place — the pair to the before-run at step 4. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
 
-Snapshots, in the order they are taken: `v4-pre-hardening` (done) → `v4-post-logging` →
-`v4-post-benign` → one per hardening bundle.
+Snapshot order: `v4-pre-hardening` (done) → `v4-post-logging` → `v4-post-benign` → one per bundle.
 
 ### Why the per-bundle runs are targeted, and what that costs
 
-A full kill chain after every bundle would mean five full runs. The cheaper scheme — targeted
-runs per bundle, one full run at the end — produces the same final comparison and still
-attributes which bundle moved which cell, so the extra four full runs buy very little. But it
-costs two things, and both are recorded here rather than discovered later:
+Targeted runs per bundle plus one full run at the end produce the same final comparison as five
+full runs, and still attribute which bundle moved which cell. Two costs, recorded here rather
+than discovered later:
 
-**Un-run cells are unmeasured, not unchanged.** This is the part that matters. If a phase was
-not re-run after a bundle, its cell in that column is not evidence that the bundle left it
-alone — it is simply not measured. The matrix therefore uses two marks:
+**Un-run cells are unmeasured, not unchanged.** A phase not re-run after a bundle has a cell
+that is not evidence the bundle left it alone — it is simply not measured. Two marks:
 
 | Mark | Meaning |
 | ---- | ------- |
 | **M** | Measured — the phase was re-run after this bundle and the result recorded |
 | **→** | Not re-measured; the value is carried forward from the previous column |
 
-Every cell in the final full-run column is measured. A phase that no bundle plausibly touches
-reads `→ → → → →  M`, which says on its face that its only post-hardening measurement is the
-final run. Without this distinction the matrix would claim more than was measured, which for a
-before/after artefact is the one failure that voids it.
+Every cell in the final full-run column is measured; a phase no bundle touches reads
+`→ → → → →  M`. Without this distinction the matrix would claim more than was measured, which
+for a before/after artefact is the one failure that voids it.
 
 **Targeted runs miss cross-bundle regressions.** The most interesting result in work like this
 is a bundle breaking a detection it has no obvious relationship to — SMB signing or NTLMv2-only
@@ -369,56 +403,64 @@ incrementally rather than written at the end.
 
 ### Which hardening controls stay, and the rule that decides it
 
-The five bundles above were scoped on 24 October by what a CIS-aligned baseline contains. That
-is the right way to describe a baseline and the wrong way to decide what this lab should spend
-time on, because the residual-gap register is deliberately built so that every kill-chain phase
-stays viable. The effect of hardening here lands on **telemetry**, not on whether the attack
-succeeds — so a control earns its place only if it changes what a detection sees.
+The five bundles above were scoped by what a CIS-aligned baseline contains — the right way to
+describe a baseline, the wrong way to decide what this lab spends time on, because the
+residual-gap register is built so that every kill-chain phase stays viable. The effect here
+lands on **telemetry**, not on whether the attack succeeds, so a control earns its place only
+if it changes what a detection sees.
 
 **The criterion: a control stays if a rule can be named whose before/after cell it moves.**
 
-| Control | Rule whose cell it moves | Stays |
-| ------- | ------------------------ | ----- |
-| Advanced audit policy | all of them — it generates the events the rules key on | yes |
-| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | yes |
-| Account lockout / FGPP | `Purple - Verify Account Lockout (post FGPP)` | yes |
-| `RunAsPPL` + Credential Guard split | the LSASS access rules — `CASE-04` | yes |
-| PowerShell script-block / module logging | the PowerShell execution rules | yes |
-| Defender ASR rules | the persistence cell, one of two with no residual-gap row | yes |
-| `ms-DS-MachineAccountQuota=0` | none — kept only because it is one setting | no cell |
-| Firewall GPO (`MARVEL-Firewall-Baseline`) | none — the lateral path is deliberately unchanged | no cell |
-| LLMNR / NBT-NS / mDNS / WPAD disabled | none — no Responder step in this chain, no rule for it | dropped |
-| LDAP signing and channel binding | none | dropped |
-| SMB signing required, SMBv1 removed | none | dropped |
-| IPsec domain isolation (Connection Security Rules) | none — prevention only | dropped |
-| LAPS | none — local-admin reuse is not a path this chain takes | dropped |
-| gMSA for service accounts | none — the legacy SPN account is a documented exception anyway | dropped |
+Naming the rule is not enough on its own — the page's own standard is that predictions go on
+record before the measurement, so each retained control also carries the direction it is
+predicted to move. Writing that column is what exposed the lockout row below.
 
-Two entries are kept despite moving no cell, and both are labelled as such rather than quietly
-counted: `MachineAccountQuota=0` because it is a single setting and leaving a known privilege-
-escalation path open to save thirty seconds would be silly, and the firewall GPO because the
-[Firewall baseline](#firewall-baseline-gpo) section above records the v3 per-host rules as an
-inconsistency, and dropping the GPO would leave that defect standing. Neither produces a column
-in the matrix.
+| Control | Rule whose cell it moves | Predicted outcome | Stays |
+| ------- | ------------------------ | ----------------- | ----- |
+| Advanced audit policy | all of them — it generates the events the rules key on | no rule changes verdict; event completeness improves and SACL telemetry becomes available with no rule yet keyed on it | yes |
+| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets; rule 2's verdict is unchanged, its zero-FP property becomes enforced | yes |
+| Account lockout / FGPP | `Purple - Verify Account Lockout (post FGPP)` | **does not fire** under the spray the register specifies — see below | yes |
+| `RunAsPPL` split (one endpoint, not both) | the LSASS access rules — `CASE-04` | attack fails on the protected host; the **risk is that it also goes silent**, because the `GrantedAccess` a PPL-denied open returns may not be in the rule's measured mask list | yes |
+| PowerShell script-block / module logging | the PowerShell execution rules | existing rules unchanged — they key on `4688` and Sysmon; `4104` arrives as a second corroborating source | yes |
+| Defender ASR rules | the persistence cell | **unchanged unless the prevalence rule blocks the payload** — no ASR rule targets scheduled-task creation | yes |
+| `ms-DS-MachineAccountQuota=0` | none — kept only because it is one setting | — | no cell |
+| Firewall GPO (`MARVEL-Firewall-Baseline`) | none — the lateral path is deliberately unchanged | — | no cell |
+| LLMNR / NBT-NS / mDNS / WPAD disabled | none — no Responder step in this chain, no rule for it | — | dropped |
+| LDAP signing and channel binding | none | — | dropped |
+| SMB signing required, SMBv1 removed | none | — | dropped |
+| IPsec domain isolation (Connection Security Rules) | none — prevention only | — | dropped |
+| LAPS | none — local-admin reuse is not a path this chain takes | — | dropped |
+| gMSA for service accounts | none — the legacy SPN account is a documented exception anyway | — | dropped |
 
-**Why the dropped controls were dropped, stated plainly:** they are prevention whose effect no
-shipped rule measures. LLMNR poisoning, LDAP relay and SMB relay are real attacks and hardening
-against them is correct in a real estate; this lab has no step that exercises them and no rule
-that would show the difference, so applying them here would produce an unmeasurable change at
-the highest cost and risk in the plan. IPsec domain isolation is the clearest case: the section
-above already concedes it is "a real project, not one switch," and it is prevention with no
-telemetry consequence. LAPS needs a schema extension and gMSA needs a KDS root key, for cells
-the register already commits to leaving unchanged.
+The two "no cell" entries are labelled rather than quietly counted: `MachineAccountQuota=0`
+because it is one setting and leaving a known privilege-escalation path open to save thirty
+seconds would be silly, and the firewall GPO because
+[Firewall baseline](#firewall-baseline-gpo) records the v3 per-host rules as a defect that
+dropping the GPO would leave standing.
 
-This cuts the hardening work from roughly 10–14 hours to about 6, and nothing that moves a
-matrix cell is given up.
+**The lockout row needs its own correction, and it is the reason the prediction column exists.**
+An earlier version of this table justified keeping lockout by naming
+`Purple - Verify Account Lockout (post FGPP)` as the rule whose cell it moves. That checked only
+that the rule exists, not that it would fire. The search is `EventCode=4740` — *account was
+locked out* — and the residual-gap register above commits to a spray that "stays under the
+threshold." Under that spray no account locks, no `4740` is written, and the cell reads
+unchanged both before and after. Naming a rule is not the same as moving its cell.
 
-**One claim corrected while writing this.** An earlier draft of this section said AES-only
-Kerberos turns the RC4 rule "from a present-but-unremarkable signal into an anomaly by
-definition." That overstates it for Sigma rule 2, which is already a clean anomaly detector:
-over 30 days this domain issued 1,649 service tickets, every one of them `0x12` (AES-256), and
-zero RC4 — so the rule already fires on nothing benign. What AES-only actually changes is
-narrower and worth stating exactly:
+The fix turns it into a measurement rather than dropping it: the **after-run adds a deliberate
+spray burst that crosses the threshold**, on one account, alongside the under-threshold spray
+the register specifies. Then the register's claim is measured instead of asserted — at N−1
+attempts the spray is invisible and at N the account locks and `4740` fires — and the matrix
+carries the boundary rather than a blank. The under-threshold case stays exactly as predicted:
+viable and undetected.
+
+The dropped controls are all prevention whose effect no shipped rule measures. They are correct
+hardening in a real estate; here they would cost the most, carry the most risk, and change
+nothing that can be shown. This cuts the hardening work from roughly 10–14 hours to about 6
+without giving up a cell.
+
+**AES-only does not make Sigma rule 2 an anomaly detector — it already is one.** Over 30 days
+this domain issued 1,649 service tickets, every one of them `0x12` (AES-256), and zero RC4, so
+the rule fires on nothing benign today. What AES-only changes is narrower:
 
 - **Prevention:** an explicit RC4 downgrade currently succeeds — the v3 Pass-the-Ticket step
   obtained a `4768` TGT at `0x17`. Under AES-only it is refused everywhere except the legacy
@@ -429,7 +471,7 @@ narrower and worth stating exactly:
 - **And one rule becomes schedulable at all:** `Purple - RC4 Anomaly (post AES enforcement)`
   counts every `0x17` regardless of SPN ownership, which is not a usable alert while RC4 is
   permitted. Its own description is "after AES enforcement every `0x17` is an anomaly —
-  threshold inverts." That rule is the one the original phrasing was true of.
+  threshold inverts."
 
 ### Benign baseline — the measurement that comes first
 
@@ -453,7 +495,7 @@ So the list is derived per rule, from what that rule actually keys on:
 | --------------------- | ------------------------- | --------------------------------- |
 | `Purple - C2 Beacon from User-Writable Path` | processes sending traffic from `Temp` / `AppData` / `ProgramData` / `Users\Public` | OneDrive sync, browser auto-updaters (Chrome and Edge both live in `AppData`), any updater left enabled |
 | `Purple - Kerberoasting User-SPN Ticket (etype-agnostic)` | legitimate service tickets for SPNs held by user accounts | **repeated, periodic authentication to `SQLService` from a user account** — see below |
-| `Purple - Large Outbound Transfer` | legitimate bulk egress | file uploads, a large download, the initial sync of a sizeable folder |
+| `Purple - Large Outbound Transfer` | legitimate bulk **egress** — the search sums `orig_bytes`, what an internal host sends | uploads to the share or to cloud storage, and the initial sync of a sizeable folder. **Not a download:** that is almost all `resp_bytes` and never touches this rule's source |
 
 The first and third happen by themselves once the machines are genuinely in use. **The middle
 one does not**, and it is the trap: a `4769` for a user-held SPN will not occur spontaneously in
@@ -476,21 +518,21 @@ Three things about that middle row are easy to get wrong:
   the event looks like when they do — and not on a rate threshold. `benign-baseline.md` records
   that those tickets were generated rather than observed, because citing a self-chosen number as
   an environment's normal rate is the error this section exists to prevent.
-- **Noted ahead, for step 5 and not for this window:** the honeypot SPN will be the one
-  documented exception to the zero/unmeasured convention. The honeypot account does not exist
-  during the benign window — it is created with the hardening baseline — so nothing about it
-  constrains this measurement. But once the rule over it is written, an unexercised zero **is**
-  its measurement rather than a gap, because its whole premise is that no legitimate traffic
-  exists. The convention must not be applied mechanically there. See
-  [the honeypot rule](#the-honeypot-needs-a-rule-or-it-is-just-an-account) below.
-
 What runs during the window is recorded in `benign-baseline.md` next to the counts, because the
-counts only mean something in terms of what was exercised.
+counts only mean something in terms of what was exercised. (The honeypot SPN, created later at
+step 6, is the one documented exception to the zero/unmeasured convention — see
+[the honeypot rule](#the-honeypot-needs-a-rule-or-it-is-just-an-account).)
 
-This is not a side quest; it is the input three shipped rules are already waiting on. The app
-ships 17 searches with 12 scheduled, and **none of the five unscheduled ones is blocked on a
-missing idea** — each is blocked on a measurement or on a setting. A sixth is missing entirely
-and is added below:
+**Window length, reconciled.** The 24 October text specifies "a full week" for the
+outbound-transfer percentiles; this revision specifies 24 to 48 hours, and the cost is stated
+rather than hidden. 48 hours gives roughly 288 ten-minute windows per host, so a p99 sits two or
+three samples from the maximum — a near-maximum, not a tail estimate. The threshold is therefore
+set from the **95th** percentile with the sample count beside it, shipping in the
+"threshold lab-specific" state. A week would give a defensible p99 and is not worth five more
+days ahead of the first artefact.
+
+The app ships 17 searches with 12 scheduled, and **none of the five unscheduled ones is blocked
+on a missing idea** — each is blocked on a measurement or a setting. A sixth is missing entirely:
 
 | Unscheduled rule | Blocked on | Unblocked by |
 | ---------------- | ---------- | ------------ |
@@ -520,62 +562,45 @@ lab could not calibrate it would be a loss dressed up as discipline.
 
 The hardening baseline above adds "a honeypot service account with an SPN that is never
 legitimately used: any Kerberos request for it is malicious by definition." **No such rule
-exists** — `detections/` has nothing keyed on a honeypot or decoy SPN, in any of the three rule
-formats. Creating the account without writing the rule produces a decoy nobody is watching,
-which is worse than not setting the trap: it reads as coverage and provides none.
+exists** — `detections/` has nothing keyed on a honeypot or decoy SPN, in any of the three
+formats. An account created without the rule is a decoy nobody watches, which is worse than not
+setting the trap: it reads as coverage and provides none. So it is scoped now as the eighteenth
+search, `4769` where `Service_Name` is the honeypot SPN, and three things make it unlike every
+other rule in the pack:
 
-So it is scoped now rather than discovered after the hardening run, and it is the eighteenth
-search:
+- **No threshold** — one hit is the alert; the legitimate rate is zero by construction.
+- **No exclusions.** The Kerberoasting rule filters machine requestors because there a machine
+  asking for a service ticket is ordinary. Here a computer account requesting the honeypot SPN
+  is as suspect as a user, so the rule excludes nothing.
+- **An unexercised zero is its measurement** — silence is the expected result, which is why the
+  zero/unmeasured convention does not apply to it.
 
-```
-[Purple - Honeypot SPN Ticket Request]
-  4769 where Service_Name = <the honeypot SPN>
-```
-
-Three things make it unlike every other rule in the pack, and all three are the point of it:
-
-- **No threshold.** One hit is the alert. There is no rate to calibrate because the legitimate
-  rate is zero by construction.
-- **No exclusions.** The Kerberoasting rule above filters machine requestors, because there a
-  machine asking for a service ticket is ordinary. Here it is not: a computer account requesting
-  the honeypot SPN is as suspect as a user doing it, so the rule excludes nothing.
-- **An unexercised zero is its measurement.** Silence over the benign window is exactly the
-  expected result, which is why the zero/unmeasured convention does not apply to it.
-
-It cannot be written or scheduled until the honeypot account exists, so it belongs to step 5 and
-not to the benign window. The account and the rule are created together, in that order, and
-neither ships without the other.
+It belongs to step 6, since it cannot exist before the account does. The two are created
+together and neither ships without the other.
 
 #### What this measurement cannot claim
 
-A false-positive rate measured here is **not** a false-positive rate in production, and the
-reason is specific rather than a general disclaimer: this lab has three Windows hosts and a
-handful of accounts, so the benign noise that drives most of these rules is a fraction of what
-a real estate generates. `Purple - C2 Beacon from User-Writable Path` is the clearest case —
-its false positives come from legitimate `AppData` egress (OneDrive, Teams, browsers), and with
-few users and almost no SaaS traffic an allowlist derived from this window is **incomplete by
-construction**. The same applies to `Purple - Large Outbound Transfer`, whose byte threshold
-reflects this segment's traffic and nothing else.
+A false-positive rate measured here is **not** one measured in production, for a specific
+reason rather than as a disclaimer: three Windows hosts and a handful of accounts generate a
+fraction of a real estate's benign noise. `Purple - C2 Beacon` is the clearest case — its false
+positives come from legitimate `AppData` egress (OneDrive, Teams, browsers), so with few users
+and almost no SaaS traffic an allowlist derived from this window is **incomplete by
+construction**. The same holds for `Purple - Large Outbound Transfer`, whose threshold reflects
+this segment and nothing else.
 
-So **a zero in the table means one of two different things**, and they must not be collapsed:
-either the rule had the opportunity to fire on benign activity and did not, or nothing in the
-window exercised its false-positive source at all. The second is not a clean rule — it is an
-unmeasured one, the same distinction the coverage matrix draws with `M` and `→`. The baseline
-table therefore records, per rule, whether the window actually exercised what the rule keys on;
-a rule whose source was never exercised is reported as unmeasured and does not graduate to
-"threshold measured" on the strength of a zero.
+So **a zero means one of two different things** and they must not be collapsed: the rule had the
+opportunity to fire and did not, or nothing exercised its false-positive source at all. The
+second is not a clean rule but an unmeasured one — the distinction the matrix draws with `M` and
+`→`. The baseline table therefore records, per rule, whether the window exercised what that rule
+keys on, and a rule whose source was never exercised does not graduate to "threshold measured"
+on the strength of a zero.
 
-This repo has already paid for that distinction once. `Purple - Spray Success` shipped with two
-claims in its description that were "reasoned about rather than executed," and when the query
-was finally run over real data on 29 October both were wrong — the rule had been passing on a
-coin flip, and a quiet day measured it at 1 true positive and 4 false where the reasoning had
-predicted none. A zero that nothing exercised is the same failure in the other direction: a
-number that looks measured, produced by a process that never tested the thing it is being
-cited for. The Addendum's spray entry is the milder sibling, "a measured estate limitation
-rather than a hardening effect" — there the number is real and only its attribution is at
-stake.
-
-Stating the limit next to the table rather than after it is the difference between a
+This repo has paid for that distinction once. `Purple - Spray Success` shipped with two claims
+that were "reasoned about rather than executed," and running the query on 29 October showed both
+were wrong — the rule had been passing on a coin flip, and a quiet day measured it at 1 true
+positive and 4 false where the reasoning predicted none. An unexercised zero is the same failure
+pointed the other way: a number that looks measured, from a process that never tested what it is
+cited for. Stating the limit beside the table rather than after it is the difference between a
 measurement and a claim.
 
 No new attack techniques are added in v4. The chain already covers spray, Kerberoasting, LSASS
@@ -590,26 +615,22 @@ so it ranks below everything above.
 ### Logging gaps to close before the benign window (step 2)
 
 Both are defects this repo found and recorded itself, and leaving them recorded-but-open is
-worse than not having found them. They are scheduled before the benign window rather than
-alongside the hardening work, for the reason given in step 2:
+worse than not having found them:
 
 - **`wazuh-vm` is not covered by the cross-sensor liveness rule.** `Purple - Sensor Feed Stale`
-  needs two independent feeds per host to cross-check, and that host sends only one
+  needs two independent feeds per host to cross-check and that host sends only one
   (`wazuh` alerts.json), which is event-driven and can be legitimately quiet. A second heartbeat
-  feed there — a scripted input or a Perfmon equivalent — brings it under the rule.
-  **This one gates the benign window.** A 24-to-48-hour measurement is only worth the wait if a
-  sensor going dark inside it is noticed while it happens; `wazuh-vm` is the one host where it
-  would not be. Closing this first is the same reasoning the Addendum applies to `ens37`, which
-  it makes step zero of v4 precisely because a dead sensor during a measured run makes the
-  measurement worthless.
-- **The `security-vm` forwarder ingests Zeek's bookkeeping files.** It monitors all of
+  feed — a scripted input or a Perfmon equivalent — brings it under the rule. **This gates the
+  benign window:** a 48-hour measurement is only worth the wait if a sensor going dark inside it
+  is noticed while it happens, and `wazuh-vm` is the one host where it would not be. Same
+  reasoning the Addendum applies to `ens37` in making it step zero.
+- **The `security-vm` forwarder ingests Zeek's bookkeeping files** — it monitors all of
   `/opt/zeek/logs/current/` and takes `.pid`, `.env_vars`, `.rotated.*` and
-  `.archive-log.running.*.tmp` in as if they were logs; the stanza should match `*.log` only.
-  Lower stakes than the first — no shipped rule keys on those files, so it does not distort any
-  false-positive count — but it is done in the same pass to keep the window's index clean.
+  `.archive-log.running.*.tmp` as logs; the stanza should match `*.log` only. Lower stakes, as
+  no shipped rule keys on those files, but done in the same pass to keep the index clean.
 
-Both are configuration changes inside the VMs, so they are made **before** `v4-post-logging` is
-taken. Made after it, a rollback would silently undo them.
+Both are configuration changes inside the VMs, so they are made **before** `v4-post-logging`.
+Made after it, a rollback would silently undo them.
 
 ### Layer 1 — triage (`investigations/`)
 
@@ -622,20 +643,19 @@ The case-file format above stands, with three elements made mandatory in every f
 | Escalation | What L1 hands to L2: the open questions, the artefacts collected, the scope still unknown |
 
 The Escalation section is the one that matters. The format above ends at the verdict and the
-remediation recommendation, which is where most written triage stops; what it does not show is
-the handoff, and the handoff is the part of the L1 role that is hardest to demonstrate on paper.
+remediation, which is where most written triage stops; the handoff is the part of the L1 role
+hardest to demonstrate on paper.
 
-**Three case files, not six.** The 24 October tree above lists `CASE-01` to `CASE-06`, which
-would be six new narratives about a kill chain [v3](../v3/) already documents in seven. The
-Escalation format is a different demonstration from the v3 case files, not a duplicate of them,
-but it is demonstrated in full by three. The three are chosen for having the richest
-before/after, and they are named here so the scope is not left to interpretation:
+**Three case files, not six.** The 24 October tree lists `CASE-01` to `CASE-06` — six new
+narratives about a chain [v3](../v3/) already documents in seven. The Escalation format is a
+different demonstration from those files, not a duplicate, but three demonstrate it in full.
+Named here so the scope is not left to interpretation:
 
 | File | Why this one |
 | ---- | ------------ |
 | `CASE-02-kerberoasting.md` | AES-only Kerberos plus the legacy-account exception — the clearest policy-driven change in the set |
-| `CASE-04-lsass-false-positive.md` | Credential Guard on one endpoint and not the other is a measurable split — blocked on one host, viable on the other — and the LSASS rule's benign reads are already measured (`WmiPrvSE.exe`, `wazuh-agent.exe`), so the TP/FP decision has real evidence behind it rather than a staged one |
-| `CASE-05-persistence.md` | ASR rules, and persistence is one of only two phases with no row in the residual-gap register, so the cell is genuinely uncertain |
+| `CASE-04-lsass-false-positive.md` | `RunAsPPL` on one endpoint and not the other is a measurable split (Credential Guard was scoped first and [is not available on these hosts](#deliberate-residual-gaps)), and the LSASS rule's benign reads are already measured (`WmiPrvSE.exe`, `wazuh-agent.exe`), so the TP/FP decision has real evidence behind it rather than a staged one |
+| `CASE-05-persistence.md` | persistence is one of only two phases with no row in the residual-gap register. The uncertainty is narrower than an earlier draft of this table claimed: no ASR rule targets scheduled-task creation, so the cell is predicted unchanged unless the prevalence rule blocks the payload the task launches — which is the thing the case file measures |
 
 Dropped: password spray (the Addendum establishes its detection outcome in advance, so there is
 nothing to find), lateral movement (deliberately unchanged — WinRM stays open), and C2
@@ -646,16 +666,14 @@ narrative.
 
 The layer the plan above does not cover at all. Two new artefacts.
 
-**`v4/hunts/` — two to three hunt files.** Hypothesis-driven, not alert-driven: the hunt starts
-from a claim about attacker behaviour that can be proven or disproven, not from an alert that
-already fired. Each file states the hypothesis, the query and why that data source, the finding
-including a negative one, and the recommendation — a detection rule, a hardening change, or "no
-action, hypothesis disproven."
+**`v4/hunts/` — two to three hunt files.** Hypothesis-driven, not alert-driven: each starts from
+a claim about attacker behaviour that can be proven or disproven, and states the hypothesis, the
+query and why that source, the finding including a negative one, and the recommendation — a
+rule, a hardening change, or "no action, hypothesis disproven."
 
-**The selection rule is to hunt the gaps, not the wins.** A hunt that re-describes an alert
-which already fired is triage in reverse. Kerberoasting and the JA4 C2 fingerprint both fired
-in v3 and are already written up as case files, so re-running them as hunts would prove nothing.
-The two gaps this page has already measured are the real hunt material:
+**The selection rule is to hunt the gaps, not the wins.** A hunt that re-describes an alert that
+already fired is triage in reverse; Kerberoasting and the JA4 fingerprint both fired in v3 and
+are already case files. The two gaps this page has measured are the real material:
 
 - **Spray detection by a signal other than the `4771` count.** The Addendum establishes that the
   shipped rule cannot fire here — the estate is one account short of the threshold — so that
@@ -669,51 +687,33 @@ The two gaps this page has already measured are the real hunt material:
   JA4 fingerprint rarity, connection-interval regularity, bytes-out to bytes-in ratio. The
   finding is the allowlist the rule needs before it can be scheduled.
 
-A hunt that disproves its hypothesis, or that proves a gap is real, is a complete hunt file. A
-negative result that names a concrete detection gap is worth more than a positive result that
-repeats a rule already known to work.
+A hunt that disproves its hypothesis, or proves a gap is real, is a complete hunt file: a
+negative result naming a concrete gap beats a positive one repeating a rule already known to
+work.
 
-**`v4/incident-report.md` — one IR timeline for the pre-hardening run.** One narrative, not a
-set of alerts: an executive summary written for someone who will not read the rest; a timeline
-correlated across all five sources into a single sequence; blast radius, separating what was
-compromised from what was reached but not compromised and what was never touched; which single
-source would have been insufficient alone; containment, in the order it was done and what that
-order cost; and the detection gaps found, including the two hunted above.
-
-This is incident scoping, not alert triage, and it must not restate the case files. A case file
-answers "is this real." The IR report answers "how far did it go."
+**`v4/incident-report.md` — one IR timeline for the before-run.** One narrative, not a set of
+alerts: an executive summary for someone who will not read the rest; a timeline correlated
+across all five sources; blast radius, separating what was compromised from what was reached but
+not compromised and what was never touched; which single source would have been insufficient
+alone; containment, in the order done and what that order cost; and the gaps found, including
+the two hunted above. This is incident scoping, not triage, and it must not restate the case
+files — a case file answers "is this real," the IR report answers "how far did it go."
 
 ### Layer 3 — detection engineering
 
-Unchanged in content. `detections/` and the Sigma pack stay as they are; `coverage-matrix.md` is
-produced by steps 5 and 6 above, not before them, since the before/after columns cannot exist
-until the bundles have been applied and the chain re-run. It carries the `M` / `→` marks so a
-reader can tell a measured cell from a carried-forward one. No CI pipeline — the matrix carries
-the argument on its own.
+Unchanged in content. `detections/` and the Sigma pack stay as they are, plus the eighteenth
+search below. `coverage-matrix.md` is produced by steps 4, 6 and 7, not before them, and carries
+the `M` / `→` marks so a reader can tell a measured cell from a carried-forward one. No CI
+pipeline — the matrix carries the argument on its own.
 
-### Current structure
+### Current structure — changes to the 24 October tree
 
-Replaces the 24 October tree above. Two files exist; the rest is still the target.
-
-```
-v4/
-├── README.md                      <- this page
-├── infrastructure/
-│   ├── topology.md
-│   ├── hardening-baseline.md      <- before / after / why, per control
-│   └── logging-config.md          <- exists (sensor persistence, cross-sensor liveness)
-├── investigations/                <- L1: the triage deliverable, 3 files not 6
-│   ├── CASE-02-kerberoasting.md
-│   ├── CASE-04-lsass-false-positive.md
-│   └── CASE-05-persistence.md
-├── hunts/                         <- L2: hypothesis-driven, 2-3 files
-├── incident-report.md             <- L2: one correlated IR timeline
-├── benign-baseline.md             <- FP rate per rule, what the window exercised, what it cannot claim
-├── coverage-matrix.md             <- L3: before / after hardening, per phase
-└── risk-register.md               <- the residual gaps above, with rationale
-```
+Rather than restate it: `README.md` and `infrastructure/logging-config.md` now **exist**;
+`investigations/` holds **three** files (`CASE-02`, `CASE-04`, `CASE-05`) instead of six; and
+three paths are **added** — `hunts/` (L2, 2–3 files), `incident-report.md` (L2, one correlated
+timeline) and `benign-baseline.md` (the FP rate per rule, what the window exercised, and what it
+cannot claim). Everything else in that tree stands as written.
 
 Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
 layers beat three half-finished ones; once these exist, all 18 searches have reached one of the
-three end states above, and the matrix is filled through the hardening run,
-v4 is closed.
+three end states above, and the matrix is filled through the hardening run, v4 is closed.
