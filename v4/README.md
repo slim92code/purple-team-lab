@@ -477,11 +477,18 @@ table therefore records, per rule, whether the window actually exercised what th
 a rule whose source was never exercised is reported as unmeasured and does not graduate to
 "threshold measured" on the strength of a zero.
 
-This is the same discipline the Addendum applies to the spray rule, which it reports as "a
-measured estate limitation rather than a hardening effect": the number is real, but the process
-that produced it does not support every conclusion that could be drawn from it. Stating the
-limit next to the table rather than after it is the difference between a measurement and a
-claim.
+This repo has already paid for that distinction once. `Purple - Spray Success` shipped with two
+claims in its description that were "reasoned about rather than executed," and when the query
+was finally run over real data on 29 October both were wrong — the rule had been passing on a
+coin flip, and a quiet day measured it at 1 true positive and 4 false where the reasoning had
+predicted none. A zero that nothing exercised is the same failure in the other direction: a
+number that looks measured, produced by a process that never tested the thing it is being
+cited for. The Addendum's spray entry is the milder sibling, "a measured estate limitation
+rather than a hardening effect" — there the number is real and only its attribution is at
+stake.
+
+Stating the limit next to the table rather than after it is the difference between a
+measurement and a claim.
 
 No new attack techniques are added in v4. The chain already covers spray, Kerberoasting, LSASS
 access, lateral movement, persistence, C2 and exfil; another technique would add volume, not
