@@ -426,11 +426,47 @@ false-positive rate per rule, which is a table this kind of portfolio almost nev
 
 **The benign activity has to be generated, not waited for.** Seven VMs left powered on and idle
 produce near-silence, and a window of silence measures nothing — it just returns zero for every
-rule and invites exactly the wrong conclusion. So the window is driven deliberately: OneDrive
-sync, opening and saving files from the share, browsing, Office documents, logon and logoff
-cycles on all three Windows hosts, scheduled-task and update activity left enabled. What runs
-during the window is recorded in `benign-baseline.md` next to the counts, because the counts
-only mean something in terms of what was exercised.
+rule and invites exactly the wrong conclusion.
+
+And the activity list cannot be generic, because under the convention below a rule whose
+false-positive source was never touched is reported as unmeasured however long the window ran.
+So the list is derived per rule, from what that rule actually keys on:
+
+| Rule being calibrated | Its false-positive source | What has to run during the window |
+| --------------------- | ------------------------- | --------------------------------- |
+| `Purple - C2 Beacon from User-Writable Path` | processes sending traffic from `Temp` / `AppData` / `ProgramData` / `Users\Public` | OneDrive sync, browser auto-updaters (Chrome and Edge both live in `AppData`), any updater left enabled |
+| `Purple - Kerberoasting User-SPN Ticket (etype-agnostic)` | legitimate service tickets for SPNs held by user accounts | **repeated, periodic authentication to `SQLService` from a user account** — see below |
+| `Purple - Large Outbound Transfer` | legitimate bulk egress | file uploads, a large download, the initial sync of a sizeable folder |
+
+The first and third happen by themselves once the machines are genuinely in use. **The middle
+one does not**, and it is the trap: a `4769` for a user-held SPN will not occur spontaneously in
+a quiet lab, so if nobody touches that service the rule reads zero after 48 hours and is
+reported as unmeasured. That is the rule the zero/unmeasured distinction was introduced for.
+Worse, its blocker is specifically "an allowlist of routinely requested SPNs" — an allowlist
+that cannot be built from a window in which no SPN was routinely requested. The baseline would
+run successfully and leave the rule exactly as unschedulable as before.
+
+Three things about that middle row are easy to get wrong:
+
+- **The requestor has to be a user principal.** The rule excludes machine requestors twice
+  over, `Account_Name!="*$"` and `Account_Name!="*$@*"`, because on `4769` the requestor arrives
+  as `principal@REALM`. Authenticating from a machine or service context produces events the
+  rule filters out, which is indistinguishable from having generated nothing at all.
+- **A natural rate cannot be measured for an SPN with no real consumer.** `SQLService` is the
+  human-managed legacy account from the residual-gap register; whatever frequency the window
+  shows is the frequency that was deliberately generated, not the domain's own. So the allowlist
+  for it is built on **identity** — which principals legitimately request which SPNs, and what
+  the event looks like when they do — and not on a rate threshold. `benign-baseline.md` records
+  that those tickets were generated rather than observed, because citing a self-chosen number as
+  an environment's normal rate is the error this section exists to prevent.
+- **The honeypot SPN is the documented exception.** The hardening baseline above adds a service
+  account "with an SPN that is never legitimately used: any Kerberos request for it is malicious
+  by definition." For a rule keyed on that SPN an unexercised zero **is** the measurement, not a
+  gap — its whole premise is that no legitimate traffic exists. The zero/unmeasured convention
+  must not be applied mechanically there.
+
+What runs during the window is recorded in `benign-baseline.md` next to the counts, because the
+counts only mean something in terms of what was exercised.
 
 This is not a side quest; it is the input three shipped rules are already waiting on. The app
 ships 17 searches with 12 scheduled, and **all five unscheduled ones are blocked on a
