@@ -113,7 +113,7 @@
     },
     {
       "techniqueID": "T1218",
-      "tactic": "defense-evasion",
+      "tactic": "stealth",
       "score": 100,
       "color": "",
       "comment": "LOLBin execution detected. See sub-technique T1218.004.",
@@ -124,7 +124,7 @@
     },
     {
       "techniqueID": "T1218.004",
-      "tactic": "defense-evasion",
+      "tactic": "stealth",
       "score": 100,
       "color": "",
       "comment": "Detected — InstallUtil.exe LOLBin execution from non-standard path. Sysmon EC1 process creation. Detection Card #3.",
