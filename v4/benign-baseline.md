@@ -369,6 +369,50 @@ October re-run is intact and is what the three rule fixes were verified against.
 
 ## Results
 
-_Empty until the window closes._ The exact queries, the time bounds and the positive control for
-each rule are fixed in advance in [`benign-baseline-queries.md`](benign-baseline-queries.md),
-generated from the rule file at the commit it names.
+Measured 3 Nov 2026, after the window closed, with the queries and controls fixed in advance in
+[`benign-baseline-queries.md`](benign-baseline-queries.md). Window: 2 Nov 18:40 to 3 Nov 18:40
+CET. Continuity: all 144 ten-minute intervals present, no host missing from any of them.
+
+**Unit:** distinct result rows the search returns over the window, never firings.
+**Control:** the count of the events each rule keys on, inside the same window. A zero only
+counts as clean where the control is non-zero.
+
+| # | Rule | Rows in window | Control in window | End state |
+| - | ---- | -------------- | ----------------- | --------- |
+| 1 | LOLBin Execution (CIM) | 0 | `Endpoint.Processes`: ~140k events, all 3 hosts | scheduled, threshold measured |
+| 2 | C2 Beacon from User-Writable Path | 4 groups, all OneDrive → **0 with the pinned allowlist** | 126 OneDrive egress attempts | scheduled, threshold lab-specific |
+| 3 | Kerberoasting RC4 | 0 | 71 × `4769`, all AES | scheduled, threshold measured |
+| 4 | Kerberoasting User-SPN (etype-agnostic) | 2 groups, both `tstark`→`SQLService` → **0 with the allowlist** | the 3 generated `tstark` requests, nothing from `pparker`/`fcastle` | scheduled, allowlist lab-specific |
+| 5 | Password Spray | 0 | 2 × `4771` (`Administrator`, mistyped password) | scheduled, threshold measured |
+| 6 | Spray Success | 0 | 2 × `4771`, 26 × `4768` | scheduled, threshold measured |
+| 7 | SAM Hive Dump via reg save | 0 | 29,939 × `4688` | scheduled, threshold measured |
+| 8 | DCSync from non-DC | 0 | 778 × `4662` | scheduled, threshold measured — still never fired on a true positive |
+| 9 | Scheduled Task Persistence | 0 | 1 × `4698` (benign) | scheduled, threshold measured |
+| 10 | LSASS Access | **0** | **78,495** Sysmon EID 10 reads of `lsass.exe` | scheduled, threshold measured |
+| 11 | Kerbrute User Enumeration | 0 | 26 × `4768` | scheduled, threshold measured |
+| 12 | Verify Account Lockout | 0 | lockout policy already in force (see README) | schedulable now |
+| 13 | RC4 Anomaly | 0 | 71 × `4769`, zero RC4 | schedulable after AES-only |
+| 14 | Sliver C2 Beacon by JA4 | 0 | Zeek continuous across the window | scheduled, threshold measured |
+| 15 | Large Outbound Transfer | **4 rows** | see below | **unscheduled** |
+
+**The strongest number is rule 10:** zero alerts across 78,495 benign reads of LSASS in a day.
+The exclusions were tuned on 935 sampled reads in v3; they held at eighty times that volume.
+
+**The one rule that fired is the exfiltration rule, and it fired on the monitoring.** All four
+rows are telemetry: forwarders to Splunk on `9997` and Wazuh agents on `1514`. Three of them sit
+in the 18:40 interval — the backlog flush when the lab came back from the host-wide freeze — and
+the fourth is HYDRA-DC at 21:20, shipping the 32,878-event spike it logged then. Excluding
+`.131:9997` and `.150:1514`, the largest egress any host produced in a ten-minute bucket was
+0.29 MB against a 10 MB threshold. So the rule needs a telemetry exclusion, it needs to see IPv6
+(section 6), and its threshold cannot be calibrated from a window with no internet and no IPv4
+bulk transfer. It stays unscheduled until a second window with internet measures it.
+
+**Throttling, measured in effect:** as the pack ran live during this window, with no
+`alert.suppress`, the four rule-15 rows and the six allowlistable rows of rules 2 and 4 would
+have re-alerted at every scheduled run for 24 hours. The throttle settings now in the repo fix
+that once they are deployed.
+
+**Two observations recorded for later work:** the CIM `Endpoint.Processes` model carries 78,706
+events with `dest=unknown`, matching the Sysmon EID 10 volume, so Sysmon process-access events
+are being mapped into the model without a host; and HYDRA-DC renders event times one hour ahead
+of Splunk's `_time`, which matters for any cross-host timeline.
