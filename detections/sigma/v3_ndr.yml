@@ -1,8 +1,13 @@
 # Purple Team Home Lab — Sigma Detection Pack, v3 NDR additions
 # Network-side detections (Zeek) added in lab v3, alongside the v2 host rules in
-# sigma_rules.yml. Compile with the Zeek pipeline:
-#   pip install sigma-cli pysigma-backend-splunk pysigma-pipeline-zeek
-#   sigma convert -t splunk -p zeek detections/sigma/v3_ndr.yml
+# sigma_rules.yml. There is no Zeek processing pipeline on PyPI or in the sigma-cli plugin
+# directory (pysigma-pipeline-zeek does not exist), so compile without one:
+#   pip install sigma-cli pysigma-backend-splunk
+#   sigma convert -t splunk --without-pipeline detections/sigma/v3_ndr.yml
+# The output uses Zeek's native names (id.orig_h, request_type ...) and carries no
+# sourcetype/source filter. Add your Zeek source to it, and note the lab's own Splunk
+# searches parse raw TSV with rex into orig_h/resp_h, so the field names only line up once
+# Zeek is ingested as JSON through the Splunk Add-on for Zeek.
 #
 # These key on network evidence, so they fire even on a host whose endpoint
 # telemetry is blind (see the SPIDERMAN EID10 blind spot in v3).
@@ -33,7 +38,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1558/003/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/10/23
+date: 2026-10-23
 tags:
     - attack.credential-access
     - attack.t1558.003
@@ -77,7 +82,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1021/006/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/10/23
+date: 2026-10-23
 tags:
     - attack.lateral-movement
     - attack.t1021.006
@@ -126,7 +131,7 @@ references:
     - https://attack.mitre.org/techniques/T1071/001/
     - https://github.com/FoxIO-LLC/ja4
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/10/23
+date: 2026-10-23
 tags:
     - attack.command-and-control
     - attack.t1071.001
@@ -142,6 +147,7 @@ fields:
     - id.resp_h
     - ja4
 falsepositives:
-    - A benign client that happens to share this exact TLS stack fingerprint (rare;
-      confirm with beacon interval/jitter analysis before escalating)
+    - Any other client built on the same Go crypto/tls stack connecting without SNI. JA4
+      fingerprints the TLS library and options, not the C2 framework, so other Go tools
+      can share it; confirm with beacon interval/jitter analysis before escalating
 level: high

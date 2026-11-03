@@ -1,13 +1,29 @@
 # Purple Team Home Lab — Sigma Detection Pack
 # Detection-as-Code. Vendor-agnostic. Compile to Splunk SPL with:
-#   pip install sigma-cli pysigma-backend-splunk
-#   sigma convert -t splunk -p sysmon -p windows-audit sigma_rules.yml
+#   pip install sigma-cli pysigma-backend-splunk pysigma-pipeline-sysmon
+#   sigma convert -t splunk -p sysmon sigma_rules.yml
+#
+# Use ONE of -p sysmon / -p windows-audit, not both. With both, every process_creation rule
+# compiles to `EventID=4688 EventID=1`, which no event can satisfy (checked with sigma-cli
+# 4.0.0). -p sysmon maps process_creation to Sysmon EID 1 and leaves the Security-channel
+# rules (service: security) as they are. -p windows-audit alone maps process_creation to 4688
+# but leaves the Sysmon-only rules (network_connection, process_access) with no EventID.
+#
+# The two threshold rules (password spray, kerbrute enumeration) are written as Sigma
+# correlation rules: a base event rule plus a `correlation:` document that counts it.
+# The old `condition: selection | count() by ...` pipe syntax is deprecated and pySigma
+# rejects it outright, which made the command above fail for the whole file.
 #
 # Field-mapping note: rules use the Sysmon-native taxonomy (Image, CommandLine,
 # DestinationIp ...) and Windows-Security taxonomy (EventID + extracted fields).
-# Sigma processing pipelines (-p sysmon / -p windows-audit) map these to the
-# field names your Splunk TAs already extract, so the generated SPL needs no
-# manual `rex field=Message`.
+# The sysmon / windows-audit pipelines map log sources to EventIDs; they do NOT rename
+# fields. Generated SPL keeps IpAddress, TargetUserName, Status, TicketEncryptionType,
+# while Splunk_TA_windows on classic (non-XML) Security events extracts Client_Address,
+# Account_Name, Failure_Code, Ticket_Encryption_Type - compare the hand-written searches in
+# ../splunk/purple_lab/default/savedsearches.conf. Add a field-mapping pipeline or edit the
+# output before deploying it. Adding -p splunk_windows scopes by source=, but it emits
+# source="WinEventLog:Microsoft-Windows-Sysmon/Operational", and since the 31 Oct
+# renderXml=1 switch this lab's Sysmon arrives as XmlWinEventLog:..., so fix that too.
 #
 # Each rule is a separate YAML document (--- separated). Split into per-rule
 # files for a SigmaHQ-style repo if you prefer.
@@ -24,7 +40,7 @@ references:
     - https://attack.mitre.org/techniques/T1218/004/
     - https://lolbas-project.github.io/lolbas/Binaries/Installutil/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.defense-evasion
     - attack.execution
@@ -67,7 +83,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1558/003/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.credential-access
     - attack.t1558.003
@@ -95,8 +111,9 @@ level: high
 
 ---
 
-title: Password Spray via Kerberos Pre-Auth Failures
+title: Kerberos Pre-Auth Failure (password spray base event)
 id: c8968f4b-b038-418a-ad42-2cd0b0e79ae4
+name: kerberos_preauth_failure
 status: experimental
 description: >
     Detects a single source attempting Kerberos pre-authentication (4771) against
@@ -106,7 +123,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1110/003/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.credential-access
     - attack.t1110.003
@@ -116,12 +133,44 @@ logsource:
 detection:
     selection:
         EventID: 4771
-        Status: '0x18'   # pre-auth failed (bad password)
-    timeframe: 5m
-    condition: selection | count(TargetUserName) by IpAddress >= 5
+        Status:
+            - '0x18'   # pre-auth failed (bad password)
+            - '0xE'    # etype not supported - also produced by the spray (see the Splunk search)
+    condition: selection
 fields:
     - IpAddress
     - TargetUserName
+falsepositives:
+    - Service account with stale credentials hammering the KDC
+    - Mobile/sync client (ActiveSync) retry storms
+level: low
+
+---
+
+title: Password Spray via Kerberos Pre-Auth Failures
+id: 5cb92c97-b2dc-468b-94e3-7c8806da6754
+status: experimental
+description: >
+    One source failing Kerberos pre-authentication against 5 or more distinct accounts
+    within 5 minutes. Counts distinct TargetUserName per IpAddress, same as the Splunk
+    search 'Purple - Password Spray (multi-user from one source)'.
+references:
+    - https://attack.mitre.org/techniques/T1110/003/
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026-06-01
+tags:
+    - attack.credential-access
+    - attack.t1110.003
+correlation:
+    type: value_count
+    rules:
+        - kerberos_preauth_failure
+    group-by:
+        - IpAddress
+    timespan: 5m
+    condition:
+        field: TargetUserName
+        gte: 5
 falsepositives:
     - Service account with stale credentials hammering the KDC
     - Mobile/sync client (ActiveSync) retry storms
@@ -139,7 +188,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1003/002/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.credential-access
     - attack.t1003.002
@@ -181,7 +230,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1003/006/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.credential-access
     - attack.t1003.006
@@ -221,7 +270,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1053/005/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 modified: 2026/10/31
 tags:
     - attack.persistence
@@ -277,7 +326,7 @@ references:
     - https://attack.mitre.org/techniques/T1071/001/
     - https://attack.mitre.org/techniques/T1572/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.command-and-control
     - attack.t1071.001
@@ -323,7 +372,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1003/001/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 modified: 2026/10/23
 tags:
     - attack.credential-access
@@ -354,7 +403,7 @@ detection:
             - 'C:\Windows\System32\taskmgr.exe'
             - 'C:\Windows\System32\MRT.exe'
             - 'C:\Windows\System32\wbem\WmiPrvSE.exe'
-            - 'C:\ProgramData\Microsoft\Windows Defender\Platform\*\MsMpEng.exe'
+            - 'C:\ProgramData\Microsoft\Windows Defender\Platform\\*\MsMpEng.exe'   # '\\*' = literal backslash + wildcard; '\*' would be an escaped, literal asterisk
             - 'C:\Program Files\VMware\VMware Tools\vmtoolsd.exe'
             - 'C:\Program Files (x86)\ossec-agent\wazuh-agent.exe'
     condition: selection and not filter_platform
@@ -376,8 +425,9 @@ level: high
 
 ---
 
-title: Kerbrute User Enumeration via Kerberos Error 0x6
+title: Kerberos TGT Request for Unknown Principal (0x6, enumeration base event)
 id: 7e9af1b4-b721-4f1f-98b7-1aa47fa97fb3
+name: kerberos_unknown_principal
 status: experimental
 description: >
     Detects a single source generating many KDC_ERR_C_PRINCIPAL_UNKNOWN (0x6)
@@ -388,7 +438,7 @@ references:
     - https://attack.mitre.org/techniques/T1087/002/
     - https://github.com/ropnop/kerbrute
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/06/01
+date: 2026-06-01
 tags:
     - attack.reconnaissance
     - attack.discovery
@@ -400,11 +450,43 @@ detection:
     selection:
         EventID: 4768
         Status: '0x6'
-    timeframe: 1m
-    condition: selection | count() by IpAddress > 50
+    condition: selection
 fields:
     - IpAddress
     - TargetUserName
+falsepositives:
+    - Misconfigured client repeatedly requesting a deleted/renamed principal
+level: low
+
+---
+
+title: Kerbrute User Enumeration via Kerberos Error 0x6
+id: 9f0eb0b5-54ad-4217-b6ae-518af030f0ab
+status: experimental
+description: >
+    One source receiving KDC_ERR_C_PRINCIPAL_UNKNOWN for more than 20 distinct names
+    within 1 minute. Keyed on distinct names rather than raw count: the Splunk search
+    requires both count > 50 and > 20 distinct names, and its own note says the distinct
+    count is what separates enumeration from one broken client. A Sigma correlation takes
+    one condition, so the distinct-name test is the one kept here.
+references:
+    - https://attack.mitre.org/techniques/T1087/002/
+    - https://github.com/ropnop/kerbrute
+author: Purple Lab (MARVEL.LOCAL)
+date: 2026-06-01
+tags:
+    - attack.discovery
+    - attack.t1087.002
+correlation:
+    type: value_count
+    rules:
+        - kerberos_unknown_principal
+    group-by:
+        - IpAddress
+    timespan: 1m
+    condition:
+        field: TargetUserName
+        gt: 20
 falsepositives:
     - Misconfigured client repeatedly requesting a deleted/renamed principal
 level: medium
@@ -428,7 +510,7 @@ description: >
 references:
     - https://attack.mitre.org/techniques/T1558/003/
 author: Purple Lab (MARVEL.LOCAL)
-date: 2026/10/24
+date: 2026-10-24
 tags:
     - attack.credential-access
     - attack.t1558.003

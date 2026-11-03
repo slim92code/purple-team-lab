@@ -120,9 +120,12 @@
     <group>persistence,pci_dss_10.6.1,</group>
   </rule>
 
+  <!-- -EncodedCommand is accepted as any unambiguous prefix (-e, -en, -enc, -enco ...) and as
+       -ec, with - or /. The previous token -enc\s missed -e, -ec, -en and /enc. The [\s;]
+       anchor allows for the HTML-escaped task XML this field carries (&gt; ends in ';'). -->
   <rule id="100211" level="10">
     <if_sid>60228</if_sid>
-    <field name="win.eventdata.taskContent" type="pcre2">(?i)(-enc\s|-EncodedCommand|-w\s+hidden|-WindowStyle\s+Hidden|-nop\b|-NoProfile)</field>
+    <field name="win.eventdata.taskContent" type="pcre2">(?i)((?:^|[\s;])[-/](?:e|ec|en|enc[a-z]*)\s|-EncodedCommand|-w\s+hidden|-WindowStyle\s+Hidden|-nop\b|-NoProfile)</field>
     <description>Scheduled task created with an obfuscated or hidden-window PowerShell launcher</description>
     <mitre>
       <id>T1053.005</id>

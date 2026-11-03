@@ -16,7 +16,9 @@ detections/
     │   ├── default/
     │   │   ├── app.conf
     │   │   ├── savedsearches.conf   # 18 searches, macro-free (2 CIM, 11 Windows, 2 Zeek, 3 pipeline health)
-    │   │   └── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
+    │   │   ├── props.conf           # Sysmon timestamp fix (lab_issues.md #10), keyed on source::
+    │   │   └── transforms.conf      # windows_hosts lookup used by the Telemetry Gap search
+    │   ├── lookups/windows_hosts.csv
     │   └── metadata/default.meta
     └── cim-acceleration/            # apply to Splunk_SA_CIM (see Install below)
         ├── datamodels.conf          # accelerate Endpoint + Network_Traffic
@@ -101,7 +103,7 @@ Installed from this repo and read back the same way:
 
 | | Searches | Scheduled |
 | --- | --- | --- |
-| Shipped here | 17 | 12 |
+| Shipped here (2 Nov) | 18 | 13 |
 | Loaded, 29 Oct | 12 | 10 |
 | Loaded, 30 Oct | 16 | 11 |
 | Loaded, 31 Oct | **17** | **12** |
@@ -160,8 +162,8 @@ by two copies that could not be seen from one account.
 
 All thirteen now carry `disabled = 1`. They are left on disk rather than deleted because the
 case files cite those names as what the analyst saw during the run, and that provenance is
-worth more than the tidiness. The lab now runs the eleven scheduled searches this app defines
-and nothing else.
+worth more than the tidiness. The lab then ran only the scheduled searches this app defined (eleven at
+the time; thirteen in this repo as of 2 Nov) and nothing else.
 
 The detections use `summariesonly=false`, so they return results immediately (raw scan)
 even before acceleration finishes building summaries, then speed up automatically once it does.
@@ -216,9 +218,15 @@ The other eleven detections filter on `source=` rather than `sourcetype=`, which
 work on this configuration. That was not a deliberate choice at the time; it is the reason
 the pack mostly survives a forwarder setup the add-ons were not expecting.
 
-Fixing it is a forwarder change, not a rule change: set per-channel sourcetypes with
-`renderXml = 1` in `inputs.conf`, then enable acceleration with the shipped
-`cim-acceleration/datamodels.conf`. Scoped into [v4](../v4/README.md).
+The fix was a forwarder change, not a rule change (`renderXml = 1` in `inputs.conf`, done
+31 Oct, above); acceleration with the shipped `cim-acceleration/datamodels.conf` is the
+remaining step. Note the knock-on in `props.conf`: its timestamp stanza was keyed on the old
+`source::WinEventLog:Microsoft-Windows-Sysmon/Operational` and no longer matches Sysmon after
+the switch, so since 31 Oct Sysmon is stamped with event time, not index time. That is left
+as it is on purpose. Re-adding the `XmlWinEventLog:` form would stamp Sysmon with index time
+again, which hides delivery lag and backfill (both measured in the v4 benign window) and puts
+Sysmon on a different time base from the Security channel. It is decided by measuring whether
+the clock drift in lab_issues.md #10 still exists, not by default.
 
 The one remaining `rex` is in the scheduled-task rule, which parses the task XML embedded in
 the `4698` event body. That XML is data inside the event rather than the event wrapper, so a

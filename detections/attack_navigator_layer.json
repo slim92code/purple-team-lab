@@ -453,7 +453,7 @@
     },
     {
       "name": "Detections",
-      "value": "13 Sigma rules (10 host, 3 Zeek), 13 Splunk saved searches, 5 Wazuh rules"
+      "value": "13 Sigma rules (10 host, 3 Zeek), 18 Splunk saved searches (13 scheduled), 7 Wazuh rules"
     },
     {
       "name": "Blue-team wins",
