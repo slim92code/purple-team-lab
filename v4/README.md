@@ -78,6 +78,17 @@ isolation*: IPsec Connection Security Rules authenticated with Kerberos, plus fi
 set to "allow the connection if it is secure." v4 documents the CSR configuration as part of
 the baseline rather than pretending it is a checkbox.
 
+> **Measured, 3 Nov 2026 — the v3 east-west SMB block holds on IPv4 only.** From THEPUNISHER,
+> `Test-NetConnection 192.168.182.138 -Port 445` fails and the same test against SPIDERMAN's
+> IPv6 address (`fd15:4ba5:5a2b:1008::/64`, the VMware NAT ULA prefix) succeeds. The per-host
+> rules are scoped by a single IPv4 address (`Block-SPIDERMAN-SMB`, remote `192.168.182.138`,
+> port 445), and both workstations also register an IPv6 address in DNS, so addressing a host by
+> name reaches it over IPv6 past the block. It was found by accident: a 100 MB copy to
+> `\\SPIDERMAN\…` succeeded while the same copy to `\\192.168.182.138\…` was refused. A block
+> written per address covers that address and that address family; the GPO's default-inbound
+> Block, with no rule admitting 445 on the workstations, covers every source. The re-test after
+> hardening checks both paths — by IP and by name.
+
 ## Forwarder sourcetypes and CIM
 
 Measured on the v3 lab, so this is a known defect rather than a planned nicety. Every

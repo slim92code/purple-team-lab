@@ -16,7 +16,8 @@ section is empty until the window closes.
 that is the one hard condition.
 
 **Opened:** 2026-11-02 16:19 CET (15:19 UTC). **Closes:** 2026-11-03 16:19 CET.
-**Superseded — the window was restarted at 2026-11-02 17:45 CET (16:45 UTC) and closes
+**Superseded twice. The measured window is 2026-11-02 18:40 CET to 2026-11-03 18:40 CET** —
+see section 6. The intermediate restart read: **the window was restarted at 2026-11-02 17:45 CET (16:45 UTC) and closes
 2026-11-03 17:45 CET.** See section 5 below.
 
 The timestamp is the indexer's own clock, not a host's, so the window boundaries and the
@@ -270,6 +271,84 @@ moves the setup noise out of the measurement: the `tstark` password reset (`4724
 therefore made again inside it, and the clean-window check and its `pparker` positive control
 run against the new bounds:
 `earliest="11/02/2026:17:45:00" latest="11/03/2026:17:45:00"`.
+
+### 6. Measured overnight, 2–3 Nov 2026 — the window bound moves to 18:40
+
+**The whole lab froze from about 18:05 to 18:40.** Bucketing by host showed no data at all for
+18:10, 18:20 and 18:30 — on all five reporting hosts at once, and never backfilled. A gap on
+every guest simultaneously is the hypervisor host, not a guest. The cause was most likely the host's own
+power management, as with the workstation gaps: idle sleep and background throttling of
+`vmware-vmx.exe`. Fixed on the host by the High performance plan, sleep and hibernate off,
+and `powercfg /powerthrottling disable` for `vmware-vmx.exe`.
+
+From 18:40 every ten-minute bucket carries data for all five hosts through to the next morning,
+unattended. **The measured window is therefore 18:40 to 18:40.** The bound is set by host
+continuity, which is visible before any false-positive count is computed, not by the counts.
+`Kali` stays off until the new close.
+
+Separately, the earlier delivery lag on THEPUNISHER (9 minutes, events arriving late but with
+their original `_time`) differed from these gaps, which never filled. One was a slow pipeline,
+the other a frozen guest; only the second removes data.
+
+**`tstark` requests inside the window:** 21:22 from SPIDERMAN (`::ffff:192.168.182.138`), 10:48
+from SPIDERMAN, 10:53 from THEPUNISHER (`::ffff:192.168.182.137`). Two hosts, spread across the
+day. A share, `BenignShare`, was created on SPIDERMAN at 23:51 (`5142`), benign administration.
+
+**The window ran without internet egress.** The guests route to the VMware NAT gateway
+(`192.168.182.2`, reachable) but nothing beyond it answers; the host itself has internet and
+no VPN. The condition did not change during the window: Sysmon `EventCode=3` to non-RFC1918
+addresses runs at a steady 2–8 attempts per hour per workstation from 18:40 onward, with no
+step. So it is recorded as a condition of this window, not repaired mid-measurement.
+
+**`C2 Beacon` was exercised anyway, because the rule keys on the attempt, not the session.** Of
+130 external connection attempts in the window, 126 are OneDrive from `AppData` on both
+workstations, all to Microsoft addresses on 443:
+`…\OneDrive\OneDrive.exe` (THEPUNISHER) and `…\OneDrive\<version>\OneDrive.Sync.Service.exe`
+(both). **The version folder differs by host** — `26.195.1006.0007` on THEPUNISHER,
+`26.189.0928.0009` on SPIDERMAN — which is the case the version-folder wildcard exists for. Every
+benign attempt matches the pinned allowlist. The remaining four are `powershell.exe` to
+`8.8.8.8:53`: the diagnostic DNS tests made during the window, from `System32`, which the rule
+does not key on. With real internet there would be more processes (browser updaters, Teams),
+so the rule's end state can be at most **scheduled, threshold lab-specific**.
+
+**`Large Outbound Transfer` was exercised and could not see it.** A 100 MB file was copied
+from THEPUNISHER to `\\SPIDERMAN\BenignShare`. Three findings came out of that one copy:
+
+- **The transfer went over IPv6.** Both workstations register a ULA address
+  (`fd15:4ba5:5a2b:1008::/64`, the VMware NAT IPv6 prefix) in DNS, and addressing the share by
+  name made SMB prefer it. Zeek logged three parallel SMB connections (multichannel,
+  `krb,gssapi,smb`) totalling 53.5 MB `orig_bytes` within seconds — five times the rule's
+  10 MB threshold. The rule filters `match(orig_h,"^192\.168\.182\.")` and never sees it. That
+  is not a calibration gap; the rule is blind to an address family.
+- **Zeek missed about a third of the bytes.** The same three connections carry 26.9 MB of
+  `missed_bytes`: packets the sensor did not capture under a burst. A byte threshold derived
+  from Zeek counts therefore under-reads exactly the large transfers it is meant to catch.
+- **The workstations' IPv6 source addresses rotate.** THEPUNISHER sent from `…:5cc0` at 11:26 and
+  from `…:91d0` at 11:39 (temporary addresses). An IPv6-aware rule cannot pin a host by address
+  the way the IPv4 rules do.
+
+So this rule ends the window **unscheduled, blind to IPv6**: it has to cover IPv6 before it can
+be calibrated, and its threshold has to be read alongside `missed_bytes`.
+
+**Wazuh stopped producing alerts at 17:52 and nothing said so.** The wazuh-vm root filesystem
+was 100% full: Vulnerability Detection's feed directories (`/var/ossec/queue/vd` 4.8 GB,
+`/var/ossec/queue/vd_updater` 5.5 GB) had filled a 24 GB disk. All three agents stayed
+`Active`, `wazuh-manager` reported `active`, and `alerts.json` stayed at zero bytes. At midnight
+the rotation wrote `ossec-alerts-02.json.gz` as a zero-byte file, so the 2 November alerts after
+17:52 are lost; those before it are in Splunk. Fixed at 11:05 on 3 November by disabling
+Vulnerability Detection (`ossec.conf`, backed up as `ossec.conf.bak-vd`) and clearing its
+directories (disk 100% → 59%); alerts reached Splunk again from 11:12.
+
+No Splunk detection reads the `wazuh` sourcetype — only the two pipeline-health searches do —
+so the false-positive measurement of the Splunk rules is unaffected. Wazuh's own rules have no
+data for this window and are measured separately.
+
+The heartbeat reported wazuh-vm healthy the whole time, which it was: the heartbeat proves the
+host and the forwarder are up, not that the manager is writing alerts or that the disk has
+room. The convention "an hour without `wazuh` is not a gap, an hour without
+`wazuh:heartbeat` is" missed sixteen hours of a dead EDR because of exactly that difference.
+The heartbeat needs to carry disk use and the growth of `alerts.json` before it can stand for
+sensor health.
 
 ---
 
