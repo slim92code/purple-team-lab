@@ -416,3 +416,8 @@ that once they are deployed.
 events with `dest=unknown`, matching the Sysmon EID 10 volume, so Sysmon process-access events
 are being mapped into the model without a host; and HYDRA-DC renders event times one hour ahead
 of Splunk's `_time`, which matters for any cross-host timeline.
+
+**Snapshot after the window:** the three Windows hosts were snapshotted as
+`v4-post-benign - bez interneta` before the 3 Nov app deployment, which only touched the Splunk
+VM. It is the rollback point for the before-run and the hardening work; the name records that
+the guests had no internet egress when it was taken.
