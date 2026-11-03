@@ -103,10 +103,11 @@ Installed from this repo and read back the same way:
 
 | | Searches | Scheduled |
 | --- | --- | --- |
-| Shipped here (2 Nov) | 18 | 13 |
+| Shipped here (3 Nov) | 18 | 15 |
 | Loaded, 29 Oct | 12 | 10 |
 | Loaded, 30 Oct | 16 | 11 |
-| Loaded, 31 Oct | **17** | **12** |
+| Loaded, 31 Oct | 17 | 12 |
+| Loaded, 3 Nov | **18** | **15** |
 
 The twelve that run are the twelve this file schedules and the five that do not are the five
 it leaves alone, `| inputlookup windows_hosts` returns its three rows so `transforms.conf`
@@ -114,7 +115,7 @@ came with it, and running the telemetry-gap search by name completes against 537
 with no error. `splunk btool check` flagged nothing in this app. The 31 Oct redeployment added
 `Purple - Sensor Feed Stale`, verified by trigger the same evening (fires at a 2-minute
 threshold with a stopped Zeek, empty at the shipped 20); `| rest` confirms 17 loaded with 12
-scheduled, and the identical query runs clean ad hoc against the current feeds. The 2 Nov pass added `Purple - Wazuh Sensor Health (single-feed host)` with its own scripted-input heartbeat on wazuh-vm, verified by trigger across all three states (empty on a healthy stack; `manager=inactive` at `hb_age_min=0.7` with wazuh-manager stopped, which is what separates a dead manager from a dead host; clear again on restart). **That verification was run as ad-hoc SPL, not as a deployed saved search: the rule is in this repo but has NOT yet been redeployed to the running Splunk instance, which still reports 17 loaded with 12 scheduled.** The search logic is proven; the deployment is pending, and `| rest` will say 18 and 13 only once it has happened. The Splunk host has no outbound internet, so the app is updated there by hand rather than by `git pull`.
+scheduled, and the identical query runs clean ad hoc against the current feeds. The 2 Nov pass added `Purple - Wazuh Sensor Health (single-feed host)` with its own scripted-input heartbeat on wazuh-vm, verified by trigger across all three states (empty on a healthy stack; `manager=inactive` at `hb_age_min=0.7` with wazuh-manager stopped, which is what separates a dead manager from a dead host; clear again on restart). **That verification was run as ad-hoc SPL, not as a deployed saved search: the rule is in this repo but has NOT yet been redeployed to the running Splunk instance, which still reports 17 loaded with 12 scheduled.** The search logic is proven; the deployment is pending, and `| rest` will say 18 and 13 only once it has happened. The Splunk host has no outbound internet, so the app is updated there by hand rather than by `git pull`. **Deployed 3 Nov 2026** as an app upgrade through Splunk Web (Install app from file, app packaged from this repo at `485811a`, no `local/` overrides on the host, previous app backed up on the Splunk VM as `~/purple_lab.bak-pre-benign`); `| rest` reads back 18 searches with 15 scheduled. That deployment carries the alert tracking and throttling, the three rule fixes verified against the 30 Oct run, the Wazuh Sensor Health search, and the two allowlists measured in the [v4 benign baseline](../v4/benign-baseline.md).
 
 **One thing went wrong on the way and is worth more than the deployment.** The old app was
 backed up to `/opt/splunk/etc/apps/purple_lab.bak-20261030` — inside the apps directory.
