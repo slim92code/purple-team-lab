@@ -350,6 +350,21 @@ room. The convention "an hour without `wazuh` is not a gap, an hour without
 The heartbeat needs to carry disk use and the growth of `alerts.json` before it can stand for
 sensor health.
 
+**The SIEM was deleting its own evidence.** Found on 3 November while re-checking three rule
+fixes against the v3 run: the 20 October data the repo cites (the spray `Purple - Spray Success`
+was measured against, and the JA4 beacon) is gone from Splunk. The cause is in `_internal`, not
+in a snapshot: `main` was capped at `maxTotalDataSizeMB = 500`, every other index on the box was
+on the 488 GB default, and no frozen path was set, so each time the index reached 500 MB Splunk
+deleted its oldest buckets — reason logged as `maxTotalDataSize=524288000 bytes`. Six freezes
+ran inside this window (2 Nov 18:51, 18:57, 19:00, 20:55, 23:28; 3 Nov 10:52), the last one
+taking the bucket that held 20 October.
+
+None of them touched the window: every frozen bucket's latest event is 23 October or earlier.
+The cap was raised to 20 GB at 12:30 on 3 November (Splunk VM has 48 GB free), which stops the
+deletion without changing any stored event. What it cannot do is bring back 20 October, so any
+claim in this repo that rests on that day's data can no longer be re-run, only read. The 30
+October re-run is intact and is what the three rule fixes were verified against.
+
 ---
 
 ## Results
