@@ -369,4 +369,6 @@ October re-run is intact and is what the three rule fixes were verified against.
 
 ## Results
 
-_Empty until the window closes._
+_Empty until the window closes._ The exact queries, the time bounds and the positive control for
+each rule are fixed in advance in [`benign-baseline-queries.md`](benign-baseline-queries.md),
+generated from the rule file at the commit it names.
