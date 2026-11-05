@@ -381,7 +381,23 @@ of them measures a change to it:
 7. **One full kill-chain re-run at the end**, with the hardening in place — the pair to the before-run at step 4. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
 
+8. **A second benign window, with internet.** The first was measured with no outbound egress
+   from the guests, which is why `Purple - Large Outbound Transfer` ships with an uncalibrated
+   placeholder and `Purple - C2 Beacon`'s allowlist rests on two OneDrive binaries. This window
+   calibrates both against real egress — Windows Update, OneDrive, browser traffic — and moves
+   them from "threshold lab-specific" to measured. It is blocked on the NAT no-internet
+   root-cause, which is not yet found.
+
 Snapshot order: `v4-pre-hardening` (done) → `v4-post-logging` → `v4-post-benign` → one per bundle.
+
+**The two axes, and where they touch.** Steps 4–7 run the hardening axis: before → bundles →
+after, measuring verdicts and coverage. Step 8 runs the internet axis, which calibrates
+thresholds. They are mostly independent — hardening does not move a threshold — but they are
+**not fully independent**, and the exception is worth naming rather than discovering. A
+volume-based verdict sitting near its own threshold couples them: the firewall GPO's cell rests
+on `Purple - Large Outbound Transfer` at a placeholder threshold that step 8 may move past the
+transfer it is meant to catch. That cell is therefore recorded under the Phase A threshold and
+annotated with the risk, which keeps step 8 free to run before or after the hardening work.
 
 ### Why the per-bundle runs are targeted, and what that costs
 
@@ -430,12 +446,12 @@ predicted to move. Writing that column is what exposed the lockout row below.
 | ------- | ------------------------ | ----------------- | ----- |
 | Advanced audit policy | all of them — it generates the events the rules key on | no rule changes verdict; event completeness improves and SACL telemetry becomes available with no rule yet keyed on it | yes |
 | AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets; rule 2's verdict is unchanged, its zero-FP property becomes enforced | yes |
-| Account lockout / FGPP | `Purple - Verify Account Lockout (post FGPP)` | **does not fire** under the spray the register specifies — see below | yes |
+| Account lockout / FGPP † | `Purple - Verify Account Lockout (post FGPP)` | **does not fire** under the spray the register specifies — see below | yes † |
 | `RunAsPPL` split (one endpoint, not both) | the LSASS access rules — `CASE-04` | attack fails on the protected host; the **risk is that it also goes silent**, because the `GrantedAccess` a PPL-denied open returns may not be in the rule's measured mask list | yes |
 | PowerShell script-block / module logging | the PowerShell execution rules | existing rules unchanged — they key on `4688` and Sysmon; `4104` arrives as a second corroborating source | yes |
 | Defender ASR rules | the persistence cell | **unchanged unless the prevalence rule blocks the payload** — no ASR rule targets scheduled-task creation | yes |
 | `ms-DS-MachineAccountQuota=0` | none — kept only because it is one setting | — | no cell |
-| Firewall GPO (`MARVEL-Firewall-Baseline`) | none — the lateral path is deliberately unchanged | — | no cell |
+| Firewall GPO (`MARVEL-Firewall-Baseline`) | `Purple - Large Outbound Transfer` | the IPv6 SMB copy succeeds today and the rule returns it at the placeholder threshold; the GPO's default-inbound Block covers every address family, so the copy fails and the rule goes silent — **but see the threshold risk below** | yes |
 | LLMNR / NBT-NS / mDNS / WPAD disabled | none — no Responder step in this chain, no rule for it | — | dropped |
 | LDAP signing and channel binding | none | — | dropped |
 | SMB signing required, SMBv1 removed | none | — | dropped |
@@ -443,11 +459,50 @@ predicted to move. Writing that column is what exposed the lockout row below.
 | LAPS | none — local-admin reuse is not a path this chain takes | — | dropped |
 | gMSA for service accounts | none — the legacy SPN account is a documented exception anyway | — | dropped |
 
-The two "no cell" entries are labelled rather than quietly counted: `MachineAccountQuota=0`
-because it is one setting and leaving a known privilege-escalation path open to save thirty
-seconds would be silly, and the firewall GPO because
-[Firewall baseline](#firewall-baseline-gpo) records the v3 per-host rules as a defect that
-dropping the GPO would leave standing.
+† **The lockout row is not a v4 change at all**, which is a different thing from moving no
+cell. The `Strong-Users` fine-grained policy has been in force since 4 June 2026; the row and its
+prediction are left as written because the correction below is what the prediction column exists
+to produce. See [the dated note](#deliberate-residual-gaps).
+
+One "no cell" entry remains and is labelled rather than quietly counted: `MachineAccountQuota=0`,
+kept because it is one setting and leaving a known privilege-escalation path open to save thirty
+seconds would be silly.
+
+**The firewall GPO moved out of "no cell" on 5 Nov 2026**, on evidence the benign window produced
+by accident. Its reason used to read "the lateral path is deliberately unchanged" — the IPv6
+finding disproves that. A 100 MB copy from THEPUNISHER to `\\SPIDERMAN\BenignShare` resolved
+over IPv6 and went through, while the same copy by IPv4 address was refused: the v3 rules are
+scoped to single IPv4 addresses. Zeek logged it, and `Purple - Large Outbound Transfer` now
+matches IPv6 sources while its `resp_h` exclusion is IPv4-only, so SPIDERMAN's IPv6 address is not
+excluded and the rule returns the row. The v4 GPO's default-inbound Block is not scoped to an
+address or a family, so it closes the path the per-address rules missed. Inbound enforcement and
+egress observation sit on the same flow, so there is no direction mismatch: block the connection
+and the bytes never accumulate.
+
+**The risk this cell carries, stated beside it.** The threshold is still the uncalibrated 10 MB
+placeholder, and two effects push the same way:
+
+- **Phase B may calibrate it above this transfer.** Real Windows Update or OneDrive traffic can
+  put hundreds of megabytes into a ten-minute bucket. If the measured threshold lands above
+  53.5 MB, volume detection misses this exfil whatever the GPO does, and the cell flips for a
+  reason that has nothing to do with hardening.
+- **Zeek under-reads these bursts by about a third.** The same copy carried 26.9 MB of
+  `missed_bytes` against 53.5 MB counted — 80.4 MB observed of a 100 MB file. A threshold
+  calibrated from Zeek counts and applied to Zeek counts is internally consistent, but its
+  effective real-world trigger point is roughly **1.9× its nominal value**: 10 MB nominal needs
+  about 19 MB of actual traffic.
+
+The cell is recorded under the Phase A placeholder threshold and carries both caveats. The rule
+is also still `enableSched = 0`; that does not empty the cell, because every measurement in this
+lab is made by re-running the search over the window rather than by reading alert history — the
+benign baseline was measured exactly that way. So the with-internet window is **not** a
+prerequisite for this cell and the ordering stays free.
+
+**Attribution is settled before the run, not during it.** The workstations' IPv6 source addresses
+rotate — THEPUNISHER sent from `…:5cc0` and thirteen minutes later from `…:91d0`, both temporary
+addresses — so the transfer cannot be tied to a host by address the way the IPv4 rules do. The
+before-run and after-run both attribute by the `fd15:4ba5:5a2b:1008::/64` prefix plus correlation
+with the host's `4624`/`5140` on the Windows side, and the same method is used in both columns.
 
 **The lockout row needs its own correction, and it is the reason the prediction column exists.**
 An earlier version of this table justified keeping lockout by naming
