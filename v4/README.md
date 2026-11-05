@@ -558,6 +558,20 @@ days ahead of the first artefact.
 The app ships 18 searches with 13 scheduled, and **none of the five unscheduled ones is blocked
 on a missing idea** — each is blocked on a measurement or a setting. A sixth is missing entirely:
 
+> **Resolved, 3 Nov 2026.** The benign window closed and two of these were unblocked by it, so
+> the live app now runs **18 searches with 15 scheduled**. `C2 Beacon` and the etype-agnostic
+> `Kerberoasting` rule are scheduled with the allowlists the window measured. Three remain
+> unscheduled: `Large Outbound Transfer`, `Verify Account Lockout (post FGPP)` and
+> `RC4 Anomaly (post AES enforcement)`.
+>
+> **One row below is wrong and is left as written.** `Verify Account Lockout` is listed as
+> blocked on "the lockout policy not being applied yet". It was already applied — the
+> `Strong-Users` fine-grained policy has been in force since 4 June 2026, which the window
+> found. That rule is schedulable now and its cell does not move between the before and after
+> columns at all. See the dated note under [Deliberate residual gaps](#deliberate-residual-gaps).
+>
+> Results and allowlists: [`benign-baseline.md`](benign-baseline.md).
+
 | Unscheduled rule | Blocked on | Unblocked by |
 | ---------------- | ---------- | ------------ |
 | `Purple - C2 Beacon from User-Writable Path` | an allowlist of legitimate `AppData` egress | benign baseline |
