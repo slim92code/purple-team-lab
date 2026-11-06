@@ -35,6 +35,34 @@ before being written: `#2`, where the OneDrive allowlist clause was omitted, and
 per-flow filter stood in for the rule's ten-minute aggregation and reversed the verdict on one
 row. Neither modification was obviously material until it was tested.
 
+**Which version of the rules this column was measured against.** A verdict is only meaningful
+against a named rule text, and in this lab the repo and the running instance are not the same
+thing: the Splunk host has no outbound internet, so
+[the app is deployed there by hand](../detections/README.md) rather than pulled. The timeline
+that applies to every cell above:
+
+| When | What changed |
+| ---- | ------------ |
+| 31 Oct | `renderXml=1` on all three Windows hosts — Sysmon `source` moves `WinEventLog:` → `XmlWinEventLog:` |
+| 3 Nov | `485811a` adds the C2 OneDrive allowlist, the `tstark` etype allowlist, the telemetry exclusions and the IPv6 branch on Large Outbound |
+| 3 Nov | that package deployed to the live Splunk instance; `\| rest` reads back 18 searches, 15 scheduled |
+| 6 Nov | this column measured |
+
+So every cell here was measured against the post-3-November rule text, allowlists included —
+which is why `#4`'s allowlist could be observed not suppressing the attack, and why `#2`'s
+OneDrive allowlist was in force and still had a gap. A measurement taken against the pre-`485811a`
+text would be answering a different question and is not comparable to these.
+
+The distinction that matters more than the version is **deployed search versus ad-hoc SPL.**
+Every cell above was run as ad-hoc SPL copied from `savedsearches.conf` at `HEAD`, not by
+triggering the deployed saved search, and the two can diverge if the host's app is behind the
+repo. They are not known to diverge here, and that was checked rather than assumed: the 3 November
+deployment packaged `485811a`, and `git diff 485811a..HEAD` on `savedsearches.conf` returns three
+changed lines, all of them `description =` text about what the 20 October screenshots preserve.
+No `search =` line differs, so the query text run ad-hoc at `HEAD` is the query text deployed on
+the host. A first draft of this paragraph claimed the file had not changed at all, which the diff
+contradicted — the claim that survives is narrower and is the one that matters.
+
 **Clock.** Splunk `_time` is CET and equals the time the attack happened, which two independent
 checks fix: the IPv4 exfil's own server response carries `Date: 16:27:16 GMT` against a Splunk
 `_time` of `17:27:09`, exactly +1h, and the `4740` lockout at `_time 11:32:05` matches the second
