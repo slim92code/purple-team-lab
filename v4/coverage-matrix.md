@@ -108,6 +108,14 @@ three pipeline-health searches are not detection cells and are not listed.
 | 14 | Sliver C2 Beacon by JA4 Fingerprint | 5a | **✓ fires on one of two hosts** | M |
 | 15 | Large Outbound Transfer | 11, 12 | **✓ fires on both exfils — and one false positive** | M |
 
+Two phases ran and have **no Splunk row at all**, because no Splunk search covers them. Both are
+measured below:
+
+| Phase | Shipped coverage | Before |
+| ----- | ---------------- | ------ |
+| 6 — Pass-the-Ticket | **none, in any layer** | attack confirmed; nothing alerts |
+| 7 — WinRM lateral movement | Zeek, [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) | **✓ fires on 6 of 7 connections** |
+
 **The column is complete: twelve measured, three N/E.** Seven fire, five are silent.
 
 The split that matters is not fires-versus-silent. It is that **four of the seven that fire are
@@ -323,6 +331,79 @@ it ran on, and not the thing it was talking to. That is the same defect class as
 columns: the rule fires, and what it hands the analyst is missing the field they will ask for
 first.
 
+### Phase 6 — Pass-the-Ticket: executed, and nothing in any layer alerts
+
+No Splunk search covers this phase, so it has no numbered cell. It ran:
+
+```
+index=main source="WinEventLog:Security" EventCode=4768 Account_Name="SQLService" earliest=-1d latest=now
+| table _time Account_Name Ticket_Encryption_Type Client_Address Result_Code
+```
+
+| `_time` | Account_Name | etype | Client_Address | Result_Code |
+| ------- | ------------ | ----- | -------------- | ----------- |
+| 6 Nov 12:21:45.874 | `SQLService` | **`0x17`** | `::ffff:192.168.182.138` | `0x0` |
+
+A service account obtaining a TGT from a workstation, successfully, 33 minutes after its SPN was
+roasted. `SQLService` has no reason to authenticate from SPIDERMAN at all; this is the cracked key
+being used.
+
+**The absence of coverage is already on record and honestly scored.** The
+[ATT&CK Navigator layer](../detections/attack_navigator_layer.json) carries `T1550.003` at score
+75, not 100, with the note that it was *"exercised and recorded during the run, but no rule for it
+exists in `detections/`"*. That is the right call and this cell does not change it — it confirms
+the gap is still open in v4, with a second data point.
+
+The detection is not hard to state, which is what makes the gap worth naming: a `4768` for an
+account that holds an SPN, sourced from a workstation rather than the host that runs the service.
+It is not written here for the same reason as the other owed content — new detection between the
+columns changes what the after column measures.
+
+### Phase 7 — WinRM lateral movement: ✓ the Zeek rule fires, on 6 of 7 connections
+
+[`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) carries *WinRM Lateral Movement — East-West 5985*:
+`id.resp_p: 5985`, `conn_state` in `SF`/`S1`/`OTH`, excluding `192.168.182.1`. The traffic:
+
+| `_time` | orig_h → resp_h | conn_state | duration | bytes out | bytes **in** |
+| ------- | --------------- | ---------- | -------- | --------- | ------------ |
+| 12:23:39.312 | `.138` → `.137` | `SF` | 2.4 s | 24,670 | 11,336 |
+| 12:23:39.961 | `.138` → `.137` | **`RSTO`** | 1.7 s | 11,528 | 6,100 |
+| 12:23:40.770 | `.138` → `.137` | `SF` | 0.9 s | 17,306 | 5,515 |
+| 12:23:41.625 | `.138` → `.137` | `SF` | 0.04 s | 2,556 | 341 |
+| 16:24:38.964 | `.138` → `.137` | `SF` | 18.2 s | 123,226 | **6,594,812** |
+| 16:24:39.202 | `.138` → `.137` | `SF` | 18.0 s | 11,841 | 7,015 |
+| 16:24:39.560 | `.138` → `.137` | `SF` | 17.6 s | 17,758 | 5,515 |
+
+SPIDERMAN to THEPUNISHER, workstation to workstation, which is exactly the pattern the rule's
+description names from the v3 chain. Reproduced in v4.
+
+**Six of seven match; the `RSTO` one does not**, because `RSTO` is not in the rule's `conn_state`
+list. A connection the originator reset is still a connection that happened, so the rule
+undercounts by one here. It does not miss the activity — six rows is not a marginal case — but the
+omission is worth recording, because an attacker whose tooling resets its sessions would shrink
+that count, and the rule has no floor that says how many it needs.
+
+**The second burst is not a pivot, it is collection.** At 16:24 one session pulls **6.59 MB back**
+to SPIDERMAN over WinRM, against 123 KB sent. Four hours after the initial pivot, over the same
+channel, in the opposite direction. The volume rule `#15` does not see it: `#15` counts bytes
+*out* of an internal host, and these bytes are internal-to-internal and inbound to the host that
+asked for them. A 6.59 MB internal transfer is exactly the shape of staging before the exfil that
+`#15` does catch an hour later.
+
+**So the chain is visible end to end across layers, with its timing:**
+
+| Time | Phase | Layer that has it |
+| ---- | ----- | ----------------- |
+| 11:48:12 | roast, `fcastle` → `SQLService` | Splunk `#4`, Suricata, Zeek |
+| 12:21:45 | Pass-the-Ticket, `SQLService` TGT at RC4 | nothing alerts |
+| 12:23:39 | WinRM pivot, SPIDERMAN → THEPUNISHER | Zeek rule |
+| 16:24:38 | 6.59 MB pulled back over WinRM | nothing alerts |
+| 17:27:09 | exfil to the C2 | Splunk `#15`, Zeek, Suricata |
+
+Thirty-three minutes from roast to stolen ticket, two minutes from ticket to pivot. The two
+unalerted steps sit in the middle, and both are the attacker *using* what the earlier steps
+obtained.
+
 ### #3 — Kerberoasting RC4 Service Ticket, phase 4a: ✗ silent, by design
 
 The rule verbatim returns nothing. The control says why, positively rather than by inference:
@@ -336,9 +417,15 @@ index=main source="WinEventLog:Security" EventCode=4769 earliest=-1d latest=now
 | ---------------------- | ----- | -------- |
 | `0x12` | 125 | `HYDRA-DC$`, `SPIDERMAN$`, `SQLService`, `THEPUNISHER$`, `krbtgt` |
 
-Every service ticket the KDC issued in the window is AES-256. Not one `0x17`. The roast was an
-AES roast, this rule keys on RC4 only, so its silence is the designed division of labour with
-`#4` and not a gap. `#4` is the rule that has to catch this, and it does.
+Every **service ticket** the KDC issued in the window is AES-256. Not one `0x17` in `4769`. The
+roast was an AES roast, this rule keys on RC4 only, so its silence is the designed division of
+labour with `#4` and not a gap. `#4` is the rule that has to catch this, and it does.
+
+> **Corrected.** An earlier version of this cell read "not one `0x17`" and "no RC4 anywhere",
+> which is false. The control above covers `4769` only, and **RC4 does exist in this estate's
+> Kerberos traffic** — two `4768` TGTs carry `0x17`, one of them the Pass-the-Ticket above. The
+> scoped claim is true and the general one was never measured; see `#13`, where the difference
+> stops being a wording problem and becomes a defect.
 
 ### #4 — Kerberoasting User-SPN (etype-agnostic), phase 4a: ✓ fires
 
@@ -763,17 +850,46 @@ index=main source="WinEventLog:Security" EventCode=4769 Ticket_Encryption_Type="
 | stats count by Service_Name Ticket_Encryption_Type
 ```
 
-No rows, on the same control as `#3`: 125 service tickets in the window, all `0x12`, no `0x17`
-anywhere. The rule's premise is that after AES enforcement every surviving `0x17` is an anomaly,
-so a silent result pre-hardening is the expected reading and not a finding.
+No rows: 125 service tickets in the window, all `0x12`. And that result is correct, uninformative,
+and hiding a defect — because **RC4 is in this estate right now and this rule is pointed at the
+wrong event.**
 
-**This cell is the weakest of the nine and the reason is worth stating.** The before column
-cannot test this rule, because the condition it inverts — AES enforcement — is a hardening bundle
-that has not been applied. It is silent now and it will be silent in the after-run too if
-enforcement works, which means a `✗ silent → ✗ silent` row that looks like a detection failure
-and is nothing of the kind. Its real test is negative: after enforcement, a deliberate RC4
-request should produce a row. That test belongs to the after-run and is recorded here as owed, so
-the pair of silences is not read as a gap.
+**The rule reads `4769`. The RC4 is in `4768`:**
+
+```
+index=main source="WinEventLog:Security" EventCode=4768 earliest=-1d latest=now
+| stats count values(Ticket_Encryption_Type) as etypes values(Client_Address) as src by Account_Name
+```
+
+| Account_Name | count | etypes | src |
+| ------------ | ----- | ------ | --- |
+| `HYDRA-DC$` | 23 | `0x12` | `::1` |
+| `Administrator` | 12 | `0x12` | `::1`, `.137`, `.138` |
+| `SPIDERMAN$` | 9 | `0x12` | `.138` |
+| `THEPUNISHER$` | 8 | `0x12` | `.137` |
+| `fcastle` | 2 | **`0x12` and `0x17`** | `.133` |
+| `SQLService` | 1 | **`0x17`** | `.138` |
+
+Two RC4 tickets, both on the attack path, neither visible to this rule at any threshold — it
+queries ticket-granting-service events and these are ticket-granting-ticket events. The rule's
+description says *"after AES enforcement every `0x17` is an anomaly"*, and the single clearest
+`0x17` anomaly this chain produced is the Pass-the-Ticket TGT at 12:21:45. **The rule cannot see
+it, and will not see it after enforcement either.**
+
+So the silence is not "nothing to anomaly on yet", which is what this cell said before. It is a
+rule watching one Kerberos message type for a condition that arrives in another. A reader
+checking RC4 coverage from this cell would conclude the estate has it instrumented.
+
+**The owed work changes accordingly.** This is no longer a rule awaiting a positive test after
+enforcement; it is a rule that needs `4768` as well as `4769` before that test means anything.
+Both are held for step 8 — the fix and then the test — and the test has to use a TGT, since that
+is where this estate actually produces RC4.
+
+**Why the before column could not have caught this on its own.** Pre-hardening, the rule is
+expected to be silent, so a silent result looks like confirmation. It took measuring a *different*
+phase — Pass-the-Ticket, which has no rule and therefore no cell — to find out that RC4 was
+present the whole time. A matrix built only from rules that exist cannot find the gaps between
+them.
 
 ### #14 — Sliver C2 Beacon by JA4, phase 5a: ✓ fires on one of two hosts
 
@@ -895,6 +1011,7 @@ destroys the comparison those columns exist to make:
 | `#6` Spray Success | exclude `0x25` from the failure side | benign clock skew satisfies the rule's shape |
 | `#2` C2 Beacon | extend the OneDrive allowlist to `OneDrive\Update\OneDriveSetup.exe` | a fourth OneDrive binary in a fourth directory shape |
 | `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress, which does not exist yet |
+| `#13` RC4 Anomaly | add `4768` — the rule reads `4769` only and this estate's RC4 is in TGTs | the defect was found from a phase with no rule; the fix must precede its positive test |
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
@@ -904,6 +1021,12 @@ only thing detecting phase 2a, it is a generic built-in, and the number behind i
 7.5 hours of an idle lab because Wazuh was dead for the rest of the benign window. The window
 cannot be re-run; a fresh day after 3 November 11:12 can. Until then the `#5` coverage claim
 stands on the thinnest evidence in this document.
+
+**Two rules are owed that do not exist, both for phases that ran.** Pass-the-Ticket has no
+coverage in any layer — a `4768` for an SPN-holding account sourced from a workstation would state
+it, and the ATT&CK layer already scores the technique 75 rather than claim otherwise. And the
+collection step at 16:24, 6.59 MB pulled back over WinRM, is caught by nothing: `#15` measures
+bytes leaving an internal host, and this was internal-to-internal.
 
 One rule is owed that does not exist yet: **a Zeek rule on `KDC_ERR_C_PRINCIPAL_UNKNOWN`.** The
 `#11` cell establishes that Windows structurally cannot see Kerberos enumeration on this estate
