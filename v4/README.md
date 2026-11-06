@@ -11,7 +11,7 @@
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
 > | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov), the benign baseline over a full 24h window (3 Nov), the guests' internet fault root-caused (6 Nov), and the before-run chain executed with two of its detection cells written up — JA4 C2 and LSASS (6 Nov) |
-> | Next | the remaining before-run cells into `coverage-matrix.md`, while the evidence is still in Splunk |
+> | Next | the remaining nine before-run cells into [`coverage-matrix.md`](coverage-matrix.md), which is started with three measured and three N/E, while the evidence is still in Splunk |
 > | Not yet done | the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule, the second benign window with internet |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
