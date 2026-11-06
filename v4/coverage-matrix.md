@@ -30,10 +30,25 @@ alert carries no information. Where the search as run differs from `savedsearche
 way, the difference is stated in the cell.
 
 That rule is strict on purpose, because a near-miss version of a search answers a different
-question. Two cells here were first measured with a modified query and re-measured verbatim
-before being written: `#2`, where the OneDrive allowlist clause was omitted, and `#15`, where a
-per-flow filter stood in for the rule's ten-minute aggregation and reversed the verdict on one
-row. Neither modification was obviously material until it was tested.
+question. This column has now produced four instances of it, across two independent passes, and
+they are worth listing together because the shape repeats:
+
+| Where | The mistake | What it would have claimed |
+| ----- | ----------- | -------------------------- |
+| `#2` | the shipped OneDrive allowlist clause omitted | every OneDrive row as a finding |
+| `#15` | a per-flow filter in place of the rule's 10-minute sum | a firing row read as "below threshold" |
+| Suricata, exfil | grouped by `alert.signature`, null for `flow`/`http` | "Suricata is blind to the exfil" |
+| `60104` noise floor | grouped by `targetUserName`, null for 744 of 764 events | the attack's own `4771`s read as the benign floor |
+
+The first two were caught by re-running verbatim, the third by its author, the fourth by the row
+counts not adding up against an earlier timechart. **The last one is the instructive case**,
+because an empty result makes a reader suspicious and a *partial* one does not — it came back
+with twenty plausible rows and nothing about it looked wrong. Had the hourly totals not already
+been on record, the estate's benign audit-failure floor would have been written down as failed
+Kerberos authentication, which is exactly backwards: those twenty rows were the attack.
+
+So: **an empty result is a claim about a query until a control proves it is a claim about the
+world — and a partial result is the same claim wearing better clothes.**
 
 **Which version of the rules this column was measured against.** A verdict is only meaningful
 against a named rule text, and in this lab the repo and the running instance are not the same
@@ -422,24 +437,48 @@ a coverage verdict, it would be wrong, and a single-source matrix offers no way 
 apart. That is the clearest argument in this document for the layer columns, and it came from the
 layer the matrix had been leaving out.
 
-The caveat travels with it, and it is larger than it first looked. `60205` is a generic built-in
-rule — *multiple Windows audit failure events* — and its false-positive rate here rests on
-**7.5 hours, not 24.** Measured over the benign window it returns zero rows, but Wazuh produced
-no events at all from the window's start until 11:00 the next morning: the wazuh-vm disk was
-full and `alerts.json` sat at zero bytes, which
-[the benign baseline documents in full](benign-baseline.md) — root cause, timing and the reason
-the heartbeat reported healthy throughout. A timechart taken independently for this cell
-reproduced the same outage without reference to that write-up.
+**`60205` is more precise than a first reading of its name suggests, and this was measured rather
+than assumed.** *Multiple Windows audit failure events* sounds like a rule that fires on noise.
+It does not fire on this estate's noise, and the estate has a lot of it.
 
-So the support for "Wazuh covers phase 2a" is: **zero false positives across roughly seven and a
-half hours of an idle lab.** Not a day, not a working one. The baseline closed its Wazuh section
-with "Wazuh's own rules have no data for this window and are measured separately", which was
-correct and correctly scoped — and this cell is what makes that debt come due, because the
-matrix now rests a coverage verdict on a Wazuh rule that the baseline never priced.
+Over the 6 November window, with Wazuh verified alive and continuous — heartbeat at exactly 60
+per hour, no gap — its parent rule `60104` fired 764 times, and the composition is the point:
 
-Coverage by an unpriced generic rule is still coverage. It is not a detection the estate can
-lean on, and this cell should not be read as saying otherwise. The number is owed from a clean
-full day after 3 November 11:12.
+| EventID | Count | Distribution | What it is |
+| ------- | ----- | ------------ | ---------- |
+| `4674` | 744 | **exactly 48 on every full hour**, flat | failed operation on a privileged object |
+| `4771` | 20 | 4 at 09:00, 16 at 11:32 | the Kerberos failures, 16 of them the spray |
+
+`60205` fired **twice, both at 11:00**, and not once across the 744 events of `4674`. So the
+separation it makes is **burst against rate**: one failed privileged operation every seventy-five
+seconds, forever, does not trigger it; sixteen pre-authentication failures in six seconds does.
+That is the correct behaviour for a frequency rule and it is the opposite of noisy.
+
+An earlier version of this cell called it "coverage by genericity, not precision". That was a
+judgement from the rule's name and the measurement contradicts it. Corrected here rather than
+quietly rewritten, because the wrong version is the more intuitive one.
+
+**What is still missing is a full clean day, and it cannot be recovered.** The benign window
+cannot supply it: Wazuh produced nothing from that window's start until 11:00 the next morning,
+the wazuh-vm disk being full with `alerts.json` at zero bytes —
+[documented in full in the baseline](benign-baseline.md), root cause and all, and independently
+reproduced for this cell. The obvious next candidate was 4–5 November, and **the estate was
+powered off**: Wazuh, the heartbeat and the Windows Security log all read zero for both days
+entirely, with data resuming at 09:00 on 6 November.
+
+So the support is: **zero false positives across roughly fifteen hours of verified-alive Wazuh
+carrying 744 benign audit failures.** That is considerably stronger than the 7.5 quiet hours this
+cell first claimed, and it is still not a full day with real user activity. The baseline closed
+its Wazuh section with "Wazuh's own rules have no data for this window and are measured
+separately"; this is that separate measurement, as far as existing data allows. The remainder
+needs a fresh 24-hour idle run, which is an action rather than a query.
+
+**A finding that fell out of the noise floor.** Something in this estate attempts a privileged
+operation and fails 48 times an hour, continuously, on a timer — 744 events in the window, and no
+rule in any layer looks at them. It is almost certainly an agent or a scheduled task, and it is
+not interesting in itself. It is interesting as a **place to hide**: a real `4674` would land in a
+constant stream nobody reads, and the only reason the number is known at all is that it had to be
+quantified to price a different rule.
 
 **One thing is unresolved and is left that way.** `kerbrute` reported seven logins tested. Six
 are accounted for: one success (`fcastle`), two non-existent principals, three with `0x18`. All
