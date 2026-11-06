@@ -10,8 +10,8 @@
 > | | |
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov), the benign baseline over a full 24h window (3 Nov), the guests' internet fault root-caused (6 Nov), and the before-run chain executed with its full Splunk column measured into [`coverage-matrix.md`](coverage-matrix.md) — twelve cells measured, three N/E (6 Nov) |
-> | Next | the Wazuh and Suricata layers, which no cell covers yet, then the IR report and hunts against this before-run |
+> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov), the benign baseline over a full 24h window (3 Nov), the guests' internet fault root-caused (6 Nov), the before-run chain executed and measured into [`coverage-matrix.md`](coverage-matrix.md) — twelve Splunk cells, three N/E, two phases that have no Splunk rule, and the Wazuh/Suricata/Zeek layers for five phases — and the first two [case files](investigations/) written against it (6 Nov) |
+> | Next | the remaining [case files](investigations/) — two written, six cells with findings and no file yet — then the hunts and the IR report |
 > | Not yet done | the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule, the second benign window with internet |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >

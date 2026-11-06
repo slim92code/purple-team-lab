@@ -109,7 +109,8 @@ on that page, kept separate from the 24 October predictions.
 
 The [before/after coverage matrix](v4/coverage-matrix.md) has its first column: fifteen
 attack-facing searches, twelve measured against the un-hardened estate and three not executable,
-each cell carrying the query that produced it and the raw result.
+each cell carrying the query that produced it and the raw result. The first
+[v4 case files](v4/investigations/) are written against it.
 
 Seven of the twelve fire. The useful number is that **four of those seven are defective in ways a
 tick in the column would have hidden** — one cannot say which account was locked, one fires on
