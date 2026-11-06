@@ -204,11 +204,27 @@ any column, because no Splunk search covers it. Two Wazuh rules caught the loude
 chain and the table above has nowhere to put it. That is the same structural gap as phase 7, found
 from the other direction.
 
-**A one-event discrepancy, unexplained and left so.** Zeek records 5 `KDC_ERR_CLIENT_REVOKED`
-from `.133`; Splunk holds 4 × `4771` with `Failure_Code=0x12`. The two unknown-principal attempts
-explain themselves — a non-existent principal produces no `4771` — but a revoked one should log.
-Nineteen failures on the wire that ought to appear in the Windows log, eighteen appear. Small, and
-the same shape as the larger gap in `#5`: the wire holds more than the log.
+**A one-event wire-versus-endpoint gap, measured on both sides.** Zeek records 5
+`KDC_ERR_CLIENT_REVOKED` from `.133`. The endpoint holds four, timestamped:
+
+```
+11:32:06.001  tstark  .133  0x12
+11:32:06.003  tstark  .133  0x12
+11:32:06.157  tstark  .133  0x12
+11:32:06.161  tstark  .133  0x12
+```
+
+(`Failure_Code=0x12` here is `KDC_ERR_CLIENT_REVOKED`, not to be confused with
+`Ticket_Encryption_Type=0x12`, which is AES-256 and appears all over `#3` and `#4`. Same hex,
+different field, opposite meaning.)
+
+So one revoked attempt crossed the wire and was never written to the Windows log. It is a single
+event inside a 160-millisecond burst, so a boundary or a dedup is possible and it is not claimed
+as proven. But it is the same shape as the much larger gap in `#5` and the total one in `#11`,
+and it is the pattern this lab has recorded before as
+[the network seeing what the endpoint missed](../v3/README.md#findings): across three Kerberos
+cells in this column, every discrepancy runs the same direction. **The wire holds more than the
+log, never less.**
 
 **The second pass caught itself making the same mistake this column has made twice.** Its first
 Suricata query grouped by `alert.signature`, which is null for `flow` and `http` events, and
@@ -406,11 +422,24 @@ a coverage verdict, it would be wrong, and a single-source matrix offers no way 
 apart. That is the clearest argument in this document for the layer columns, and it came from the
 layer the matrix had been leaving out.
 
-The caveat travels with it: `60205` is a generic built-in rule — *multiple Windows audit failure
-events* — whose false-positive rate here has never been measured, because the benign baseline
-covered the Splunk searches and nothing else. Coverage by a noisy rule is still coverage, but it
-is not the same as a tuned detection, and this cell should not be read as saying the estate has
-spray detection it can trust.
+The caveat travels with it, and it is larger than it first looked. `60205` is a generic built-in
+rule — *multiple Windows audit failure events* — and its false-positive rate here rests on
+**7.5 hours, not 24.** Measured over the benign window it returns zero rows, but Wazuh produced
+no events at all from the window's start until 11:00 the next morning: the wazuh-vm disk was
+full and `alerts.json` sat at zero bytes, which
+[the benign baseline documents in full](benign-baseline.md) — root cause, timing and the reason
+the heartbeat reported healthy throughout. A timechart taken independently for this cell
+reproduced the same outage without reference to that write-up.
+
+So the support for "Wazuh covers phase 2a" is: **zero false positives across roughly seven and a
+half hours of an idle lab.** Not a day, not a working one. The baseline closed its Wazuh section
+with "Wazuh's own rules have no data for this window and are measured separately", which was
+correct and correctly scoped — and this cell is what makes that debt come due, because the
+matrix now rests a coverage verdict on a Wazuh rule that the baseline never priced.
+
+Coverage by an unpriced generic rule is still coverage. It is not a detection the estate can
+lean on, and this cell should not be read as saying otherwise. The number is owed from a clean
+full day after 3 November 11:12.
 
 **One thing is unresolved and is left that way.** `kerbrute` reported seven logins tested. Six
 are accounted for: one success (`fcastle`), two non-existent principals, three with `0x18`. All
@@ -664,9 +693,29 @@ complementary in a way that neither description states.
 millisecond apart (`RecordNumber` 2319917 and 2319918) for the same account, so the alert shows
 two rows for one lockout. Minor, but it is the kind of thing that erodes trust in a feed.
 
-The fix — `Account_Locked_Out_Name` in place of `Target_User_Name`, and `Caller_Computer_Name`
-dropped or replaced with the correlation — is held for step 8 with the others, so the rule does
-not change between the before and after columns.
+**The fix changed shape once the other layers were measured, and it is now cheaper.** Wazuh
+`60115` — *user account locked out* — fires at level 9 on the same two events and carries the
+field Splunk's extraction does not:
+
+```
+_time                    rule.level  targetUserName  eventID  subjectUserName
+2026-11-06 11:32:06.953  9           tstark          4740     HYDRA-DC$
+2026-11-06 11:32:06.941  9           tstark          4740     HYDRA-DC$
+```
+
+`data.win.eventdata.targetUserName` holds `tstark` outright. So the estate already has the
+locked-out account on an alerting path; what it lacks is the routing. The owed work stops being
+"repair the Splunk extraction" and becomes **"take the lockout alert from the layer that already
+names the account"**, which touches no Splunk rule and therefore does not disturb the before/after
+comparison at all.
+
+That is the clearest operational return in this column from reading more than one layer, and it
+only appeared because the two were compared. Neither cell says it alone: Splunk's says the field
+is empty, Wazuh's says a lockout fired. The useful sentence is in the gap between them.
+
+The original fix — `Account_Locked_Out_Name` in place of `Target_User_Name`, and
+`Caller_Computer_Name` dropped — is still correct and still held for step 8, but it is now the
+fallback rather than the plan.
 
 ### #13 — RC4 Anomaly, phase 4a: ✗ silent, nothing to anomaly on yet
 
@@ -811,17 +860,11 @@ destroys the comparison those columns exist to make:
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
 
-**Three questions the layer measurements opened and did not close:**
-
-1. **Does Wazuh `60115` carry the locked-out account name?** If it does, the pairing answers
-   `#12`'s empty-output defect without touching the Splunk rule, and the owed fix changes shape
-   from "repair the rule" to "route the alert from the layer that has the field".
-2. **What is `60205`'s false-positive rate in this estate?** It is the only thing detecting the
-   spray, it is a generic built-in, and the benign baseline never measured Wazuh. Until that
-   number exists, "Wazuh covers phase 2a" is a true sentence that cannot be relied on.
-3. **Why does Zeek hold 5 `CLIENT_REVOKED` where Splunk holds 4 × `0x12`?** One failure on the
-   wire that should have been logged and was not. Small, and the same shape as `#5`'s larger
-   undercount.
+**One measurement, not a fix: `60205`'s false-positive rate over a clean full day.** It is the
+only thing detecting phase 2a, it is a generic built-in, and the number behind it is currently
+7.5 hours of an idle lab because Wazuh was dead for the rest of the benign window. The window
+cannot be re-run; a fresh day after 3 November 11:12 can. Until then the `#5` coverage claim
+stands on the thinnest evidence in this document.
 
 One rule is owed that does not exist yet: **a Zeek rule on `KDC_ERR_C_PRINCIPAL_UNKNOWN`.** The
 `#11` cell establishes that Windows structurally cannot see Kerberos enumeration on this estate
