@@ -201,16 +201,28 @@ The practical value is a detection angle the Splunk rules do not have: `#3` keys
 etype and goes silent on an AES roast by design, while Suricata flags the *request*. A roast is
 visible at the network layer **regardless of what the KDC issues.**
 
-**The roast converges on three layers to within 140 ms:**
+**The roast converges on three layers inside 140 ms:**
 
 | Layer | Timestamp | What it saw |
 | ----- | --------- | ----------- |
 | Suricata | 11:48:12.373, .384 | `applayer/weak_encryption` ×2 |
 | Zeek | 11:48:12.382 | TGS, `fcastle/MARVEL.LOCAL` → `MARVEL.LOCAL\SQLService` |
-| Splunk | 11:48:12.513 | `4769`, `0x12`, from `::ffff:192.168.182.133` |
+| Splunk | 11:48:12.502 | `4768`, `fcastle`, **`0x17`** — the TGT, RC4 |
+| Splunk | 11:48:12.513 | `4769`, `SQLService`, `0x12` — the TGS, AES |
 
-Network first, the DC's own log 130 ms later — the order the request and the issued ticket
-actually happen in. Nothing here needed correlating by hand; three independent sensors agree.
+The two network sensors sit about 120 ms ahead of the DC's own log, and the DC's two events are
+11 ms apart in the order Kerberos requires: ticket-granting ticket, then service ticket. Nothing
+here needed correlating by hand — three independent sensors agree on one event to within a
+seventh of a second.
+
+**One caveat on reading that ordering too closely.** These are four timestamps from three hosts
+with independent clocks, and Zeek writes a `kerberos.log` line when it closes a transaction
+rather than when the first packet lands. The convergence inside 140 ms is solid; the internal
+sequence across sensors is not evidence on its own. The ordering that *is* evidence is the
+11 ms between `4768` and `4769`, because both come from the same host and the same log.
+
+The RC4 TGT in that table is the finding `#13` turns on: the louder cryptographic signal arrived
+eleven milliseconds before the ticket that triggered an alert, and no rule read it.
 
 **Incidental: Wazuh independently confirms three things this column already held.** These were
 measured blind, by a pass that had not read the cells they corroborate:
@@ -871,10 +883,30 @@ index=main source="WinEventLog:Security" EventCode=4768 earliest=-1d latest=now
 | `SQLService` | 1 | **`0x17`** | `.138` |
 
 Two RC4 tickets, both on the attack path, neither visible to this rule at any threshold — it
-queries ticket-granting-service events and these are ticket-granting-ticket events. The rule's
-description says *"after AES enforcement every `0x17` is an anomaly"*, and the single clearest
-`0x17` anomaly this chain produced is the Pass-the-Ticket TGT at 12:21:45. **The rule cannot see
-it, and will not see it after enforcement either.**
+queries ticket-granting-service events and these are ticket-granting-ticket events. Timestamped:
+
+| `_time` | Account | etype | What it is |
+| ------- | ------- | ----- | ---------- |
+| 11:32:01.111 | `fcastle` | `0x12` | TGT from the spray success |
+| **11:48:12.502** | `fcastle` | **`0x17`** | **the TGT `GetUserSPNs` asked for** |
+| **12:21:45.874** | `SQLService` | **`0x17`** | the Pass-the-Ticket |
+
+**The roast obtained an RC4 TGT eleven milliseconds before the AES service ticket that `#4`
+catches.** Same tool, same transaction, same second. `impacket` requested RC4 for its own TGT as a
+matter of course and the KDC issued it; the TGS then came back AES because `GetUserSPNs` requested
+no particular etype for it and the KDC chose the strongest shared one. That second half is
+[already documented](../detections/splunk/purple_lab/default/savedsearches.conf) in `#3`'s own
+description. The first half — that the roast's TGT was RC4 — is new here, and it means the
+RC4 evidence was eleven milliseconds away from the rule that did fire.
+
+**So the coverage is inverted relative to the risk.** This domain issued RC4 to an attacker twice.
+The rule for etype-agnostic roasting caught the AES ticket. The rule named *RC4 Anomaly* caught
+neither RC4 ticket, and will not after enforcement either, because the message type it reads is
+not the one RC4 arrives in. The weaker cryptography is the uncovered half.
+
+It also puts a second data point under a v3 conclusion: this domain **prefers** AES rather than
+enforcing it. One RC4 TGT was arguable as an artefact; two, to two different principals, from two
+different tools, is the behaviour.
 
 So the silence is not "nothing to anomaly on yet", which is what this cell said before. It is a
 rule watching one Kerberos message type for a condition that arrives in another. A reader
