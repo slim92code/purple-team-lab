@@ -513,8 +513,9 @@ as far as this measurement can say.
 **What this does to the benign baseline's claim.** [The baseline](benign-baseline.md) recorded
 this rule as clean across 78,495 `EventCode=10` reads, and that is still true *of its window* —
 2 Nov 18:40 to 3 Nov 18:40 — which is exactly the problem. That window contains no Sysmon
-restart, and a 24-hour sample cannot see a false positive whose trigger is an administrative
-event occurring every few days. The measurement was honest and the number is right; the sentence
+restart, and every occurrence of this false positive tracks one. A 24-hour sample cannot see a
+reader that only appears around an administrative event it does not
+contain. The measurement was honest and the number is right; the sentence
 it supports is "none in twenty-four hours", not "zero false positives", and those are different
 claims. The before/after comparison depends on the difference, because **the hardening bundles
 will restart Sysmon and reboot the DC repeatedly** — so this row can reappear in the after-run
@@ -526,8 +527,12 @@ the rule between the before and after columns. It goes in with the step 8 recali
 alongside the `Large Outbound` threshold, and the after-run is read with this row known.
 
 The 31 Oct `powershell.exe` event is **not** a before-run artefact — it falls six days earlier,
-in the 31 October rollout and canary work. It is listed so that anyone re-running this rule over
-a week-long window does not credit it to the chain.
+on the same evening as the rollout and canary work, and **it is unexplained.** `0x1f3fff` from
+PowerShell is not something to wave through, and nothing measured here says which it was: a test
+trigger from that evening's verification, or a real read nobody chased. It is listed rather than
+dropped so that anyone re-running this rule over a week-long window neither credits it to the
+chain nor assumes it was accounted for. Resolving it needs the `CallTrace` and the parent process
+from the raw event, which is a hunt for `hunts/` rather than a cell in this matrix.
 
 **A second-order finding: most of the exclusion list does no work.** Cross-reading the nine
 `SourceImage!=` exclusions against the masks those processes were observed using since the
@@ -541,7 +546,7 @@ a week-long window does not credit it to the chain.
 | `svchost.exe` | `0x1000`, `0x3000`, `0x100000`, `0x101000` | no |
 | `taskmgr.exe` | `0x1000`, `0x1400`, `0x1410` | no |
 | `WmiPrvSE.exe` | `0x1000`, `0x1400`, `0x1410` | no |
-| `MsMpEng.exe` | `0x1000`–`0x1418`, `0x3600` | no |
+| `MsMpEng.exe` | `0x1000`, `0x1010`, `0x1400`, `0x1410`, `0x1418`, `0x101000`, `0x3600` | no |
 | `vmtoolsd.exe` | `0x1000`, `0x1400`, `0x1410` | no |
 | `MRT.exe` | never observed | untested |
 

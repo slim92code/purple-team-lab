@@ -10,8 +10,8 @@ than quietly fixed.
 Detection-as-code lives at the repo root. Each lab iteration has its own folder.
 
 Status: [v2](v2/) complete, [v3](v3/) complete, [v4](v4/) in progress — its
-[predictions are on record](v4/README.md), the pre-hardening baseline is captured, the
-hardening run itself is not done yet.
+[predictions are on record](v4/README.md), the pre-hardening baseline and the un-hardened
+kill-chain run are both measured, the hardening run itself is not done yet.
 
 Built and measured by me, written with AI assistance. Details in [Notes](#notes).
 
@@ -36,7 +36,7 @@ measured.
 | ------- | --------------- | ------ |
 | [v2](v2/) | Sysmon + Splunk SIEM | Complete. [Playbooks and screenshots](v2/README.md) |
 | [v3](v3/) | + Zeek/Suricata NDR, Wazuh EDR | Complete. [Summary](v3/README.md), [technical report, 32 pp. (EN)](v3/Purple_Team_Report_v3_EN.pdf) |
-| [v4](v4/) | v3 stack on a hardened, CIS-aligned baseline | In progress. [Plan and measurements](v4/README.md) — baseline captured, hardening run pending |
+| [v4](v4/) | v3 stack on a hardened, CIS-aligned baseline | In progress. [Plan and measurements](v4/README.md) — baseline and before-run measured, hardening run pending |
 
 ### v2 — baseline
 
@@ -101,10 +101,18 @@ The plan is committed before the work. The deliverable is a before/after compari
 predictions and the residual-gap list have to be on record first.
 
 What is done so far is the "before" half: the NDR sensor made reboot-durable, a CIM
-sourcetype defect found and fixed on the ingest path, and the pre-hardening baseline verified
-across all five sources and snapshotted. The hardening bundles, the re-run and the matrix are
-still ahead. Each measurement is in its own dated section on that page, kept separate from the
-24 October predictions.
+sourcetype defect found and fixed on the ingest path, the pre-hardening baseline verified
+across all five sources and snapshotted, a 24-hour benign window measured per rule, and the kill
+chain run against the un-hardened estate with each detection cell measured. The hardening
+bundles, the re-run and the matrix are still ahead. Each measurement is in its own dated section
+on that page, kept separate from the 24 October predictions.
+
+Two findings from the before-run are worth naming here. The C2 beacon's JA4 fingerprint appears
+on both endpoints but the rule's threshold alerts on only one, so the evidence is wider than the
+alert — a tick in a matrix would have lost that. And running the LSASS rule over a week instead
+of a day surfaced a benign reader the benign window was structurally unable to contain: its
+headline, zero alerts across 78,495 reads, was measured correctly and still claimed more than a
+one-day sample can support.
 
 ## Notes
 
