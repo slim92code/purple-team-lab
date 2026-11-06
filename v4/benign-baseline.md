@@ -415,6 +415,20 @@ counts as clean where the control is non-zero.
 **The strongest number is rule 10:** zero alerts across 78,495 benign reads of LSASS in a day.
 The exclusions were tuned on 935 sampled reads in v3; they held at eighty times that volume.
 
+> **Qualified, 6 Nov 2026 — the number is right and the claim built on it was too strong.** The
+> same rule run over seven days returns two benign rows this window could not contain:
+> `C:\Windows\Sysmon64.exe` reading `lsass.exe` with `0x1FFFFF` on HYDRA-DC, on 30 and 31 October.
+> Both follow a Sysmon service start on the DC by about a minute, and this window contains no
+> Sysmon restart — so a 24-hour sample was structurally unable to see a false positive whose
+> trigger is an administrative event. Zero across 78,495 reads remains exactly what was measured.
+> What it supports is **"none in twenty-four hours"**, not "zero false positives", and the
+> difference matters because the hardening bundles restart Sysmon and reboot the DC repeatedly.
+> The full measurement, including why the exclusion is not being added yet, is in
+> [the before-run section of the v4 README](README.md#before-run-detection-measurement-6-nov-2026--two-cells-closed-and-a-false-positive-source-the-benign-window-could-not-see).
+> This is a limit of the window's length, not an error in the count — but it is the second time
+> on this page that a one-day sample has been read as a general property, and that pattern is the
+> finding.
+
 **The one rule that fired is the exfiltration rule, and it fired on the monitoring.** All four
 rows are telemetry: forwarders to Splunk on `9997` and Wazuh agents on `1514`. Three of them sit
 in the 18:40 interval — the backlog flush when the lab came back from the host-wide freeze — and

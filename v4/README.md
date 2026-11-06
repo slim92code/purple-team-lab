@@ -5,14 +5,14 @@
 > The plan below was written before the work started and its predictions are left unchanged, so
 > they stay auditable. **Nothing in the plan is a result.** What has been measured since is in
 > dated sections, each carrying the date it was measured — those are results. The distinction
-> between the two is the point of this page. Last updated 2 Nov 2026.
+> between the two is the point of this page. Last updated 6 Nov 2026.
 >
 > | | |
 > | --- | --- |
 > | Written 24 Oct | scope, hardening baseline, firewall GPO design, logging change, residual-gap risk register |
-> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov) |
-> | Next | the benign baseline — 24-48h with no attack, the false-positive rate per rule |
-> | Not yet done | the before-run, the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule |
+> | Measured since | sensor persistence (30 Oct), CIM sourcetype fix rolled out and verified (31 Oct), pre-hardening baseline verified across all five feeds and snapshotted on all seven VMs, both logging gaps closed and verified — `wazuh-vm` heartbeat with an 18th search, and the Zeek bookkeeping-file ingest (2 Nov), the benign baseline over a full 24h window (3 Nov), the guests' internet fault root-caused (6 Nov), and the before-run chain with its detection cells (6 Nov) |
+> | Next | the IR report and hunts against the before-run, then hardening bundle by bundle |
+> | Not yet done | the hardening bundles, the after-run, the coverage matrix, the case files, the hunts, the IR report, the honeypot rule, the second benign window with internet |
 > | Completed labs | [v2](../v2/) and [v3](../v3/) |
 >
 > It is published first on purpose. v4's deliverable is a before/after detection-coverage
@@ -439,6 +439,124 @@ volume-based verdict sitting near its own threshold couples them: the firewall G
 on `Purple - Large Outbound Transfer` at a placeholder threshold that step 8 may move past the
 transfer it is meant to catch. That cell is therefore recorded under the Phase A threshold and
 annotated with the risk, which keeps step 8 free to run before or after the hardening work.
+
+### Before-run detection measurement, 6 Nov 2026 — two cells closed, and a false-positive source the benign window could not see
+
+The before-run at step 4 was executed on 6 November. Two cells were closed afterwards from the
+blue side; what follows is the measurement, not the chain.
+
+**The JA4 C2 rule fires on one endpoint and is silent on the other, and the threshold is why.**
+The fingerprint hard-coded in `Purple - Sliver C2 Beacon by JA4 Fingerprint` matches the one this
+run produced exactly — `t13i131000_f57a46bbacb6_e5728521abd4`, no drift from v3. Twelve TLS
+handshakes carry it, every one of them to the Sliver host at `192.168.182.133` and nothing else:
+
+| Host | Handshakes | Window | Mean interval | Jitter | Rule |
+| ---- | ---------- | ------ | ------------- | ------ | ---- |
+| SPIDERMAN (`.138`) | 11 | 12:04:15–12:09:15 | 30.0 s | 23.9 s | fires |
+| THEPUNISHER (`.137`) | 1 | — | n/a | n/a | silent |
+
+`where count > 5` separates them, and it is right to: one handshake has no interval, so there is
+nothing to call beaconing. The distinction worth recording is that **the evidence covers both
+endpoints while the alert covers one.** The v3 finding that a single JA4 links both hosts still
+holds — it is visible in the fingerprint and invisible in the alert. Read off the alert alone,
+half of it is lost. The fingerprint is the pivot; the rule is a threshold sitting on top of it,
+and the two answer different questions.
+
+**`ja4` is not a field in this pipeline.** This Zeek build ships `ja4d.log` (DHCP, 1,640 events)
+and `ja4ssh.log` (SSH, 69) but no `ja4.log`; the TLS fingerprint is appended as a column to
+`ssl.log`, and the forwarder delivers Zeek's TSV, so Splunk extracts no `ja4` field at all. The
+shipped rule works because it matches the fingerprint as a bare string in `_raw` — that is why it
+is written that way rather than as a field comparison. Any search that wants to *group* by
+fingerprint needs a `rex` first, which is how the table above was produced. The move to JSON
+through the Splunk Add-on for Zeek, already noted in `savedsearches.conf`, is what retires that.
+
+**LSASS access: the rule caught the dump, and the beacon was not the caller.** `SharpKatz` ran
+through Sliver's `execute-assembly`, which executes in a sacrificial process, so the beacon path
+`C:\Temp\GlobalProtect_Update.exe` never appears as `SourceImage`. Searching for it returns
+nothing, and a cell written from that search would have read as a miss when the rule had in fact
+fired. What fired:
+
+| Time | Host | SourceImage | GrantedAccess |
+| ---- | ---- | ----------- | ------------- |
+| 6 Nov 17:06:07 | THEPUNISHER | `notepad.exe` | `0x1f3fff` |
+
+One event. The paired `0x1410` read 294 ms earlier is below the rule's mask list and correctly
+does not fire. **`Purple - LSASS Access` = M, detects.**
+
+**Running the rule over a week turned up a false positive the benign baseline could not have
+seen.** Over seven days it returns four rows, not one:
+
+| Time | Host | SourceImage | GrantedAccess | Verdict |
+| ---- | ---- | ----------- | ------------- | ------- |
+| 30 Oct 22:59:43 | HYDRA-DC | `C:\Windows\Sysmon64.exe` | `0x1FFFFF` | benign — Sysmon itself |
+| 31 Oct 19:20:12 | HYDRA-DC | `C:\Windows\Sysmon64.exe` | `0x1FFFFF` | benign — Sysmon itself |
+| 31 Oct 20:52:56 | SPIDERMAN | `powershell.exe` | `0x1f3fff` | pre-dates the before-run |
+| 6 Nov 17:06:07 | THEPUNISHER | `notepad.exe` | `0x1f3fff` | true positive |
+
+`Sysmon64.exe` is not in the exclusion list, and it reads LSASS on the DC with the widest mask
+there is. Both occurrences follow a Sysmon service start on HYDRA-DC by about a minute:
+
+| HYDRA-DC Sysmon `Started` (EID 4) | LSASS read follows | Delay |
+| --------------------------------- | ------------------ | ----- |
+| 30 Oct 22:58:42 | yes, 22:59:43 | +61 s |
+| 31 Oct 19:18:56 | yes, 19:20:12 | +76 s |
+| 6 Nov 09:50:46 | no | — |
+
+Seven starts were logged in the window; the four on SPIDERMAN and THEPUNISHER produced nothing,
+so this is DC-only. **The mechanism is not pinned down.** Two of three DC starts produced a read
+and the third did not, and the shipped
+[Sysmon config](../config/sysmonconfig.xml) cannot be the reason — its `ProcessAccess` is an
+`include` on `TargetImage` alone, with no `SourceImage` filter, so the new config logs
+`Sysmon64.exe` exactly as the old one did. Correlated with a DC Sysmon start, not caused by one
+as far as this measurement can say.
+
+**What this does to the benign baseline's claim.** [The baseline](benign-baseline.md) recorded
+this rule as clean across 78,495 `EventCode=10` reads, and that is still true *of its window* —
+2 Nov 18:40 to 3 Nov 18:40 — which is exactly the problem. That window contains no Sysmon
+restart, and a 24-hour sample cannot see a false positive whose trigger is an administrative
+event occurring every few days. The measurement was honest and the number is right; the sentence
+it supports is "none in twenty-four hours", not "zero false positives", and those are different
+claims. The before/after comparison depends on the difference, because **the hardening bundles
+will restart Sysmon and reboot the DC repeatedly** — so this row can reappear in the after-run
+column, where reading it as credential theft would be a false attribution of exactly the kind
+this page exists to prevent.
+
+The fix is held rather than applied: adding `Sysmon64.exe` to the exclusion list now would change
+the rule between the before and after columns. It goes in with the step 8 recalibration,
+alongside the `Large Outbound` threshold, and the after-run is read with this row known.
+
+The 31 Oct `powershell.exe` event is **not** a before-run artefact — it falls six days earlier,
+in the 31 October rollout and canary work. It is listed so that anyone re-running this rule over
+a week-long window does not credit it to the chain.
+
+**A second-order finding: most of the exclusion list does no work.** Cross-reading the nine
+`SourceImage!=` exclusions against the masks those processes were observed using since the
+31 October cutover, only three can ever reach the rule's mask list at all:
+
+| Exclusion | Masks observed | Reaches the mask list? |
+| --------- | -------------- | ---------------------- |
+| `wininit.exe` | `0x1000000`, `0x1fffff` | yes — load-bearing |
+| `csrss.exe` | `0x1fffff` | yes — load-bearing |
+| `wazuh-agent.exe` | `0x1000`, `0x1410`, `0x1fffff` | yes — load-bearing |
+| `svchost.exe` | `0x1000`, `0x3000`, `0x100000`, `0x101000` | no |
+| `taskmgr.exe` | `0x1000`, `0x1400`, `0x1410` | no |
+| `WmiPrvSE.exe` | `0x1000`, `0x1400`, `0x1410` | no |
+| `MsMpEng.exe` | `0x1000`–`0x1418`, `0x3600` | no |
+| `vmtoolsd.exe` | `0x1000`, `0x1400`, `0x1410` | no |
+| `MRT.exe` | never observed | untested |
+
+The list was tuned against a draft that did not filter on `GrantedAccess`; once the mask filter
+went in, five entries stopped mattering and one was never exercised, while the one process that
+demonstrably needs excluding is absent. **This is an inference from one week of observed
+behaviour, not a proof.** `svchost.exe` is entitled to open LSASS with a wider mask than it
+happened to use here, so the redundant entries are cheap insurance and are not being deleted —
+the actionable half of this finding is the missing entry, not the surplus ones.
+
+**Phases 3 and 9b were not executed, and are N/E in both columns rather than silent.** The
+decision rule stands: a phase runs in the before-run only if a shipped rule measures it *and* the
+after-run will run it too. Dropping them from one column alone would make the comparison
+asymmetric, so they are dropped from both. `Purple - SAM Hive Dump` and the LOLBin branch carry
+no verdict in v4 — unmeasured, with the reason named, which is not the same as untested.
 
 ### Why the per-bundle runs are targeted, and what that costs
 
