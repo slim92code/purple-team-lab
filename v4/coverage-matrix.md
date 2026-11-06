@@ -29,6 +29,19 @@ searches ship with `enableSched = 0` and never run on a schedule at all, so for 
 alert carries no information. Where the search as run differs from `savedsearches.conf` in any
 way, the difference is stated in the cell.
 
+That rule is strict on purpose, because a near-miss version of a search answers a different
+question. Two cells here were first measured with a modified query and re-measured verbatim
+before being written: `#2`, where the OneDrive allowlist clause was omitted, and `#15`, where a
+per-flow filter stood in for the rule's ten-minute aggregation and reversed the verdict on one
+row. Neither modification was obviously material until it was tested.
+
+**Clock.** Splunk `_time` is CET and equals the time the attack happened, which two independent
+checks fix: the IPv4 exfil's own server response carries `Date: 16:27:16 GMT` against a Splunk
+`_time` of `17:27:09`, exactly +1h, and the `4740` lockout at `_time 11:32:05` matches the second
+`kerbrute bruteuser` reported the account locked. The `+1h` discrepancy noted during the benign
+baseline is in the DC's rendering inside the event body, not in `_time`; timestamps in this
+matrix need no adjustment.
+
 ## Before-run — un-hardened baseline, 6 Nov 2026
 
 Chain executed 6 November, roughly 11:03 to 17:06 CET. Fifteen attack-facing searches; the
@@ -217,18 +230,48 @@ and there is no `0xE` at all — `Guest` supplied the fifth via `0xE` in the 20 
 been disabled since. So the rule is silent by exactly one account, which is the condition already
 written into its description from two earlier runs. Nothing new there.
 
-**What is new is the size of the gap between what the spray did and what the rule can count.**
-The `#11` cell measured two unknown-principal errors in this same 11:32 minute, visible in Zeek
-and absent from the Windows log, because an attempt against an account that does not exist
-produces no `4771` of any code. So the spray touched **at least six** accounts. The rule sees
-four. It needs five.
+**What is new is the size of the gap, and the four is not what it looks like.** Timestamped, the
+`0x18` events separate into two sub-phases that the rule's five-minute bucket merges:
 
-That is the finding, and it is sharper than "the threshold is too high for this estate": the
-attack was **larger** than the threshold, and the telemetry reported it smaller — by exactly
-enough to keep the rule quiet. A threshold tuned on what the Windows log can count is tuned on an
-undercount, and the undercount is not constant, it grows with however many non-existent accounts
-the attacker's wordlist happens to contain. The threshold stays at 5; detections are not tuned
-down to a lab's account count. What changes is that the gap now has a number on both sides of it.
+```
+index=main source="WinEventLog:Security" EventCode=4771 Failure_Code="0x18" … src="192.168.182.133"
+| table _time Account_Name | sort _time
+```
+
+| window | accounts | sub-phase |
+| ------ | -------- | --------- |
+| 11:32:00.913 – 11:32:01.425 | Administrator ×2, SQLService ×2, pparker ×2 | the spray — **3 distinct** |
+| 11:32:05.983 – 11:32:05.996 | tstark ×8 | `bruteuser`, a separate action 4.5 s later |
+
+**The spray on its own produces three countable accounts, not four.** The fourth is borrowed from
+an adjacent attack that happens to land in the same bucket. And the `#11` cell measured two
+unknown-principal errors in this same minute — `frankcastle` and `peterparker`, the long forms of
+two accounts whose short forms exist — which produce no `4771` of any code because the principal
+does not exist.
+
+So: the spray touched at least six accounts, the rule can count three of them, it needs five, and
+it reaches four only by absorbing a different attack. That is sharper than "the threshold is too
+high for this estate". The attack was **larger** than the threshold and the telemetry reported it
+smaller, and the undercount is not a constant — it grows with however many non-existent names the
+attacker's wordlist contains, which is a number the defender does not control and cannot see from
+Windows alone.
+
+The threshold stays at 5. Detections are not tuned down to a lab's account count, and tuning one
+to a number produced by an undercount would be worse than leaving it. What changes is that the
+gap now has a measurement on both sides of it.
+
+**This cell will read the same in the after column, and that is itself the result.** No hardening
+bundle adds accounts to a spray or makes Windows log a non-existent principal, so `✗ silent`
+before and `✗ silent` after is the honest prediction. It is recorded as a silent cell rather than
+as `N/E` because the distinction matters: the phase ran, and the rule was measured against it.
+`N/E` is reserved for phases that did not run. A rule that cannot be exercised in this estate and
+a phase that was never executed produce the same empty table and mean entirely different things.
+
+**One thing is unresolved and is left that way.** `kerbrute` reported seven logins tested. Six
+are accounted for: one success (`fcastle`), two non-existent principals, three with `0x18`. All
+fourteen `0x18` and all four `0x12` events from `.133` are allocated between the spray and
+`bruteuser`, so the seventh login produced no `4771` this search can find. Not explained here
+rather than explained badly.
 
 The `0x12` row is tstark post-lockout (`KDC_ERR_CLIENT_REVOKED`), and the `0x25` row is clock skew
 from SPIDERMAN, not the attack — it is the same skew that produces the false positive in `#6`.
@@ -385,6 +428,24 @@ never written. This reproduces in v4 the v3 finding that
 kept rather than deleted because it is correct against a KDC that does log `0x6`, and the cell is
 the evidence that this one does not.
 
+**And nothing acts on what Zeek sees.** This is the part the cell originally missed, and it turns
+a corroboration into a gap. Zeek holds all 59 errors with the client principal on each, so the
+evidence for enumeration is complete on the network side. The shipped Zeek content is three
+rules in [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) — Kerberoasting on `zeek/kerberos`, WinRM
+lateral movement on `zeek/conn`, and the JA4 beacon on `zeek/ssl`. **None keys on
+`KDC_ERR_C_PRINCIPAL_UNKNOWN.`** So the one layer that can see this attack has no rule that fires
+on it, and the only rule that exists watches a log the DC never writes.
+
+The fix is unusually cheap, which is what makes the omission worth recording: `zeek/kerberos` is
+already a logsource in use by the roasting rule, so the gap is one more rule against a field
+Zeek already parses, not new telemetry. It is **not** written now — adding detection content
+between the before and after columns would change what the after column is measuring, the same
+reason the five rule fixes are held. It goes in with step 8 and the after-run then has something
+to measure.
+
+Two further principals turn up in these 59 and are used by the `#5` cell: `frankcastle` and
+`peterparker`, at 11:32, the long forms of two accounts whose short forms exist.
+
 **A note for anyone re-running control 2.** It also returns one hit in `http.log` from
 `192.168.182.1`, which is not evidence of anything: that is the browser running the Splunk search,
 and the search string `KDC_ERR_C_PRINCIPAL_UNKNOWN` crossed the monitored segment inside the HTTP
@@ -526,6 +587,20 @@ data and absent from the rule's 12.48 MB sum.
 So this is the placeholder threshold doing exactly what its own description predicts: 10 MB per
 10 minutes was never calibrated and a single Windows service download clears it.
 
+**This row is also where the verbatim-search rule earned itself.** An independent measurement of
+the same window, taken from the same Splunk instance, read this traffic as *below* threshold and
+recorded it as background. It used a per-flow filter — `orig_bytes > 1000000`, then a table of
+individual connections — and by that reading it is correct: the two flows are 8,409,958 and
+4,205,343 bytes, and neither reaches 10 MB on its own. But the shipped rule does
+`bucket _time span=10m | stats sum(orig_bytes)` before it compares, and 8.4 + 4.2 = 12.6 MB in
+one bucket. The rule fires. The difference between the two readings is not the data — both runs
+saw the same bytes — it is that one applied the rule's aggregation and the other did not.
+
+That is worth more than the cell. A per-flow view of a volume rule inverts its verdict whenever
+an attacker, or Windows Update, splits a transfer; it is the same class of mistake as judging a
+threshold rule by eye. The exfil rows survive either reading because each is a single large PUT,
+which is precisely why the error would not have been caught on the true positives.
+
 **Which makes it the third instance of one pattern, and that pattern is the finding.** This false
 positive could not have appeared in the benign baseline, because the guests had no working egress
 during that window (the dated 6 November note in [the v4 README](README.md) has the measurements)
@@ -544,11 +619,30 @@ rule and the fix are waiting on the same event.
 
 Two things this column does not yet have, recorded so they are not discovered later as gaps.
 
-**The other four detection layers.** Every cell above is Splunk. The v3 matrix carried five
-sources per phase — Splunk, Zeek, Suricata, Wazuh, and the Windows log itself — and two cells here
-already depend on Zeek to mean anything (`#11`, where Zeek holds the only record of the enum, and
-`#5`, where it supplies the undercount). Wazuh and Suricata are unexamined for this run. An empty
-Wazuh column is a finding; an unmentioned one is an error.
+**The other detection layers, and the rules in them that have no cell at all.** Every cell above
+is one of the fifteen attack-facing Splunk searches. That is not the whole of this repo's shipped
+detection content, and scoping the matrix to Splunk quietly dropped the rest:
+
+| Layer | Shipped | Cells here |
+| ----- | ------- | ---------- |
+| Splunk saved searches | 15 attack-facing | 12 measured, 3 N/E |
+| [Sigma, host](../detections/sigma/sigma_rules.yml) | 10 | none |
+| [Sigma, network / Zeek](../detections/sigma/v3_ndr.yml) | 3 | none |
+| [Wazuh](../detections/wazuh/local_rules.xml) | 7 | none |
+
+Two cells above already depend on Zeek to mean anything — `#11`, where Zeek holds the only record
+of the enumeration, and `#5`, where it supplies the undercount — so the network layer is load-
+bearing in this column while having no row of its own.
+
+**And one shipped rule covers a phase this matrix does not list.** `v3_ndr.yml` carries *WinRM
+Lateral Movement — East-West 5985*, which is phase 7. The matrix has no phase 7 row, because it
+was built from the Splunk app's rule list and no Splunk search covers that phase. A reader
+checking coverage by this table would conclude the lab has nothing for lateral movement, and it
+does. The fix is to build the next column from the shipped detection content rather than from one
+tool's view of it.
+
+An empty Wazuh column is a finding. An absent one is an error, and this is currently the second
+kind.
 
 **The fixes this column has earned, all held until step 8.** Five rules want changes that are
 deliberately not being made, because changing a rule between the before and after columns
@@ -564,6 +658,12 @@ destroys the comparison those columns exist to make:
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
+
+One rule is owed that does not exist yet: **a Zeek rule on `KDC_ERR_C_PRINCIPAL_UNKNOWN`.** The
+`#11` cell establishes that Windows structurally cannot see Kerberos enumeration on this estate
+and Zeek sees all of it, and no shipped rule closes that. Writing it is the single cheapest
+coverage gain available here, and it is held for the same reason as the five fixes: new detection
+content between the columns changes what the after column measures.
 
 `#2` and `#15` are owed something beyond their own fix, and it is the same thing. Both have a
 `dest`-shaped hole — `#2` because the CIM model returns `-` where the destination belongs, `#15`
