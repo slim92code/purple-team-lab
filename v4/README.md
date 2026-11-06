@@ -385,10 +385,51 @@ of them measures a change to it:
    from the guests, which is why `Purple - Large Outbound Transfer` ships with an uncalibrated
    placeholder and `Purple - C2 Beacon`'s allowlist rests on two OneDrive binaries. This window
    calibrates both against real egress — Windows Update, OneDrive, browser traffic — and moves
-   them from "threshold lab-specific" to measured. It is blocked on the NAT no-internet
-   root-cause, which is not yet found.
+   them from "threshold lab-specific" to measured. **The root cause was found on 6 November
+   and is not the NAT** — see the dated note below. Step 8 now begins with that fix rather than
+   with a diagnosis.
 
 Snapshot order: `v4-pre-hardening` (done) → `v4-post-logging` → `v4-post-benign` → one per bundle.
+
+> **Measured, 6 Nov 2026 — why the guests cannot browse, and why two earlier descriptions of it
+> were both wrong.** This page and the benign baseline recorded the condition as "no internet",
+> and a check on 2 November recorded the opposite, "they have internet". Neither holds. The
+> measurements:
+>
+> | From | Query | Result |
+> | ---- | ----- | ------ |
+> | Kali (Linux, same segment) | `dig @192.168.182.2` and `@8.8.8.8`, UDP | answers in 11 ms and 47 ms |
+> | Windows ×3 | `Resolve-DnsName -Type A @192.168.182.2`, UDP | times out on all three |
+> | Windows | `Resolve-DnsName @8.8.8.8 -TcpOnly` | returns A **and** AAAA |
+> | Windows ×3 | `curl -6 https://www.google.com` | fails on all three; hung **133 s** on THEPUNISHER |
+> | Windows ×3 | `curl -4 https://www.google.com` | `200` in 0.5 s (THEPUNISHER), `200` in 17 s (HYDRA-DC), fails (SPIDERMAN) |
+>
+> **Two faults overlap.** The VMware NAT advertises an IPv6 ULA prefix with no route out — every
+> IPv6 flow in Zeek carries `resp_bytes = 0` — and Windows prefers IPv6 by default, so a browser
+> resolves `AAAA`, tries it, and hangs for up to two minutes before anything else happens.
+> Separately, UDP/53 from the Windows hosts is lossy rather than blocked: `nslookup` answered
+> after four two-second timeouts, and the same query from Linux on the same segment answers in
+> 11 ms. Outbound firewall rules were ruled out — there are none enabled on any of the three.
+>
+> **So the honest description is neither of the two that were recorded.** Transport to the
+> internet works over IPv4; name resolution and browsing do not. That is why ICMP, a TCP connect
+> and 137 MB of service traffic could all be true at once while Edge showed nothing, and it is
+> why the condition looked intermittent — it is.
+>
+> **Conditions were not uniform across hosts during the before-run.** In one minute of testing,
+> THEPUNISHER fetched a page over IPv4 in half a second, HYDRA-DC took seventeen, and SPIDERMAN
+> could not at all. Any before-run cell that depends on external egress carries that unevenness.
+>
+> **Deliberately not repaired yet.** Fixing it mid-measurement would change the estate between
+> the before and after columns, so it is left as a measured condition of the before-run and
+> becomes the first action of step 8. The order there is IPv6 priority first, since the Windows
+> DNS client queries `A` and `AAAA` together and some of the UDP timeouts are likely that same
+> dead path; the UDP/53 loss is re-measured afterwards rather than assumed to be separate.
+>
+> One state change did happen on 6 Nov, after phases 1–4 and 11–12 were measured:
+> `Clear-DnsServerCache -Force` was run on HYDRA-DC, so names that had been resolving from its
+> cache now go through the failing forwarder path. The already-measured phases are unaffected;
+> the remaining ones run in a slightly worse state than the earlier ones did.
 
 **The two axes, and where they touch.** Steps 4–7 run the hardening axis: before → bundles →
 after, measuring verdicts and coverage. Step 8 runs the internet axis, which calibrates

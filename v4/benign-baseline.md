@@ -300,6 +300,23 @@ no VPN. The condition did not change during the window: Sysmon `EventCode=3` to 
 addresses runs at a steady 2–8 attempts per hour per workstation from 18:40 onward, with no
 step. So it is recorded as a condition of this window, not repaired mid-measurement.
 
+> **Corrected, 6 Nov 2026 — the cause here is wrong, and the conclusion drawn from it is too
+> strong.** "Nothing beyond the gateway answers" was inferred from Sysmon `EventCode=3` counts,
+> and `EventCode=3` records that a process *opened* a connection, not that anything replied. The
+> shipped Sysmon config logs NetworkConnect only for processes under `C:\Users`, `C:\ProgramData`,
+> `C:\Temp\` and a few similar paths, so those 130 events were never the total — they were the
+> suspicious-path subset. Zeek, which does see replies, records **137 MB returned to SPIDERMAN
+> from 173 external addresses** inside this same window, and 19.7 MB to THEPUNISHER from 168.
+>
+> The window therefore had internet, and the real fault is narrower: IPv6 is advertised without a
+> route out and Windows prefers it, while UDP/53 from the Windows hosts is lossy. Full
+> measurements are in [`README.md`](README.md), under the 6 Nov note.
+>
+> **What survives unchanged is the number.** Outbound was ~1 MB per workstation per day and the
+> largest ten-minute bucket was 0.29 MB, which is a real property of a two-user lab rather than a
+> consequence of connectivity. So the threshold conclusion below stands; only its stated cause
+> was wrong, and a second window will not move it by much.
+
 **`C2 Beacon` was exercised anyway, because the rule keys on the attempt, not the session.** Of
 130 external connection attempts in the window, 126 are OneDrive from `AppData` on both
 workstations, all to Microsoft addresses on 443:
