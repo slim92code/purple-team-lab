@@ -110,11 +110,114 @@ Of the five silent, three are silent for reasons that are correct or by design (
 wrong.** That is the opposite of the v3 result, where rules failed by being wrong; here they
 fail by being imprecise, which is harder to see and is why every cell carries its query.
 
+**This table is Splunk alone, and one of its verdicts does not survive that.** `#5` reads
+`✗ silent`, which is true of the rule and false as a statement about the estate: Wazuh detects
+that spray. [The other three layers](#the-other-three-layers-measured-6-nov-2026) are measured
+below for the phases this pass covered, and they also close `#11` as a four-layer gap rather than
+a two-layer one. Read the two tables together; either alone misleads in a different direction.
+
 Three cells are N/E by decision rather than by accident. A phase runs in the before-run only if
 a shipped rule measures it **and** the after-run will run it too; dropping a phase from one
 column alone would make the comparison asymmetric, so it is dropped from both. Phases 3 and 9b
 were not executed. Phase 9c was attempted in an earlier run and failed at RPC 1825, and
 repairing it mid-measurement would change the estate between columns.
+
+## The other three layers, measured 6 Nov 2026
+
+The table above is Splunk only. This one is not, and it changes what two of those cells mean.
+Measured independently, by a second pass that had the raw evidence and deliberately did **not**
+read the column above first — which is the whole reason its disagreements are worth anything.
+It covers the phases that pass measured: 1, 2, 4, 11 and 12.
+
+| Phase | Splunk | Wazuh | Suricata | Zeek |
+| ----- | ------ | ----- | -------- | ---- |
+| 1 enum | ✗ no `0x6` | ✗ silent | `krb5` logging only | ✓ 59 unknown principals |
+| 2a/2b spray | ✗ silent (3 of 5) | **✓ `60205` level 10** | `krb5` logging only | ✓ 14 pre-auth fails + 1 success |
+| 2c lockout | ✓ fires, output empty | **✓ `60115` level 9** | — | ✓ 5 `CLIENT_REVOKED` |
+| 4 roast | ✓ fires | ✗ silent | **✓ `weak_encryption` ×2** | ✓ NDR Kerberoast rule fires |
+| 11/12 exfil | ✓ fires | n/a — host EDR sees no byte volume | ✓ visibility, no signature | ✓ `conn.log` |
+
+**The spray cell changes meaning.** `#5` is silent in Splunk because the spray yields three
+countable accounts against a threshold of five. Wazuh `60205` — *Multiple Windows audit failure
+events* — fires at level 10 on the same minute. **The estate detected the spray; the Splunk rule
+did not.** A single-source matrix would have recorded this phase as a miss, and it was not one.
+
+That is the strongest argument in this document for building the matrix from the shipped
+detection content rather than from one tool, and it was produced by the layer the column had been
+ignoring.
+
+**Two things keep it honest.** `60205` is a *built-in* Wazuh rule, not one of the seven custom
+ones, and "multiple audit failures" is generic by construction — it fires on a burst of failures
+whatever caused them. So this is coverage by genericity, not precision, and its false-positive
+rate in this estate is **unmeasured**: the benign baseline covered the fifteen Splunk searches and
+nothing in Wazuh. Until that number exists, the honest claim is that Wazuh saw the spray, not
+that Wazuh is a reliable spray detection here.
+
+**The lockout cell gains the field Splunk cannot give it.** `#12` fires and reports two empty
+columns. Wazuh `60115` — *User account locked out* — fires at level 9 on the same event. If it
+carries the account name, the pairing is the answer to `#12`'s defect without touching the Splunk
+rule at all; that is open and listed below.
+
+**Phase 1 gets worse, and more conclusive.** Wazuh is also silent — its built-in authentication
+failure rules key on `4771`, which enumeration never produces. So the enum is invisible to
+Windows, invisible to Wazuh, visible to Suricata only as `krb5` traffic with no alert, and fully
+recorded by Zeek, where no shipped rule acts on it. **Four layers measured, one has the evidence,
+none alerts.** The `#11` cell previously asserted that gap from two layers; it is now measured
+across all four.
+
+**Phase 4 reproduces a v3 reversal rather than discovering something.** Suricata raises
+`applayer/weak_encryption` twice at 11:48:12 on an AES-256 roast. That looks contradictory and is
+not: the signature fires on what the client *offers* in negotiation, and `impacket` advertises
+RC4 among its supported etypes even when the KDC issues `0x12`. This lab already argued the
+opposite and was wrong —
+[what `weak_encryption` actually fires on](../v3/README.md#what-weak_encryption-actually-fires-on)
+is the v3 write-up of that reversal. It now has an independent reproduction, from a measurement
+taken without reference to it.
+
+The practical value is a detection angle the Splunk rules do not have: `#3` keys on the issued
+etype and goes silent on an AES roast by design, while Suricata flags the *request*. A roast is
+visible at the network layer **regardless of what the KDC issues.**
+
+**The roast converges on three layers to within 140 ms:**
+
+| Layer | Timestamp | What it saw |
+| ----- | --------- | ----------- |
+| Suricata | 11:48:12.373, .384 | `applayer/weak_encryption` ×2 |
+| Zeek | 11:48:12.382 | TGS, `fcastle/MARVEL.LOCAL` → `MARVEL.LOCAL\SQLService` |
+| Splunk | 11:48:12.513 | `4769`, `0x12`, from `::ffff:192.168.182.133` |
+
+Network first, the DC's own log 130 ms later — the order the request and the issued ticket
+actually happen in. Nothing here needed correlating by hand; three independent sensors agree.
+
+**Incidental: Wazuh independently confirms three things this column already held.** These were
+measured blind, by a pass that had not read the cells they corroborate:
+
+| Wazuh rule | Level | Confirms |
+| ---------- | ----- | -------- |
+| `100200` | 12 | the LSASS read in `#10` |
+| `100210` | 12 | the `\Updater` task in `#9` |
+| `92203`, `92213` | 6, 15 | the beacon path in `#2`, naming `C:\Temp\GlobalProtect_Update.exe` outright |
+
+`92213` is *executable dropped in a folder commonly used by malware*, at level 15 — the highest
+severity anything produced in this run. **And the implant drop has no cell in this matrix**, in
+any column, because no Splunk search covers it. Two Wazuh rules caught the loudest event of the
+chain and the table above has nowhere to put it. That is the same structural gap as phase 7, found
+from the other direction.
+
+**A one-event discrepancy, unexplained and left so.** Zeek records 5 `KDC_ERR_CLIENT_REVOKED`
+from `.133`; Splunk holds 4 × `4771` with `Failure_Code=0x12`. The two unknown-principal attempts
+explain themselves — a non-existent principal produces no `4771` — but a revoked one should log.
+Nineteen failures on the wire that ought to appear in the Windows log, eighteen appear. Small, and
+the same shape as the larger gap in `#5`: the wire holds more than the log.
+
+**The second pass caught itself making the same mistake this column has made twice.** Its first
+Suricata query grouped by `alert.signature`, which is null for `flow` and `http` events, and
+returned nothing — read at face value that is "Suricata is blind to the exfil", and it is false.
+The corrected query shows Suricata recorded the transfer as `flow`, `http` and `fileinfo`, the
+last meaning it captured the file itself. Third instance in this project of a query returning
+empty for a reason that has nothing to do with the estate, now across two independent passes.
+The pattern is the finding: **an empty result is a claim about a query until a control proves it
+is a claim about the world.**
 
 ---
 
@@ -295,6 +398,20 @@ as `N/E` because the distinction matters: the phase ran, and the rule was measur
 `N/E` is reserved for phases that did not run. A rule that cannot be exercised in this estate and
 a phase that was never executed produce the same empty table and mean entirely different things.
 
+**But the estate detected this spray, and the Splunk column cannot show it.** Wazuh `60205`
+fires at level 10 on the same minute — see
+[the other three layers](#the-other-three-layers-measured-6-nov-2026). So the phase is covered
+and this rule is not the thing covering it. Read as a Splunk cell, `✗ silent` is correct; read as
+a coverage verdict, it would be wrong, and a single-source matrix offers no way to tell those
+apart. That is the clearest argument in this document for the layer columns, and it came from the
+layer the matrix had been leaving out.
+
+The caveat travels with it: `60205` is a generic built-in rule — *multiple Windows audit failure
+events* — whose false-positive rate here has never been measured, because the benign baseline
+covered the Splunk searches and nothing else. Coverage by a noisy rule is still coverage, but it
+is not the same as a tuned detection, and this cell should not be read as saying the estate has
+spray detection it can trust.
+
 **One thing is unresolved and is left that way.** `kerbrute` reported seven logins tested. Six
 are accounted for: one success (`fcastle`), two non-existent principals, three with `0x18`. All
 fourteen `0x18` and all four `0x12` events from `.133` are allocated between the spray and
@@ -463,6 +580,14 @@ rules in [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) — Kerberoasting on `ze
 lateral movement on `zeek/conn`, and the JA4 beacon on `zeek/ssl`. **None keys on
 `KDC_ERR_C_PRINCIPAL_UNKNOWN.`** So the one layer that can see this attack has no rule that fires
 on it, and the only rule that exists watches a log the DC never writes.
+
+**All four layers have since been measured, and the gap is worse than this cell first claimed.**
+Wazuh is silent too — its built-in authentication-failure rules key on `4771`, which enumeration
+never generates — and Suricata carries the `krb5` traffic with no alert on it. So: Windows cannot
+see it, Wazuh cannot see it, Suricata sees it without saying anything, Zeek has every one of the
+59 and nothing fires. **Of four detection layers, exactly one holds the evidence and none
+alerts.** The earlier version of this cell inferred that from two layers; it is now measured
+across all four, which turns a reasonable claim into a demonstrated one.
 
 The fix is unusually cheap, which is what makes the omission worth recording: `zeek/kerberos` is
 already a logsource in use by the roasting rule, so the gap is one more rule against a field
@@ -647,30 +772,29 @@ rule and the fix are waiting on the same event.
 
 Two things this column does not yet have, recorded so they are not discovered later as gaps.
 
-**The other detection layers, and the rules in them that have no cell at all.** Every cell above
-is one of the fifteen attack-facing Splunk searches. That is not the whole of this repo's shipped
-detection content, and scoping the matrix to Splunk quietly dropped the rest:
+**The remaining layer coverage.** The Splunk table is one of four layers, and
+[the other three are now measured](#the-other-three-layers-measured-6-nov-2026) for phases 1, 2,
+4, 11 and 12. What is still missing is the same three layers for the phases the second pass did
+not run — 5, 6, 7, 8, 9, 10 — and that is owed by the session that measured those.
+
+**Shipped detection content still without a cell:**
 
 | Layer | Shipped | Cells here |
 | ----- | ------- | ---------- |
 | Splunk saved searches | 15 attack-facing | 12 measured, 3 N/E |
 | [Sigma, host](../detections/sigma/sigma_rules.yml) | 10 | none |
-| [Sigma, network / Zeek](../detections/sigma/v3_ndr.yml) | 3 | none |
-| [Wazuh](../detections/wazuh/local_rules.xml) | 7 | none |
+| [Sigma, network / Zeek](../detections/sigma/v3_ndr.yml) | 3 | 1 observed firing (Kerberoast, phase 4) |
+| [Wazuh](../detections/wazuh/local_rules.xml) | 7 custom | 4 observed firing (`100200`, `100210`, `92203`, `92213`) |
 
-Two cells above already depend on Zeek to mean anything — `#11`, where Zeek holds the only record
-of the enumeration, and `#5`, where it supplies the undercount — so the network layer is load-
-bearing in this column while having no row of its own.
+**Two phases have shipped detection and no row in this matrix at all.** `v3_ndr.yml` carries
+*WinRM Lateral Movement — East-West 5985*, which is phase 7; and the implant drop into `C:\Temp`
+is caught by Wazuh `92203` and `92213`, the latter at level 15 — the loudest single event the
+chain produced. Neither has a row, because the table was built from the Splunk app's rule list
+and no Splunk search covers either. A reader checking coverage by this table would conclude the
+lab has nothing for lateral movement or for implant drop, and it has both.
 
-**And one shipped rule covers a phase this matrix does not list.** `v3_ndr.yml` carries *WinRM
-Lateral Movement — East-West 5985*, which is phase 7. The matrix has no phase 7 row, because it
-was built from the Splunk app's rule list and no Splunk search covers that phase. A reader
-checking coverage by this table would conclude the lab has nothing for lateral movement, and it
-does. The fix is to build the next column from the shipped detection content rather than from one
-tool's view of it.
-
-An empty Wazuh column is a finding. An absent one is an error, and this is currently the second
-kind.
+That is the structural lesson of this column, arrived at twice from opposite directions: **build
+the next one from the shipped detection content, not from one tool's view of it.**
 
 **The fixes this column has earned, all held until step 8.** Five rules want changes that are
 deliberately not being made, because changing a rule between the before and after columns
@@ -686,6 +810,18 @@ destroys the comparison those columns exist to make:
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
+
+**Three questions the layer measurements opened and did not close:**
+
+1. **Does Wazuh `60115` carry the locked-out account name?** If it does, the pairing answers
+   `#12`'s empty-output defect without touching the Splunk rule, and the owed fix changes shape
+   from "repair the rule" to "route the alert from the layer that has the field".
+2. **What is `60205`'s false-positive rate in this estate?** It is the only thing detecting the
+   spray, it is a generic built-in, and the benign baseline never measured Wazuh. Until that
+   number exists, "Wazuh covers phase 2a" is a true sentence that cannot be relied on.
+3. **Why does Zeek hold 5 `CLIENT_REVOKED` where Splunk holds 4 × `0x12`?** One failure on the
+   wire that should have been logged and was not. Small, and the same shape as `#5`'s larger
+   undercount.
 
 One rule is owed that does not exist yet: **a Zeek rule on `KDC_ERR_C_PRINCIPAL_UNKNOWN`.** The
 `#11` cell establishes that Windows structurally cannot see Kerberos enumeration on this estate
