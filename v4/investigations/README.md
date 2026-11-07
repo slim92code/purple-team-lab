@@ -17,15 +17,10 @@ reasoning over it.
 | [CASE-05 — two C2 rules, one endpoint each, and neither covers both](CASE-05-c2-two-rules-one-host-each.md) | 5a, 5b | True positive on two hosts. Both rules correct, neither complete. |
 | [CASE-06 — exfiltration detected twice, and a Windows download that looks the same](CASE-06-exfil-uncalibrated-threshold.md) | 11, 12 | Two true positives, one false positive. No rule defect; the open item is a number. |
 | [CASE-07 — the loudest rule on the instance is in nobody's inventory, and notifies nobody](CASE-07-the-loudest-rule-is-not-in-the-repo.md) | — | 28 firings from a rule in no file here. Three ways of counting coverage, three wrong answers. |
+| [CASE-08 — the alerts give the ends of the chain and not the links](CASE-08-the-middle-of-the-chain-is-unalerted.md) | 6, 7 | Three true positives, no alerts. The estate detects acquisition and egress, not movement. |
 
-## Still to write
-
-Cells with findings already measured and no case file yet:
-
-| Cell | The finding |
-| ---- | ----------- |
-| Phase 6 — Pass-the-Ticket | Executed, successful, and nothing in any layer alerts. |
-| Phase 7 — WinRM lateral | The Zeek rule fires on 6 of 7 connections; the second burst is 6.59 MB of collection that no rule reads. |
+Every cell in the before-run column with a finding now has a case file. What remains of step 5 is
+the hunts and the incident report.
 
 ## A convention worth stating once
 

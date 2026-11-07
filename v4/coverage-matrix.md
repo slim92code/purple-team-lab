@@ -116,7 +116,15 @@ measured below:
 | Phase | Shipped coverage | Before |
 | ----- | ---------------- | ------ |
 | 6 — Pass-the-Ticket | **none, in any layer** | attack confirmed; nothing alerts |
-| 7 — WinRM lateral movement | Zeek, [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) | **✓ fires on 6 of 7 connections** |
+| 7 — WinRM lateral movement | Sigma only, [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) | logic matches 6 of 7 connections; **not deployed, nothing alerts** |
+
+**Phase 7's wording was corrected.** An earlier version of this table read "✓ fires on 6 of 7
+connections", which is wrong in a way worth keeping visible. The WinRM rule is Sigma — portable
+rule content — with no corresponding saved search in the Splunk app, and
+[the week's alert history](#the-alert-history-which-this-column-should-have-read-first) contains
+no WinRM entry. What was measured is the rule's logic matching the data, by translating it to SPL
+by hand. Nothing on this estate would have alerted. Those two readings look identical in a
+coverage table and are not the same thing.
 
 **The column is complete: twelve measured, three N/E.** Seven fire, five are silent.
 
@@ -509,7 +517,7 @@ account that holds an SPN, sourced from a workstation rather than the host that 
 It is not written here for the same reason as the other owed content — new detection between the
 columns changes what the after column measures.
 
-### Phase 7 — WinRM lateral movement: ✓ the Zeek rule fires, on 6 of 7 connections
+### Phase 7 — WinRM lateral movement: the rule's logic matches 6 of 7, and nothing alerts
 
 [`v3_ndr.yml`](../detections/sigma/v3_ndr.yml) carries *WinRM Lateral Movement — East-West 5985*:
 `id.resp_p: 5985`, `conn_state` in `SF`/`S1`/`OTH`, excluding `192.168.182.1`. The traffic:
