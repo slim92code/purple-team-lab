@@ -12,16 +12,17 @@ already fired is triage in reverse. The material here is what the
 | Hunt | Hypothesis | Outcome |
 | ---- | ---------- | ------- |
 | [HUNT-01 — is the spray detectable by any signal that does not depend on the account count?](HUNT-01-spray-without-the-4771-count.md) | A signal exists that does not require counting accounts in the Windows failure log | **Proven twice, disproven once.** Zeek counts 8 principals where the shipped rule sees 3; `4625` returns zero, so the industry-default spray signal is blind here |
-
-## Planned
-
-| Hunt | Hypothesis |
-| ---- | ---------- |
-| HUNT-02 — C2 beaconing from an allowlisted path | A beacon in `AppData` is separable from OneDrive, Teams and browser traffic by **behaviour** — interval regularity, bytes-out to bytes-in ratio, fingerprint rarity — rather than by location. The finding is the allowlist `Purple - C2 Beacon` needs before it can be scheduled |
+| [HUNT-02 — can the beacon be separated by behaviour instead of a path allowlist?](HUNT-02-beacon-by-behaviour-not-path.md) | A beacon is separable from legitimate software by behaviour rather than by location | **One proven, one inverted.** Connections per destination gives 12.0 against OneDrive's 1.6–2.4; interval regularity ranks OneDrive *above* the implant |
 
 ## Why a negative result counts
 
-A hunt that disproves its hypothesis, or proves a gap is real, is a complete hunt. HUNT-01's most
-useful single number is a zero: no `4625` events at all, which means the spray detection most
-SIEM content ships would have seen nothing from this attack. That is worth more than another
-confirmation of a rule already known to work.
+Both hunts here produced a disproof more useful than their proof.
+
+HUNT-01's is a zero: no `4625` events at all, so the spray detection most SIEM content ships
+would have seen nothing from this attack. HUNT-02's is worse than a zero — interval regularity,
+the first signal most beacon-detection content reaches for, ranks a Microsoft sync client as more
+regular than a live C2 implant. A team that built it would get a false positive on OneDrive and a
+false sense of coverage on the beacon, and it would survive review because the method is textbook.
+
+Neither of those is a confirmation of a rule already known to work, which is the point of
+hunting the gaps.
