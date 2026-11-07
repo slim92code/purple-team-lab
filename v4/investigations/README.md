@@ -13,6 +13,7 @@ reasoning over it.
 | [CASE-01 — a password spray that fired two alerts, neither from the spray rule](CASE-01-password-spray-undercount.md) | 2a | True positive. The rule written for it did not fire; two other things did. |
 | [CASE-02 — account enumeration: four layers, one holds the evidence, none alerts](CASE-02-kerberos-enumeration.md) | 1 | True positive, undetected. Structural, not a threshold. |
 | [CASE-03 — the RC4 rule reads the wrong Kerberos message, and its own description says so](CASE-03-rc4-wrong-message-type.md) | 4a, 6 | Two RC4 tickets issued to an attacker, neither detected. Scope defect, not tuning. |
+| [CASE-04 — the lockout alert fires correctly and cannot say which account](CASE-04-lockout-alert-with-no-account.md) | 2c | True positive, unusable output. Two causes, one not the rule's fault. |
 
 ## Still to write
 
@@ -20,7 +21,6 @@ Cells with findings already measured and no case file yet:
 
 | Cell | The finding |
 | ---- | ----------- |
-| `#12` Verify Account Lockout | Fires correctly and reports two empty columns. Wazuh carries the account name the Splunk extraction does not, so the fix is routing rather than repair. |
 | `#2` / `#14` C2 | Two rules, each covering one endpoint, neither covering both. The evidence is wider than either alert. |
 | `#15` Large Outbound | Fires on both exfiltrations and on 12.5 MB of ordinary Microsoft HTTPS, on a threshold that was never calibrated. |
 | Phase 6 — Pass-the-Ticket | Executed, successful, and nothing in any layer alerts. |
