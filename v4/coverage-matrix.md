@@ -39,9 +39,11 @@ they are worth listing together because the shape repeats:
 | `#15` | a per-flow filter in place of the rule's 10-minute sum | a firing row read as "below threshold" |
 | Suricata, exfil | grouped by `alert.signature`, null for `flow`/`http` | "Suricata is blind to the exfil" |
 | `60104` noise floor | grouped by `targetUserName`, null for 744 of 764 events | the attack's own `4771`s read as the benign floor |
+| fired-alert history | `\| rest /services/` instead of `/servicesNS/-/-/` | "the undocumented rule has never fired" — it fired 28 times |
 
 The first two were caught by re-running verbatim, the third by its author, the fourth by the row
-counts not adding up against an earlier timechart. **The last one is the instructive case**,
+counts not adding up against an earlier timechart, the fifth by an audit-log query asked for a
+different reason. **The fourth is the instructive case**,
 because an empty result makes a reader suspicious and a *partial* one does not — it came back
 with twenty plausible rows and nothing about it looked wrong. Had the hourly totals not already
 been on record, the estate's benign audit-failure floor would have been written down as failed
@@ -144,6 +146,124 @@ a shipped rule measures it **and** the after-run will run it too; dropping a pha
 column alone would make the comparison asymmetric, so it is dropped from both. Phases 3 and 9b
 were not executed. Phase 9c was attempted in an earlier run and failed at RPC 1825, and
 repairing it mid-measurement would change the estate between columns.
+
+## The alert history, which this column should have read first
+
+Every cell above was measured by re-running a search. That was the right method and it was not
+the only one available: the scheduled rules track their own triggered alerts, and nobody had
+looked.
+
+```spl
+index=_audit action=alert_fired earliest=-7d latest=now
+| stats count min(_time) as first max(_time) as last by ss_name
+| sort -count
+```
+
+| `ss_name` | fired | first | last |
+| --------- | ----- | ----- | ---- |
+| **`Kerberoasting Detection - TGS Source Anomaly`** | **28** | 31 Oct 14:00 | 7 Nov 01:00 |
+| `Purple - Spray Success` | **2** | 6 Nov 09:40 | 6 Nov 11:40 |
+| `Purple - C2 Beacon from User-Writable Path` | 1 | 6 Nov 12:10 | — |
+| `Purple - Kerberoasting User-SPN Ticket` | 1 | 6 Nov 11:50 | — |
+| `Purple - LSASS Access` | 1 | 6 Nov 17:10 | — |
+| `Purple - Scheduled Task Persistence` | 1 | 6 Nov 17:20 | — |
+| `Purple - Sliver C2 Beacon by JA4 Fingerprint` | 1 | 6 Nov 12:10 | — |
+| `Purple - Wazuh Sensor Health` | 1 | 6 Nov 09:08 | — |
+
+**It confirms the column independently.** Five attack cells recorded as `✓ fires` have a triggered
+alert in the next scheduling cycle after the attack: the roast at 11:48 and `#4` at 11:50, the
+beacon window 12:04–12:09 and both C2 rules at 12:10, the LSASS read at 17:06 and `#10` at 17:10,
+the task at 17:19 and `#9` at 17:20. Nothing contradicts a verdict reached by re-running, which
+is worth having — the two methods could have disagreed and did not. `Purple - Wazuh Sensor Health`
+firing once at 09:08 is the estate coming up, which is correct behaviour for it.
+
+**`Purple - Spray Success` fired twice, and the second one is the false positive.** 11:40 is the
+attack. **09:40 is the clock-skew row** recorded in `#6` — SPIDERMAN, `0x25` failures plus
+successful TGTs inside ten minutes. So that false positive is not a shape the rule *could*
+mistake, which is how `#6` describes it. **It was delivered.** This estate sent an analyst a spray
+alert for ordinary authentication that failed on time drift.
+
+**And the loudest rule on this instance is not in this repository.**
+`Kerberoasting Detection - TGS Source Anomaly` fired 28 times in seven days — more than every
+documented rule combined, which managed eight. It is owned by `admin` and shared `user`, so it
+lives in a private namespace and appears in no inventory taken from the admin account. It is not
+in `purple_lab`, not in `savedsearches.conf`, and not in this matrix.
+
+### The undocumented rule, measured
+
+```
+index=* EventCode=4769
+| eval src=replace(Client_Address, "::ffff:", "")
+| where NOT match(Service_Name, "\$$") AND Service_Name!="krbtgt" AND src!="::1"
+| lookup userhost Account_Name OUTPUT expected_ip
+| lookup enc_types enc_code AS Ticket_Encryption_Type OUTPUT enc_name, risk
+| eval anomaly=if(isnull(expected_ip), "NOT IN LOOKUP", if(src!=expected_ip, "HIGH", "OK"))
+| where anomaly!="OK"
+```
+
+Hourly, enabled, `alert_threshold = 0` with `greater than` so any row fires, `alert.track` on,
+`actions` empty.
+
+**Its approach is better than `#4`'s in one real way.** `#4` carries its allowlist in the search
+text as a hard-coded principal, SPN and two addresses. This one uses a lookup mapping accounts to
+expected source hosts, so it generalises past three users and needs no edit to add one. That is
+arguably the design `#4` should have had.
+
+**And three properties together make it worse than no rule.** The `NOT IN LOOKUP` branch fires on
+every account the table does not cover, so its alert volume is a function of a lookup's
+completeness rather than of anything an attacker did. The threshold of zero means one row
+triggers. And `actions` is empty, so twenty-eight firings went into a list and notified nobody.
+
+That is the v3 Wazuh pattern exactly — *it loaded, reported as coverage, and was discarded* — with
+the difference that this one has a measurable history, and the history says it has been firing
+every few hours for a week while being invisible to every inventory.
+
+**Two dependencies outside version control.** It needs the `userhost` and `enc_types` lookups,
+which exist on the instance and nowhere in this repository. Transcribed into the app it would not
+run, and nothing in the repo records that those tables are part of this estate's detection logic.
+
+### What else is on the instance
+
+```spl
+| rest /servicesNS/-/-/saved/searches splunk_server=local
+| search eai:acl.app="search" NOT eai:acl.owner="nobody"
+| table title eai:acl.owner eai:acl.sharing disabled is_scheduled cron_schedule
+```
+
+Twenty-three saved searches outside `purple_lab`, named like detections —
+`LSASS Access — notepad.exe injection`, `C2 Injection — Sliver notepad.exe`,
+`Sliver C2 — JA4 Fingerprint Detection`, `V3 - Kerberoasting SQLService` among them. Their state:
+
+| State | Count | Effect |
+| ----- | ----- | ------ |
+| enabled **and** scheduled | **1** | runs — the rule above |
+| scheduled but `disabled=1` | 6 | never runs |
+| enabled but `is_scheduled=0` | 16 | saved queries, not detections |
+
+**An inventory that counted titles would report 38 detections where 16 run.** Twenty-two are
+inert and several duplicate shipped rules by name, which is the trap: the names are the names of
+real detections, and reading the list tells you nothing about whether anything fires.
+
+**This resolves a worry rather than creating one.** `LSASS Access — notepad.exe injection` and
+`C2 Injection — Sliver notepad.exe` match what `#10` measured exactly, and had either been
+scheduled, a cell recorded as "fires via `#10`" could have been firing from somewhere
+undocumented. Neither is scheduled. The cells stand.
+
+**What does not stand is this matrix's scope sentence.** It was built from the shipped app, and
+"the fifteen attack-facing searches" is true of `purple_lab` and false of the estate. Sixteen
+scheduled detections run here, one of them undocumented and by far the noisiest.
+
+### And the same trap caught this measurement
+
+`| rest /services/alerts/fired_alerts` returned **zero rows** for the undocumented rule while
+`_audit` showed twenty-eight firings. `/services/` resolves in the current user's namespace and
+the rule is in another user's private one. The `/servicesNS/-/-/` form used for `saved/searches`
+above was the correct one and was not used here.
+
+This is the [v3 `| rest` finding](../detections/README.md) — *an inventory that changes with the
+login is not an inventory* — reproduced a third time, during the investigation of itself, by
+someone who had just written it down. The lesson is not that the trap exists. It is that knowing
+about it does not prevent walking into it, which is the argument for controls rather than care.
 
 ## The other three layers, measured 6 Nov 2026
 
