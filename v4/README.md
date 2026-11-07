@@ -989,3 +989,30 @@ cannot claim). Everything else in that tree stands as written.
 Three case files, two to three hunt files, one IR report, one benign baseline. Three clean
 layers beat three half-finished ones; once these exist, all 19 searches have reached one of the
 three end states above, and the matrix is filled through the hardening run, v4 is closed.
+
+> **Built, 7 Nov 2026 — eight case files rather than three, and the numbering is fresh.** The
+> prediction above is left as written. What step 5 actually produced:
+>
+> | Planned | Built |
+> | ------- | ----- |
+> | `investigations/`, 3 files, reusing the v3 numbers `CASE-02`/`04`/`05` | **8 files, numbered `CASE-01`–`CASE-08` from scratch** |
+> | `hunts/`, 2–3 files | 2 files |
+> | `incident-report.md` | as planned |
+>
+> **Why eight.** The plan sized `investigations/` by the three v3 case files whose techniques the
+> chain repeats. The before-run produced eight cells with a finding worth a file, and five of
+> them are about defects the v3 cases could not have anticipated because the rules did not exist
+> yet — a rule pointed at the wrong Kerberos message, an alert that cannot name the account it
+> fired on, two C2 rules that each cover one endpoint, a scheduled rule in no inventory, and
+> three consecutive chain steps with no alert between them. Writing three would have meant
+> dropping findings to match a count.
+>
+> **Why fresh numbering.** Reusing `CASE-02`/`04`/`05` would tie a v4 file to the v3 file for the
+> same technique, and none of the eight is a continuation of its v3 counterpart —
+> [`CASE-01`](investigations/CASE-01-password-spray-undercount.md) is about telemetry that cannot
+> count, where v3's spray case was about a threshold. A reader following `CASE-05` across versions
+> would find two unrelated arguments. The v3 set stays [where it is](../v3/investigations/) and is
+> linked from the cases that build on it.
+>
+> The end-state claim above still holds: every shipped search now has a measured cell, a case
+> file, or a stated reason it has neither.

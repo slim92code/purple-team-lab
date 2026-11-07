@@ -153,6 +153,38 @@ included. `V3 - Pass-the-Ticket EC4768` was scheduled, running, and absent from 
 made from the admin account. An inventory that changes with the login is not an inventory, and
 nothing about the lab looked wrong from either side of it.
 
+> **Re-measured, 7 Nov 2026 — and the same trap caught the re-measurement.** The v4 before-run
+> needed to confirm that Pass-the-Ticket really had no coverage before writing that down as a
+> gap, which meant asking the question the way this paragraph says to:
+> `| rest /servicesNS/-/-/saved/searches`. `V3 - Pass-the-Ticket EC4768` has since been deleted
+> and exists nowhere, so the gap is real. What the wider query found instead:
+>
+> | State, outside `purple_lab` | Count |
+> | --------------------------- | ----- |
+> | enabled **and** scheduled | **1** |
+> | scheduled but `disabled = 1` | 6 |
+> | enabled but `is_scheduled = 0` | 16 |
+>
+> Twenty-three saved searches named like detections, twenty-two of them inert. **An inventory
+> that counted titles would report 38 detections where 16 run** — so the v3 lesson generalises
+> past namespaces: neither the login nor the title count tells you what fires. The only
+> expression that did was `disabled=0 AND is_scheduled=1` over a namespace wildcard, cross-checked
+> against `index=_audit action=alert_fired`.
+>
+> The one live rule, `Kerberoasting Detection - TGS Source Anomaly`, **fired 28 times in seven
+> days — more than every rule in this pack combined, which managed eight** — with no `actions` set,
+> so none of it reached anyone. Its design is better than this pack's equivalent in one respect, a
+> lookup mapping accounts to expected source hosts rather than an allowlist hard-coded in the
+> search, and it depends on two lookup tables that exist on the instance and in no file here.
+> Written up in [CASE-07](../v4/investigations/CASE-07-the-loudest-rule-is-not-in-the-repo.md).
+>
+> **And the re-measurement walked into the same trap one query later.**
+> `| rest /services/alerts/fired_alerts` returned zero rows for that rule while the audit log
+> showed twenty-eight, because `/services/` resolves in the caller's namespace — the exact failure
+> this paragraph documents, repeated by someone who had just used the correct form for
+> `saved/searches`. The lesson is not that the trap exists. It is that knowing about it does not
+> prevent walking into it, which argues for a committed inventory query rather than for care.
+
 One duplicate matters more than the others. This app ships
 `Purple - Large Outbound Transfer` at a 10 MB threshold with `enableSched = 0`, and its own
 description says why: the threshold is an uncalibrated placeholder, and shipping one as an
