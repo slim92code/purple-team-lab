@@ -109,8 +109,18 @@ on that page, kept separate from the 24 October predictions.
 
 The [before/after coverage matrix](v4/coverage-matrix.md) has its first column: fifteen
 attack-facing searches, twelve measured against the un-hardened estate and three not executable,
-each cell carrying the query that produced it and the raw result. The first
-[v4 case files](v4/investigations/) are written against it.
+each cell carrying the query that produced it and the raw result. Written against it: eight
+[alert-triage case files](v4/investigations/), two [hunts](v4/hunts/), and one
+[incident report](v4/incident-report.md) that scopes how far the intrusion got rather than
+re-litigating each alert.
+
+The headline from the incident report is not a detection gap. Six attacker actions raised correct
+alerts within minutes; none produced a response, because the pack ships alert tracking and no
+notification action — so the estate detected the intrusion in thirty-seven minutes and let it run
+for another six hours. The second finding is that the chain alerted at its ends and not its
+middle: the steps that *acquired* something fired rules, and the steps that *used* what was
+acquired — a stolen ticket, a lateral session, an internal data pull — fired nothing, while being
+visible in the telemetry the whole time.
 
 Seven of the twelve fire. The useful number is that **four of those seven are defective in ways a
 tick in the column would have hidden** — one cannot say which account was locked, one fires on
