@@ -563,6 +563,69 @@ after-run will run it too. Dropping them from one column alone would make the co
 asymmetric, so they are dropped from both. `Purple - SAM Hive Dump` and the LOLBin branch carry
 no verdict in v4 — unmeasured, with the reason named, which is not the same as untested.
 
+### Revised, 7 Nov 2026 — what the before column changed about three of the five bundles
+
+The predictions in [the controls table](#which-hardening-controls-stay-and-the-rule-that-decides-it)
+were written on 24 October against rules nobody had measured. The before-run measured them, and
+three bundles now have a prediction that is wrong, incomplete, or testable in advance. Recorded
+here **before** the bundles run, because discovering it mid-run would leave the comparison unable
+to say whether a cell moved for the reason claimed.
+
+**Bundle 4, Account and Kerberos — the AES prediction tests a rule that cannot see the
+condition.** The table says `Purple - RC4 Anomaly (post AES enforcement)` *"goes schedulable and
+returns only the legacy `SQLService` tickets"*.
+[CASE-03](investigations/CASE-03-rc4-wrong-message-type.md) measured why that cannot happen: the
+rule reads `EventCode=4769`, and this estate's RC4 arrives in `4768` — two tickets on the attack
+path, one of them eleven milliseconds before the alert that did fire. **Enforcing AES changes
+nothing this rule can observe**, before or after, so a `✗ silent → ✗ silent` row would read as a
+detection failure and prove nothing.
+
+Two consequences for this bundle:
+
+1. The rule has to carry `4768` before its post-enforcement test means anything. That fix is
+   owed and held; **it must land before this bundle, not after**, or the bundle's own column is
+   uninterpretable.
+2. The bundle gains a prediction it did not have, and a better one: **AES enforcement should
+   break Pass-the-Ticket outright.** `Rubeus asktgt` presenting an RC4 key to a KDC that enforces
+   AES has nothing to negotiate. So phase 6 has two questions in the after-run rather than zero —
+   does a rule catch the attempt, and does the attempt still work. A phase with no coverage at all
+   becomes the bundle's clearest measurement.
+
+**Bundle 2, Credential protection — the `RunAsPPL` risk is now measurable in advance.** The table
+already names it: the attack fails on the protected host, and *"the risk is that it also goes
+silent, because the `GrantedAccess` a PPL-denied open returns may not be in the rule's measured
+mask list."* That was the right worry and it was unquantified.
+
+The mask list is now known exactly — `0x1438`, `0x143a`, `0x1f0fff`, `0x1f1fff`, `0x1f2fff`,
+`0x1f3fff`, `0x1fffff` — and so is the full distribution of masks this estate's benign processes
+produce, from [the `#10` cell](coverage-matrix.md). So the test does not have to wait for the
+bundle's re-run: **apply `RunAsPPL` on the one endpoint, attempt the LSASS open, and read the
+`GrantedAccess` directly.** If it is outside the list, the silence is predicted rather than
+discovered, and the cell can be marked as *attack blocked, detection blind* instead of as a
+regression.
+
+**Bundle 3, Network protocols — "the rule goes silent" is wrong.** The table predicts the firewall
+GPO's default-inbound Block kills the IPv6 SMB copy, so
+`Purple - Large Outbound Transfer` *"goes silent"*.
+[CASE-06](investigations/CASE-06-exfil-uncalibrated-threshold.md) measured that the rule also
+fires on 12.5 MB of ordinary Microsoft HTTPS, which the GPO does not touch — it blocks inbound,
+and this is outbound to a Microsoft address.
+
+So the honest prediction is **the rule stops returning the exfiltration rows and keeps returning
+the benign one.** The cell reads `fires → fires`, with different contents, and a reader comparing
+only the verdicts would conclude the bundle did nothing. The cell has to record *what* fired, not
+just whether something did — which is a change to how this one is written down, not to the bundle.
+
+**Bundles 1 and 5 stand as written.** Audit policy improves event completeness and moves no
+verdict, and no ASR rule targets scheduled-task creation, so the persistence cell is unchanged
+unless the prevalence rule blocks the payload. PowerShell script-block logging arrives as a second
+source on the `\Updater` cradle, corroborating `#9` rather than replacing it, exactly as predicted.
+
+**One ordering consequence, which is the practical output of this section.** The general rule in
+this build sequence is that no rule changes between the before and after columns. Bundle 4 is the
+exception and it has to be stated as one: `#13` needs `4768` before AES enforcement is applied, or
+that bundle measures nothing. Every other owed fix still waits for step 8.
+
 ### Why the per-bundle runs are targeted, and what that costs
 
 Targeted runs per bundle plus one full run at the end produce the same final comparison as five
