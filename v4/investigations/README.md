@@ -16,6 +16,7 @@ reasoning over it.
 | [CASE-04 — the lockout alert fires correctly and cannot say which account](CASE-04-lockout-alert-with-no-account.md) | 2c | True positive, unusable output. Two causes, one not the rule's fault. |
 | [CASE-05 — two C2 rules, one endpoint each, and neither covers both](CASE-05-c2-two-rules-one-host-each.md) | 5a, 5b | True positive on two hosts. Both rules correct, neither complete. |
 | [CASE-06 — exfiltration detected twice, and a Windows download that looks the same](CASE-06-exfil-uncalibrated-threshold.md) | 11, 12 | Two true positives, one false positive. No rule defect; the open item is a number. |
+| [CASE-07 — the loudest rule on the instance is in nobody's inventory, and notifies nobody](CASE-07-the-loudest-rule-is-not-in-the-repo.md) | — | 28 firings from a rule in no file here. Three ways of counting coverage, three wrong answers. |
 
 ## Still to write
 

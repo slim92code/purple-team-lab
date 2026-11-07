@@ -265,6 +265,24 @@ login is not an inventory* — reproduced a third time, during the investigation
 someone who had just written it down. The lesson is not that the trap exists. It is that knowing
 about it does not prevent walking into it, which is the argument for controls rather than care.
 
+**Re-run with the namespace wildcard, the two counters reconcile:**
+
+| Source | Kerberoasting rule | `purple_lab` rules | Total |
+| ------ | ------------------ | ------------------ | ----- |
+| `_audit action=alert_fired`, 7 days | 28 | 8 | 36 |
+| `/servicesNS/-/-/alerts/fired_alerts` | 9 | 8 | 17 |
+
+The gap is retention, not disagreement: `fired_alerts` lists triggered alerts that have not yet
+expired, `_audit` logs the event. The eight `purple_lab` firings are all from 6 November and all
+still listed; nineteen of the Kerberoasting rule's twenty-eight have aged out, which is itself a
+measure of how long it has been firing.
+
+**And one row in that endpoint nearly became a sixth bad reading.** It returns an entry with
+`title` of `-`, no owner, no app, and `triggered_alert_count = 17` — the largest number in the
+table. It is the aggregate, not an unnamed rule: `9 + 2 + (6 × 1) = 17`. The arithmetic is what
+established that, and without it "a nameless rule fired seventeen times" would have been the
+natural reading of a row that looks exactly like the others.
+
 ## The other three layers, measured 6 Nov 2026
 
 The table above is Splunk only. This one is not, and it changes what two of those cells mean.
