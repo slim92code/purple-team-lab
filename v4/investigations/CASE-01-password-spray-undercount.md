@@ -143,10 +143,20 @@ does not control and cannot see from the Windows log at all.
 
 **A threshold tuned on what the Windows log can count is tuned on an undercount.**
 
-**One attempt is unaccounted and is left that way.** `kerbrute` reported seven logins. Six are
-allocated above. All fourteen `0x18` and all four `0x12` events from the attacker host are
-distributed between the spray and `bruteuser`, so the seventh produced no `4771` this search can
-find. Not explained here rather than explained badly.
+**One attempt was unaccounted, and has since been identified.** `kerbrute` reported seven logins
+and only six could be allocated from the Windows log; all fourteen `0x18` and all four `0x12`
+events from the attacker host are distributed between the spray and `bruteuser`, so the seventh
+produced no `4771` of any code.
+
+It is **`Guest`**, found by
+[HUNT-01](../hunts/HUNT-01-spray-without-the-4771-count.md) in Zeek's record of the wire, which
+lists all eight principals the minute touched. `Guest` is disabled, so it writes nothing.
+
+That completes the roster, and the completion is the finding: **every account this rule cannot see
+is invisible for a different reason** — `fcastle` because it succeeded, `frankcastle` and
+`peterparker` because they do not exist, `Guest` because it is disabled. No single adjustment to
+the rule recovers them, which is why the answer in HUNT-01 is a different rule on a different
+source rather than a tweak to this one.
 
 ### 4.4 Two other things detected it
 
