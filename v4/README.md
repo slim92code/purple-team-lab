@@ -569,6 +569,31 @@ and the third did not, and the shipped
 `Sysmon64.exe` exactly as the old one did. Correlated with a DC Sysmon start, not caused by one
 as far as this measurement can say.
 
+> **Qualified, 9 Nov 2026 — those two deltas are index time, not event time.** Both
+> `Sysmon64.exe` reads and all three `Started` events dated 30–31 October arrived on the
+> **pre-renderXml** source, `WinEventLog:Microsoft-Windows-Sysmon/Operational`, and the app's
+> [`props.conf`](../detections/splunk/purple_lab/default/props.conf) sets
+> `DATETIME_CONFIG = CURRENT` on exactly that stanza — Splunk stamps those events with the moment
+> it indexed them, not the moment the host wrote them.
+>
+> So `+61 s` and `+76 s` are **indexing separation.** Both events travelled the same forwarder in
+> sequence, so the ordering is almost certainly real; the magnitude is not evidence. The
+> correlation stands, the precision does not, and "about a minute" should be read as "in the same
+> forwarder batch".
+>
+> **Nothing measured on 6 November is affected.** `WinEventLog:Security` was never in that stanza,
+> and Sysmon has arrived as `XmlWinEventLog:…` since the 31 October cutover, which the stanza does
+> not match. Every before-run timestamp — the roast convergence across three sensors, the 11 ms
+> between `4768` and `4769`, the 294 ms LSASS pair — is real event time.
+>
+> **And the stanza is now inert, which is its third state.** v3 found it
+> [keyed on a sourcetype this forwarder never emits](../detections/README.md), so the fix it
+> documented had never applied. It was re-keyed on `source::` in `2b070eb` and did apply. Then the
+> renderXml rollout on 31 October renamed the source, and it stopped matching again — **fixed and
+> obsoleted within days, for unrelated reasons.** It is not harmful: its purpose was to paper over
+> clocks that drift when a VM resumes, which is the problem the revert procedure above now solves
+> properly. It should be deleted rather than re-pointed, and that goes on the step 8 list.
+
 **What this does to the benign baseline's claim.** [The baseline](benign-baseline.md) recorded
 this rule as clean across 78,495 `EventCode=10` reads, and that is still true *of its window* —
 2 Nov 18:40 to 3 Nov 18:40 — which is exactly the problem. That window contains no Sysmon
