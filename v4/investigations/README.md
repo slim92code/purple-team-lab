@@ -18,6 +18,7 @@ reasoning over it.
 | [CASE-06 — exfiltration detected twice, and a Windows download that looks the same](CASE-06-exfil-uncalibrated-threshold.md) | 11, 12 | Two true positives, one false positive. No rule defect; the open item is a number. |
 | [CASE-07 — the loudest rule on the instance is in nobody's inventory, and notifies nobody](CASE-07-the-loudest-rule-is-not-in-the-repo.md) | — | 28 firings from a rule in no file here. Three ways of counting coverage, three wrong answers. |
 | [CASE-08 — the alerts give the ends of the chain and not the links](CASE-08-the-middle-of-the-chain-is-unalerted.md) | 6, 7 | Three true positives, no alerts. The estate detects acquisition and egress, not movement. |
+| [CASE-09 — a catch-up alert for a three-day-old attack suppressed a live one](CASE-09-a-stale-alert-suppressed-a-live-one.md) | 2a | Two false alerts, one missed real one. No rule defect — a scheduler behaviour colliding with a throttle. |
 
 Every cell in the before-run column with a finding now has a case file. What remains of step 5 is
 the hunts and the incident report.

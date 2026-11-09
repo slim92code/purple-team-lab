@@ -382,17 +382,28 @@ result_count=1, alert_actions="", suppressed=1, fired=0, skipped=1
 
 **Matched, throttled, never delivered — and no action configured even if it had been.**
 
-Two defects, stacked:
+**What armed the throttle is the finding, and it is not what it first looked like.** This rule's
+last recorded firing was 6 November at 11:40 — three days earlier, well past a 24-hour
+suppression period. So something fired it again, and the audit log has it at **14:50:46 today**:
+two hours *before* the spray, on an estate reverted to a clean snapshot an hour earlier, with no
+attack in between.
 
-**The throttle key does not exist in the results.** `alert.suppress.fields = Client_Address`, and
-the search's final command is `| table _time src Account_Name eventcount`. `Client_Address` was
-renamed to `src` by an `eval` three lines earlier. So the suppression key is empty, and a single
-global entry throttles every source instead of one entry per attacker address.
+The search ID resolves it. That execution carries `…_at_1794013200_…`, a scheduled slot of
+**7 November 02:00** — a **catch-up run** for a slot missed while the lab was powered off. A
+catch-up searches the window belonging to its original slot, here 6 Nov 02:00 to 7 Nov 02:00,
+**which contains the before-run's spray.** The rule alerted on a three-day-old attack as though
+it were live, armed its 24-hour throttle, and the real spray two hours later was suppressed.
+`Purple - LSASS Access` fired in the same millisecond for the same reason.
 
-**And the search window makes that permanent.** `dispatch.earliest_time = -24h@h`. Once a spray
-enters the window, every run for the next twenty-four hours returns the same row, and every
-suppressed run can refresh the suppression. The rule goes quiet and stays quiet while the
-evidence is still in its own results.
+Written up as [CASE-09](investigations/CASE-09-a-stale-alert-suppressed-a-live-one.md).
+
+**And a correction to this cell's first reading.** The throttle key is `Client_Address` while the
+search's final line is `| table _time src Account_Name eventcount` — renamed to `src` by an
+`eval`, so the key is empty and one global entry throttles every source rather than one per
+attacker. That defect is real and still owed. **It is not the cause here:** the 6 November spray
+and today's both came from `192.168.182.133`, so a correctly keyed throttle would have matched
+and suppressed the live attack identically. Attributing it to the key would have been a tidy
+wrong answer.
 
 **What this does to the column.** The matrix's verdicts are all obtained by re-running the
 shipped search, which is [stated as the method](#marks) and remains correct: `#6`'s search
