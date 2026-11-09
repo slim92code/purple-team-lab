@@ -1186,7 +1186,7 @@ destroys the comparison those columns exist to make:
 | ---- | ----------- | ------------ |
 | `#10` LSASS Access | exclude `C:\Windows\Sysmon64.exe` | fires benignly after a DC Sysmon restart, which the bundles will cause |
 | `#12` Verify Account Lockout | `Account_Locked_Out_Name`; drop `Caller_Computer_Name` | fires correctly, reports nothing usable |
-| `#6` Spray Success | exclude `0x25` from the failure side | benign clock skew satisfies the rule's shape |
+| `#6` Spray Success | **reconsidered — see below** | the clock skew is produced by this lab's own revert procedure, not by the estate |
 | `#2` C2 Beacon | extend the OneDrive allowlist to `OneDrive\Update\OneDriveSetup.exe` | a fourth OneDrive binary in a fourth directory shape |
 | `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress, which does not exist yet |
 | `#13` RC4 Anomaly | add `4768` — the rule reads `4769` only and this estate's RC4 is in TGTs | the defect was found from a phase with no rule; the fix must precede its positive test |
@@ -1211,6 +1211,21 @@ One rule is owed that does not exist yet: **a Zeek rule on `KDC_ERR_C_PRINCIPAL_
 and Zeek sees all of it, and no shipped rule closes that. Writing it is the single cheapest
 coverage gain available here, and it is held for the same reason as the five fixes: new detection
 content between the columns changes what the after column measures.
+
+**`#6`'s owed fix was withdrawn on 9 November.** The plan was to exclude `0x25`
+(`KRB_AP_ERR_SKEW`) from its failure side, on the reading that benign clock skew satisfies the
+rule's shape. Measuring the estate after a snapshot revert showed where the skew comes from: a
+guest booting on the snapshot's clock emits `0x25` until `w32time` converges, and THEPUNISHER was
+**5.76 days** behind the DC for about an hour after today's revert. The four `0x25` errors behind
+`#6`'s false positive, and the alert it
+[actually delivered](#the-alert-history-which-this-column-should-have-read-first) at 09:40 on
+6 November, are that mechanism — [the full measurement is in the v4 plan](README.md).
+
+So the rule is reporting a real anomaly. **Excluding `0x25` would suppress a signal this lab
+generates every time it rolls a VM back**, which is worse than the false positive: the next
+genuine skew — a failing NTP hierarchy, a VM paused and resumed, a host with a drifting RTC —
+would also go unreported. The fix is to the revert procedure, not to the rule, and it is in the
+plan's step 4. `#6` stays as shipped.
 
 `#2` and `#15` are owed something beyond their own fix, and it is the same thing. Both have a
 `dest`-shaped hole — `#2` because the CIM model returns `-` where the destination belongs, `#15`

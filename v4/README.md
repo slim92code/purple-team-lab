@@ -367,6 +367,65 @@ of them measures a change to it:
    `v4-post-benign` before hardening begins. **Rollback scope is three hosts, never seven:**
    reverting Splunk or the sensors would erase the benign measurement and this run's own
    evidence. From the moment a measurement exists, the SIEM and the sensors are not rolled back.
+
+   > **Measured, 9 Nov 2026 — reverting a guest while keeping the indexer has three side effects,
+   > and one of them was already in the before-run column.** The revert was performed and the
+   > estate measured immediately afterwards:
+   >
+   > | Host | Timezone | UTC offset vs DC after boot |
+   > | ---- | -------- | --------------------------- |
+   > | SPIDERMAN | `Central Europe Standard Time` | **−0.006 s** — fine |
+   > | THEPUNISHER | `Central Europe Standard Time` | **+497,404 s = 5.76 days** |
+   >
+   > THEPUNISHER came up on the snapshot's clock and stayed there. Kerberos tolerates five
+   > minutes, so for about an hour that host **could not authenticate to the domain at all**.
+   > `w32tm /config /syncfromflags:domhier /update` then `/resync /force` brought it to +1.3 s.
+   >
+   > **The three side effects, in order of how long they stayed hidden.**
+   >
+   > **1. Kerberos skew errors.** A guest booting on a stale clock emits `KRB_AP_ERR_SKEW`
+   > (`0x25`) until `w32time` converges. This is not hypothetical: the before-run recorded four
+   > such errors from SPIDERMAN at 09:29 on 6 November, and the week's alert history shows
+   > `Purple - Spray Success` **delivered an alert** on them at 09:40 — the false positive in
+   > [`#6`](coverage-matrix.md) and [CASE-01](investigations/CASE-01-password-spray-undercount.md).
+   > Its cause was recorded as "clock skew" without knowing where the skew came from. **It came
+   > from this procedure.**
+   >
+   > **2. Backdated event injection.** The reverted guest's forwarder resumes with its old
+   > `fishbucket` state and the host's stale clock, so it sends events that index today and claim
+   > to be from the snapshot's date. Split by `_indextime`:
+   >
+   > | Indexed | `_time` claimed | Events |
+   > | ------- | --------------- | ------ |
+   > | 3 Nov | 3 Nov 19:00–23:00 | 40,534 — the original, legitimate |
+   > | 6 Nov | 3 Nov 20:38–23:00 | 14 — the previous boot did this too |
+   > | **9 Nov** | **3 Nov 20:42–20:48** | **1,986 — today's revert** |
+   >
+   > The 1,986 sit inside a range already indexed on 3 November, so they are duplicates, and any
+   > count over a window containing 3 Nov 20:42–20:48 is inflated by them.
+   >
+   > **No cell in this repo is affected**, and that is luck rather than design: the benign window
+   > closed at 18:40 on 3 November, two hours earlier, and every before-run measurement is on
+   > 6 November. The next revert could land anywhere.
+   >
+   > **3. The mechanism is already documented in this pack, for a different reason.**
+   > `Purple - Wazuh Sensor Health` and its two siblings key on `_indextime` rather than `_time`
+   > precisely because *"a forwarder restart backfills with original timestamps and erases a
+   > `_time` gap retroactively."* Same mechanism. The health rules were written to survive it;
+   > the revert procedure was not written to avoid causing it.
+   >
+   > **So the procedure gains a step, and it is not optional for the per-bundle reverts.** Before
+   > reverting a Windows guest: stop its forwarder. After boot: resync the clock, verify the
+   > offset against the DC, *then* start the forwarder. Done in that order there is no skew window
+   > and no backdated batch. Done as it was today, every bundle rollback reproduces all three
+   > effects — and the plan calls for a snapshot per bundle plus a rollback on any bundle that
+   > corrupts the baseline, so this would have happened five more times.
+   >
+   > One finding travels with it. `#6`'s false positive is not an estate quirk to be tuned away,
+   > it is **an artefact of this lab's own methodology**, and it will appear in every after-run
+   > column produced by a revert until the procedure above is followed. That reframes the owed
+   > fix: excluding `0x25` from the rule would hide a signal the lab itself generates, which is a
+   > worse outcome than the false positive.
 5. **The IR report and the hunts are written against that before-run.** They describe and
    interrogate the chain as it fires against the un-hardened baseline, so the "before" story is
    on record before anything changes. Neither waits on hardening.
