@@ -360,6 +360,48 @@ No Splunk detection reads the `wazuh` sourcetype — only the two pipeline-healt
 so the false-positive measurement of the Splunk rules is unaffected. Wazuh's own rules have no
 data for this window and are measured separately.
 
+> **Root-caused, 9 Nov 2026 — the DC's "+1h rendering" is a timezone, and it was correct until
+> 25 October.** This page records elsewhere that HYDRA-DC renders event times one hour ahead of
+> Splunk's `_time`. That is not a rendering quirk. Measured on the DC:
+>
+> | | |
+> | --- | --- |
+> | `Get-Date` | `2026-11-09 15:51:42 **+02:00**` |
+> | `tzutil /g` | `FLE Standard Time_dstoff` — UTC+2, **DST disabled** |
+> | Same instant, UTC | `13:51:42` — correct to within a minute of an external reference |
+> | `w32tm /query /status` | `Source: Free-running System Clock`, stratum 1, `LOCL` |
+>
+> **The clock is right and the label is wrong.** Belgrade is `Central European Standard Time`,
+> UTC+1. The DC is set to FLE, UTC+2, with DST switched off, so it displays local time an hour
+> ahead while its UTC is accurate. Kerberos works because Kerberos uses UTC; Splunk `_time` is
+> correct because Splunk resolves to an absolute instant, which is why it matched the
+> exfiltration server's own `Date: … GMT` header to the second.
+>
+> **And it explains why this only appeared in v4.** EU daylight saving ended on 25 October 2026:
+>
+> | Run | Date | Local time then | FLE_dstoff (fixed UTC+2) |
+> | --- | ---- | --------------- | ------------------------ |
+> | v2 lab | 1 Jun 2026 | CEST, UTC+2 | **matches** |
+> | v3 kill chain | 20 Oct 2026 | CEST, UTC+2 | **matches** |
+> | This benign window | 2–3 Nov 2026 | CET, UTC+1 | one hour ahead |
+> | v4 before-run | 6 Nov 2026 | CET, UTC+1 | one hour ahead |
+>
+> The DC's timezone was accidentally correct for both earlier labs because both ran in summer
+> time. It became an hour ahead three days before the v4 work that noticed it. So this was never
+> a defect that went unobserved — it did not exist until late October, and the first measurement
+> taken after it started is the one that recorded it.
+>
+> **Two consequences worth carrying.** v2 and v3 screenshot timestamps are reliable as written;
+> v4 timestamps read off a DC **event body** are an hour ahead of local time, while `_time` is
+> correct. Anyone comparing a v3 screenshot against a v4 event body is comparing two conventions.
+> And because DST is disabled rather than mis-set, the offset is seasonal: it returns to zero when
+> European summer time resumes in late March 2027.
+>
+> **Deliberately not fixed.** Nothing measurable is wrong — UTC is accurate, Kerberos is
+> unaffected, `_time` is correct — and changing the DC's timezone between the before and after
+> columns would alter the estate for a display-layer cosmetic. It is documented instead, and the
+> correction belongs with the step 8 work.
+
 The heartbeat reported wazuh-vm healthy the whole time, which it was: the heartbeat proves the
 host and the forwarder are up, not that the manager is writing alerts or that the disk has
 room. The convention "an hour without `wazuh` is not a gap, an hour without
