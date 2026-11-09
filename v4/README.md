@@ -437,6 +437,19 @@ of them measures a change to it:
    back to `v4-post-benign`. The honeypot account and
    [the rule that watches it](#the-honeypot-needs-a-rule-or-it-is-just-an-account) are created
    in this step, together.
+
+   > **Order, decided 9 Nov 2026: `1 → 2 → 4 → 5 → 3`.**
+   >
+   > | # | Bundle | Why here |
+   > | - | ------ | -------- |
+   > | **1** | Audit policy | **A control measurement.** It only *adds* events — blocks nothing, removes nothing, and no attack phase can fail because of it. The plan predicts no cell changes verdict, so **if one does, the measurement procedure is broken**, not the estate: wrong window, contaminated index, or the chain re-run differently. Worth discovering on the harmless bundle rather than on the third, with three columns already resting on it. And it has to be first for a second reason — every later column is read through the telemetry this bundle provides, so hardening first and improving audit later makes earlier columns less complete and leaves no way to separate a control's effect from a logging change. |
+   > | **2** | Credential protection | `RunAsPPL` goes on one endpoint and not the other by design, so the chain still runs on the unprotected host and the pair is the measurement. |
+   > | **4** | Account and Kerberos | **Blocked on one prerequisite:** `#13` must read `4768` before AES enforcement, or the bundle measures nothing. AES-only may also break Pass-the-Ticket outright, which is this bundle's clearest prediction. |
+   > | **5** | Execution controls | ASR can **block the payload** — a legitimate result that would leave later bundles with no implant to run. So it follows the bundles that still need the chain working. |
+   > | **3** | Network protocols | **Last, on blast radius.** The firewall GPO is the only control here that can sever the forwarders' path to Splunk — a bad rule costs the evidence, not just the column. Its cell is also coupled to the step 8 threshold work, so it benefits from going last. |
+   >
+   > The principle, stated once: **bundles that can block an attack phase go late**, so the earlier
+   > ones can still run the chain they are being measured against.
 7. **One full kill-chain re-run at the end**, with the hardening in place — the pair to the before-run at step 4. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
 
