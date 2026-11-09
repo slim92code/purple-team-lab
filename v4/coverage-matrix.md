@@ -424,6 +424,50 @@ So the honest reading of `#6` is **the search fires and the alert does not**, wh
 variety of the pattern this column keeps finding — after a rule that fires and notifies nobody,
 and content that exists and is not deployed.
 
+## Defender, the fifth layer nobody counted — measured 9 Nov 2026
+
+The layer table below has four columns: Splunk, Wazuh, Suricata, Zeek. There is a fifth running
+on every Windows host in this estate, and it has no cell anywhere in this matrix.
+
+While verifying LSA Protection for bundle 2, an administrator ran Task Manager's built-in
+**Create dump file** against `lsass.exe` on SPIDERMAN. Microsoft Defender caught it behaviourally
+and said so on the console:
+
+```
+Behavior:Win32/DumpLsass.C!attk      Severe      9 Nov 2026 20:30      Active
+```
+
+**That detection never reached the SIEM**, and the reason is an ingest gap rather than a rule
+gap:
+
+```spl
+index=main source="WinEventLog:Microsoft-Windows-Windows Defender/Operational" earliest=-7d latest=now
+| stats count min(_time) as first max(_time) as last by host
+```
+
+| host | events, 7 days |
+| ---- | -------------- |
+| THEPUNISHER | 187 |
+| SPIDERMAN | **0** |
+| HYDRA-DC | **0** |
+
+Defender's operational channel is forwarded from **one of three hosts**. The detection happened
+on one of the two that do not forward it. And the host that does forward sends only `2001`,
+`5007` and `1152` — signature updates and configuration changes. **Not one detection event
+(`1116`/`1117`) exists in the index from any host.**
+
+So Defender is detecting credential theft on this estate, correctly and at severity *Severe*, and
+the SIEM has never seen it do so.
+
+**This is the v3 Wazuh finding in a new product.** That run recorded *"a Sysmon ingestion gap left
+the EDR blind on two of three hosts"*. Here a second EDR is blind to the SIEM on two of three
+hosts, found two years of lab-time later, by an action taken for an unrelated reason.
+
+Owed, and not done now: forward `Microsoft-Windows-Windows Defender/Operational` from all three
+hosts, and give the matrix a Defender column. Both are additions rather than rule changes, but
+adding a detection source mid-measurement changes what the after column can see, so they wait
+for step 8.
+
 ## The other three layers, measured 6 Nov 2026
 
 The table above is Splunk only. This one is not, and it changes what two of those cells mean.

@@ -677,7 +677,7 @@ from the raw event, which is a hunt for `hunts/` rather than a cell in this matr
 | `csrss.exe` | `0x1fffff` | yes — load-bearing |
 | `wazuh-agent.exe` | `0x1000`, `0x1410`, `0x1fffff` | yes — load-bearing |
 | `svchost.exe` | `0x1000`, `0x3000`, `0x100000`, `0x101000` | no |
-| `taskmgr.exe` | `0x1000`, `0x1400`, `0x1410` | no |
+| `taskmgr.exe` | `0x1000`, `0x1400`, `0x1410` | **yes — see the correction below** |
 | `WmiPrvSE.exe` | `0x1000`, `0x1400`, `0x1410` | no |
 | `MsMpEng.exe` | `0x1000`, `0x1010`, `0x1400`, `0x1410`, `0x1418`, `0x101000`, `0x3600` | no |
 | `vmtoolsd.exe` | `0x1000`, `0x1400`, `0x1410` | no |
@@ -689,6 +689,38 @@ demonstrably needs excluding is absent. **This is an inference from one week of 
 behaviour, not a proof.** `svchost.exe` is entitled to open LSASS with a wider mask than it
 happened to use here, so the redundant entries are cheap insurance and are not being deleted —
 the actionable half of this finding is the missing entry, not the surplus ones.
+
+> **Corrected, 9 Nov 2026 — the `taskmgr.exe` entry is not surplus, it is a bypass.** The
+> paragraph above classified it as redundant because across a week this estate's Task Manager
+> never opened LSASS with a mask in the alert list. That was true of observed behaviour and wrong
+> about the process's capability.
+>
+> Measured while verifying LSA Protection for bundle 2: an administrator used Task Manager's
+> built-in **Create dump file** on `lsass.exe` on SPIDERMAN. It succeeded, wrote
+> `lsass.DMP` to disk, and Sysmon recorded it:
+>
+> | `_time` | Computer | SourceImage | GrantedAccess |
+> | ------- | -------- | ----------- | ------------- |
+> | 9 Nov 20:30 | SPIDERMAN | `C:\Windows\system32\Taskmgr.exe` | **`0x1fffff`** ×2 |
+>
+> `0x1fffff` **is** in the rule's mask list. The rule was then run verbatim over that window and
+> **returned nothing**, because `SourceImage!="C:\\Windows\\System32\\taskmgr.exe"` removes it
+> first.
+>
+> So `#10` has a complete bypass. A full credential dump, using a signed in-box Windows tool, on
+> a host where the rule is scheduled and enabled, produces no alert. And it is not an obscure
+> path — dumping LSASS through Task Manager is a documented technique precisely because the
+> binary is built in and commonly allowlisted.
+>
+> **The correction is about method as much as content.** The earlier classification came from
+> cross-reading observed masks against the rule's list — reasoning over data rather than testing
+> the control. The entry looked harmless because nothing on this estate had used Task Manager
+> that way in the sample. One deliberate exercise of the capability inverted the conclusion.
+>
+> The fix is not simply deleting the exclusion: Task Manager polls LSASS constantly at
+> `0x1000`/`0x1400`/`0x1410`, which is why it was excluded at all. It needs to be excluded by
+> mask rather than by name — or the rule needs `CallTrace`, which separates a dump from a poll
+> regardless of which binary made it. Held for step 8 with the rest.
 
 **Phases 3 and 9b were not executed, and are N/E in both columns rather than silent.** The
 decision rule stands: a phase runs in the before-run only if a shipped rule measures it *and* the
