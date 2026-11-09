@@ -101,7 +101,7 @@ three pipeline-health searches are not detection cells and are not listed.
 | 5 | Password Spray (multi-user from one source) | 2 | **✗ silent — one account below threshold** | M |
 | 6 | Spray Success (4771 then 4768 same source) | 2 | **✓ fires — and one false positive** | M |
 | 7 | SAM Hive Dump via reg save | 9b | N/E | — |
-| 8 | DCSync from non-DC | 9c | N/E | — |
+| 8 | DCSync from non-DC | 9c | N/E — **and its input does not exist**, see below | — |
 | 9 | Scheduled Task Persistence | 10 | **✓ fires — 1 of 1, no false positives** | M |
 | 10 | LSASS Access (credential theft mask) | 8 | **✓ fires** | M |
 | 11 | Kerbrute User Enumeration (4768 error 0x6) | 1 | **✗ silent — structural** | M |
@@ -154,6 +154,40 @@ a shipped rule measures it **and** the after-run will run it too; dropping a pha
 column alone would make the comparison asymmetric, so it is dropped from both. Phases 3 and 9b
 were not executed. Phase 9c was attempted in an earlier run and failed at RPC 1825, and
 repairing it mid-measurement would change the estate between columns.
+
+> **Measured, 9 Nov 2026 — `#8`'s input has never existed, which is a second and independent
+> reason that cell is empty.** The rule was recorded as `N/E` because the attack failed at
+> RPC 1825. Checking the audit configuration before bundle 1 turned up the other half.
+>
+> `Purple - DCSync from non-DC` reads `EventCode=4662` and requires `Properties` to contain one
+> of three replication control-access GUIDs. Those are written by the **Directory Service Access**
+> subcategory, and `auditpol /get /category:*` shows it **disabled on all three hosts**.
+>
+> `4662` events do exist — 887 on HYDRA-DC, 512 on SPIDERMAN, 254 on THEPUNISHER over seven days,
+> the most recent minutes old. None of them is the right kind:
+>
+> | Host | With a replication GUID | Object types actually seen |
+> | ---- | ----------------------- | -------------------------- |
+> | HYDRA-DC | **0** | `WMI Namespace` |
+> | SPIDERMAN | **0** | `WMI Namespace`, `SecretObject` |
+> | THEPUNISHER | **0** | `WMI Namespace`, `SecretObject` |
+>
+> WMI object access and LSA secret access — monitoring-agent traffic, the same class of
+> background noise as the `4674` floor in `#5`. The rule's filter can never match them.
+>
+> **So this is a high-fidelity rule, scheduled, enabled, marked "always investigate", whose input
+> stream has been empty for its whole life** — the v3 Wazuh pattern a third time, found a third
+> way. And the benign baseline's row for it reads `0 alerts | 778 × 4662 | threshold measured`,
+> which is the trap: 778 is a real count of a real event code and it looked like the benign volume
+> the rule sits on. It is not the rule's input. **A measured number that looks like coverage and
+> is not** — exactly the failure mode catalogued in the method section above, this time from an
+> event-content mismatch rather than a query mistake.
+>
+> **This gives bundle 1 the only concrete capability change in it.** Enabling
+> `Directory Service Access` with a SACL on the domain naming context is what makes `#8`'s input
+> exist for the first time. The cell stays `N/E` afterwards — the attack still fails at RPC 1825 —
+> but it moves from *"untestable because nothing is logged"* to *"untestable because the attack
+> does not work"*, and those are different gaps with different fixes.
 
 ## The alert history, which this column should have read first
 

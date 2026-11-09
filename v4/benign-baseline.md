@@ -445,7 +445,7 @@ counts as clean where the control is non-zero.
 | 5 | Password Spray | 0 | 2 × `4771` (`Administrator`, mistyped password) | scheduled, threshold measured |
 | 6 | Spray Success | 0 | 2 × `4771`, 26 × `4768` | scheduled, threshold measured |
 | 7 | SAM Hive Dump via reg save | 0 | 29,939 × `4688` | scheduled, threshold measured |
-| 8 | DCSync from non-DC | 0 | 778 × `4662` | scheduled, threshold measured — still never fired on a true positive |
+| 8 | DCSync from non-DC | 0 | 778 × `4662` † | scheduled — **but see the correction below: none of those 778 is this rule's input** |
 | 9 | Scheduled Task Persistence | 0 | 1 × `4698` (benign) | scheduled, threshold measured |
 | 10 | LSASS Access | **0** | **78,495** Sysmon EID 10 reads of `lsass.exe` | scheduled, threshold measured |
 | 11 | Kerbrute User Enumeration | 0 | 26 × `4768` | scheduled, threshold measured |
@@ -453,6 +453,23 @@ counts as clean where the control is non-zero.
 | 13 | RC4 Anomaly | 0 | 71 × `4769`, zero RC4 | schedulable after AES-only |
 | 14 | Sliver C2 Beacon by JA4 | 0 | Zeek continuous across the window | scheduled, threshold measured |
 | 15 | Large Outbound Transfer | **4 rows** | see below | **unscheduled** |
+
+> **† Corrected, 9 Nov 2026 — the 778 are not rule 8's input.** This row reads as though the rule
+> was measured against a populated event stream. It was not. `Purple - DCSync from non-DC` needs
+> `4662` events whose `Properties` carry a replication control-access GUID, and those are written
+> by the **Directory Service Access** audit subcategory, which `auditpol` shows **disabled on all
+> three hosts**. Checked against seven days of data: of 1,653 `4662` events across the estate,
+> **not one** carries a replication GUID — they are `WMI Namespace` and `SecretObject` accesses,
+> monitoring-agent traffic of the same kind as the `4674` floor described in
+> [the matrix](coverage-matrix.md).
+>
+> So "778 × `4662`" is a true count of a real event code and a false description of what the rule
+> sees, which is nothing. The rule has never had an input. Its "never fired on a true positive"
+> was read as a tuning observation and is a telemetry gap.
+>
+> Worth naming the shape rather than just the fix: a measured number that looks like coverage and
+> is not. The same page already records three false positives the window could not see; this is
+> the inverse — benign volume the window **did** see and that was never relevant.
 
 **The strongest number is rule 10:** zero alerts across 78,495 benign reads of LSASS in a day.
 The exclusions were tuned on 935 sampled reads in v3; they held at eighty times that volume.
