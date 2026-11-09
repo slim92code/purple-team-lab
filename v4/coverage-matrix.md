@@ -325,6 +325,86 @@ table. It is the aggregate, not an unnamed rule: `9 + 2 + (6 × 1) = 17`. The ar
 established that, and without it "a nameless rule fired seventeen times" would have been the
 natural reading of a row that looks exactly like the others.
 
+## Control re-run after bundle 1, 9 Nov 2026 — and a rule that matches without firing
+
+Bundle 1 was applied and two phases re-run against it as a procedural control. The reasoning for
+doing that is in [the plan](README.md): audit policy moves no verdict, so any cell that moves
+indicts the measurement procedure rather than the estate.
+
+Inputs were identical — the same 58-name wordlist and the same 7-account spray list, both
+recovered from the attacker host and line-counted before use.
+
+| | 6 Nov | 9 Nov, post-bundle |
+| --- | ----- | ------------------ |
+| Enum: rule rows | 0 | **0** |
+| Enum: `4768` result codes | `0x0` only | **`0x0` only** |
+| Enum: Zeek unknown principals | 57 | **57** |
+| Spray: rule rows | 0 | **0** |
+| Spray: `0x18` accounts from `.133` | 4 | **3** |
+| Spray: `0x18` events | 14 | **6** |
+| Spray: Zeek distinct principals | 8 | **7** |
+
+**The enum reproduces exactly. The spray reproduces with a predicted difference, and the
+arithmetic closes.** Today's run omitted the `bruteuser` attack against `tstark` that followed
+the spray by 4.5 seconds on 6 November. Remove it and the numbers fall out: 14 − 8 = 6 events,
+4 − 1 = 3 accounts, 8 − 1 = 7 principals on the wire.
+
+So [CASE-01](investigations/CASE-01-password-spray-undercount.md)'s central claim is confirmed by
+independent re-measurement: **the fourth account was never the spray's.** Measured alone, the
+spray yields three.
+
+### Wazuh did not fire this time, and that reverses a conclusion
+
+6 November: `60205` fired twice, at level 10, on 16 audit failures inside six seconds.
+9 November: six audit failures, and **`60205` did not fire.** Its frequency threshold sits
+somewhere between the two.
+
+`CASE-01` and the layer table above both record that Wazuh detected this spray where the Splunk
+rule did not, and present that as the phase being covered after all. **Measured in isolation, it
+is not.** What Wazuh detected on 6 November was the spray *plus* `bruteuser` — the same adjacent
+attack that inflated the Splunk account count. Strip it and the spray alone is detected by
+nothing: Splunk needs five accounts and has three, Wazuh needs a bigger burst than six.
+
+Both layers were credited with a coverage they only had because two attacks landed in the same
+few seconds. That is the control re-run earning its cost.
+
+### `#6` matched, and no alert was delivered
+
+The sharper finding. `Purple - Spray Success` returns a row for today's spray when run by hand —
+`192.168.182.133`, four accounts, `eventcount=7`, at 16:34:47. The scheduled search ran twice
+afterwards and succeeded both times. No alert appears in the audit log.
+
+The scheduler says why, in one line:
+
+```
+result_count=1, alert_actions="", suppressed=1, fired=0, skipped=1
+```
+
+**Matched, throttled, never delivered — and no action configured even if it had been.**
+
+Two defects, stacked:
+
+**The throttle key does not exist in the results.** `alert.suppress.fields = Client_Address`, and
+the search's final command is `| table _time src Account_Name eventcount`. `Client_Address` was
+renamed to `src` by an `eval` three lines earlier. So the suppression key is empty, and a single
+global entry throttles every source instead of one entry per attacker address.
+
+**And the search window makes that permanent.** `dispatch.earliest_time = -24h@h`. Once a spray
+enters the window, every run for the next twenty-four hours returns the same row, and every
+suppressed run can refresh the suppression. The rule goes quiet and stays quiet while the
+evidence is still in its own results.
+
+**What this does to the column.** The matrix's verdicts are all obtained by re-running the
+shipped search, which is [stated as the method](#marks) and remains correct: `#6`'s search
+matches, today and on 6 November. What is weaker than written is
+[CASE-07](investigations/CASE-07-the-loudest-rule-is-not-in-the-repo.md)'s section arguing that
+the alert history independently confirms this column. It confirmed one instance. The same rule,
+on the same shape of data, delivered nothing today.
+
+So the honest reading of `#6` is **the search fires and the alert does not**, which is a third
+variety of the pattern this column keeps finding — after a rule that fires and notifies nobody,
+and content that exists and is not deployed.
+
 ## The other three layers, measured 6 Nov 2026
 
 The table above is Splunk only. This one is not, and it changes what two of those cells mean.

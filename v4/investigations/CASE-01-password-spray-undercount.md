@@ -174,8 +174,51 @@ five names, including `fcastle` — because a *success* is a `4768`, and this ru
 The information `#5` needed was in the index; `#5` is just not looking at the half of it that
 survived.
 
+> **Qualified, 9 Nov 2026 — its search matches and its alert does not arrive.** On the re-run the
+> same search returns a row by hand: `192.168.182.133`, four accounts, `eventcount=7`. The
+> scheduled search then ran twice and succeeded both times. **No alert was recorded.** From
+> `scheduler.log`:
+>
+> ```
+> result_count=1, alert_actions="", suppressed=1, fired=0, skipped=1
+> ```
+>
+> Two stacked defects. `alert.suppress.fields = Client_Address`, and the search's last line is
+> `| table _time src Account_Name eventcount` — `Client_Address` was renamed to `src` by an
+> `eval` three lines earlier, so the throttle key is empty and one global entry suppresses every
+> source rather than one entry per attacker. And `dispatch.earliest_time = -24h@h` means that
+> once a spray enters the window, every run for the next day returns the same row and every
+> suppressed run can refresh the suppression — the rule goes quiet while its own results still
+> contain the attack.
+>
+> `alert_actions=""` is the third line of it: even unsuppressed, nothing was configured to
+> notify anyone, which is the estate-wide finding in
+> [CASE-07](CASE-07-the-loudest-rule-is-not-in-the-repo.md).
+>
+> So "fired" above describes 6 November and is not a property of the rule. The search matches
+> reliably; delivery does not.
+
 **Wazuh `60205` fired at level 10**, twice, in the same minute — *multiple Windows audit failure
 events*, a built-in frequency rule.
+
+> **Reversed, 9 Nov 2026 — it was not this spray that Wazuh detected.** The spray was re-run
+> alone, without the `bruteuser` attack that followed it by 4.5 seconds on 6 November, and
+> **`60205` did not fire.** Six audit failures today where the original minute produced sixteen;
+> the rule's frequency threshold sits between the two.
+>
+> So Wazuh caught the spray *plus* the adjacent brute force — the same pairing that inflated this
+> rule's countable accounts from three to four in 4.1. **Measured in isolation, this spray is
+> detected by nothing.** Splunk needs five accounts and has three; Wazuh needs a burst larger
+> than six.
+>
+> The paragraph above is a correct reading of the 6 November data and a wrong statement about
+> the technique. Both layers were credited with a coverage they only had because two attacks
+> landed in the same few seconds — and the verdict in section 5, that the estate detected this
+> spray, does not survive. Full re-measurement in
+> [the matrix](../coverage-matrix.md).
+>
+> `Purple - Spray Success` is a separate problem and is covered in 4.4 below: today its search
+> matched and the alert was suppressed before delivery.
 
 ### 4.5 And `60205` is better than its name, but priced on seven hours
 
@@ -204,14 +247,30 @@ and still not a working day.
 
 ## 5. Verdict
 
-**True positive. Detected twice, by neither of the rules whose name says password spray.**
+> **Rewritten, 9 Nov 2026.** The original verdict read *"true positive, detected twice, by
+> neither of the rules whose name says password spray"* and concluded the estate caught it
+> anyway. A controlled re-run of the spray **alone** removed both of those detections. The
+> original text is replaced rather than annotated, because unlike the corrections elsewhere in
+> this file it was not a matter of precision — it was the wrong answer. What produced it is in
+> 4.4 and 4.5 above.
 
-Three statements, all true, which is the point of the case:
+**True positive. Not detected by anything, once the adjacent attack is removed.**
+
+Four statements, and the first three were in the original verdict:
 
 - `Purple - Password Spray` did not fire, and lowering its threshold is the wrong fix.
-- The estate detected the spray anyway, through a correlation rule and a generic EDR frequency
-  rule.
-- A coverage matrix built from one tool would have recorded this phase as a miss.
+- A coverage matrix built from one tool would have recorded this phase as a miss — still true,
+  and still the argument for the layer columns.
+- The undercount is real: three countable accounts against six the spray touched.
+- **And the two detections credited here both depended on a second attack.** Wazuh `60205`
+  needed the `bruteuser` burst to clear its frequency threshold. `Purple - Spray Success`
+  matched today and was **suppressed before delivery**, so no alert existed either time it
+  would have counted.
+
+What this case originally demonstrated was a gap covered by other layers. What it actually
+demonstrates is a **phase with no working detection at all**, hidden for three days by an
+accident of timing — two attacks four and a half seconds apart, which is close enough to make
+one look like coverage for the other.
 
 The threshold stays at 5. Detections are not tuned down to a lab's account count, and tuning one
 to a number produced by an undercount is worse than leaving it — the undercount moves with the

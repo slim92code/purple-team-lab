@@ -169,6 +169,25 @@ Every cell recorded as `✓ fires` by re-running a search has a corresponding tr
 the next scheduling cycle. **Two independent methods, no disagreement.** That was not guaranteed
 — the whole column was measured one way, and this is the first time the other way was asked.
 
+> **Qualified, 9 Nov 2026 — this confirms the 6 November run, not the rules.** A controlled
+> re-run after the first hardening bundle produced the same match for
+> `Purple - Spray Success` and **no alert at all**. `scheduler.log` for that run:
+> `result_count=1, suppressed=1, fired=0, alert_actions=""`. The search matched, the throttle
+> suppressed it, and no action was configured in any case.
+>
+> So the agreement recorded above is real and narrower than it reads. It establishes that on
+> 6 November the searches and the alert history told the same story. It does not establish that
+> a matching search produces an alert, because three days later the same rule on the same shape
+> of data produced none. The matrix's verdicts come from re-running the searches, which is
+> [its stated method](../coverage-matrix.md) and is unaffected; what loses force is treating the
+> alert history as independent corroboration of the rules rather than of one run.
+>
+> The cause is in [CASE-01](CASE-01-password-spray-undercount.md) — a throttle keyed on a field
+> the search renames away, over a 24-hour window that lets every suppressed run refresh the
+> suppression. It is a fourth variety of this case's own theme: after a rule that fires and
+> notifies nobody, and content that exists and is not deployed, a rule whose search matches and
+> whose alert never leaves the scheduler.
+
 ### 4.7 `Purple - Spray Success` fired twice, which settles a hedge in CASE-01
 
 11:40 is the attack. **09:40 is the clock-skew false positive.**
