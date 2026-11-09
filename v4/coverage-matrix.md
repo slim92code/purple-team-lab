@@ -19,6 +19,15 @@ the point of them.
 | **✓ fires** | The shipped rule returns at least one row for the attack |
 | **✗ silent** | The attack ran and the shipped rule returns nothing |
 | **N/E** | Not executable — the phase was not run, so there is no verdict to give |
+| **⊘ blocked** | A control prevented the attack, and the prevention left **no telemetry to detect** |
+
+`⊘ blocked` was added on 9 November, forced by the first hardening measurement that produced it,
+and it exists because the other three marks cannot express a hardening success. See
+[the bundle 2 measurement](#bundle-2-measured-9-nov-2026--lsa-protection-blocks-the-attack-and-erases-the-evidence):
+after LSA Protection, a credential dump fails and Sysmon records nothing that differs from idle
+polling. Written as `✗ silent` that reads as a detection regression; written as `N/E` it claims
+the phase was not run. **It is neither — the attack ran and lost**, and a before/after table with
+no mark for that will score every effective control as a coverage loss.
 
 `✗ silent` and `N/E` are kept apart deliberately. Silent is a finding about the rule; N/E is a
 gap in the run. Collapsing them would let an unrun phase read as a working detection.
@@ -423,6 +432,46 @@ on the same shape of data, delivered nothing today.
 So the honest reading of `#6` is **the search fires and the alert does not**, which is a third
 variety of the pattern this column keeps finding — after a rule that fires and notifies nobody,
 and content that exists and is not deployed.
+
+## Bundle 2, measured 9 Nov 2026 — LSA Protection blocks the attack and erases the evidence
+
+`RunAsPPL = 1` was applied to **THEPUNISHER only**, deliberately, so that the protected and
+unprotected hosts form a pair. After reboot, `wininit` confirms it:
+*"LSASS.exe was started as a protected process with level: 4."*
+
+The same action was then performed on both hosts: Task Manager's built-in **Create dump file**
+against `lsass.exe`, run elevated.
+
+| Host | LSA Protection | Result | Sysmon `EventCode=10` from `taskmgr.exe` |
+| ---- | -------------- | ------ | ----------------------------------------- |
+| SPIDERMAN | off | **dump succeeded**, `lsass.DMP` written | `0x1fffff` ×2, plus normal polling |
+| THEPUNISHER | **on** | *"The operation could not be completed. Access is denied."* | **`0x1000` only**, 95 events — nothing else |
+
+**The control works and the evidence disappears with it.** On the protected host there is no
+event carrying a dump-capable mask — not a lower one, not a denied one, nothing. All that remains
+is the `0x1000` polling Task Manager performs constantly whether anyone attacks or not.
+
+So after this bundle, `#10` has nothing to fire on, and **its silence is indistinguishable from
+an estate where nobody tried.** That is the risk
+[the plan named on 7 November](README.md) — *"the attack fails on the protected host; the risk is
+that it also goes silent"* — confirmed in its sharpest form: not a mask outside the rule's list,
+but no event at all.
+
+### Which is why this column needed a new mark
+
+Three marks existed: fires, silent, not executable. None of them says *the attack ran and the
+control beat it*. Recording this cell as `✗ silent` would read as a detection regression caused
+by hardening; recording it as `N/E` would claim the phase was not run. Both are false, and a
+matrix that can only say those two things **scores every working control as a loss of coverage.**
+
+`⊘ blocked` is the fourth mark and it carries an obligation: a cell only earns it when the
+blocking is *demonstrated*, not assumed. Here the demonstration is the pair — the identical
+action on the unprotected host succeeded and produced `0x1fffff`, so the absence on the protected
+host is attributable to the control rather than to nobody having tried.
+
+**Without the unprotected half, this measurement would be worthless**, which is the argument for
+the one-endpoint split the plan specified and the reason it must survive into the remaining
+bundles.
 
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
