@@ -150,6 +150,40 @@ obvious fix. "Old alerts replayed while the setting that prevents backfill was e
 behaviour nobody would predict from reading the configuration, which is exactly the kind of thing
 this lab exists to find. The cause is owed; the consequence below is not contingent on it.
 
+### 4.2c Two attempts to reproduce it, both negative
+
+Rather than leave the mechanism as a guess, it was tested twice on 9 November.
+
+**A plain restart of a running Splunk.** Every rule executed on its current slot, with
+`scheduled_time` and `dispatch_time` two seconds apart. No stale slots.
+
+**A fifteen-minute stop, long enough to miss a full ten-minute slot, then a start.** The missed
+17:15 slot was **not** executed. Everything that ran at 17:30 ran on the 17:30 slot, with lag
+between 0.2 and 1.3 minutes — ordinary dispatch delay.
+
+```spl
+index=_internal sourcetype=scheduler savedsearch_name="Purple*" earliest=-20m latest=now
+| rex field=sid "_at_(?<slot>\d+)_"
+| eval slot_time=strftime(slot,"%F %T"), lag_min=round((_time-slot)/60,1)
+| table _time savedsearch_name slot_time lag_min result_count fired
+```
+
+So `realtime_schedule = 1` behaves exactly as documented under both conditions: **a missed slot
+is skipped, not replayed.** Neither a restart nor a short outage reproduces what happened at
+14:50.
+
+What was different on 9 November is that the **whole lab had been powered off for roughly two
+days** — 7 and 8 November are empty in the index, with no Zeek or Suricata data either, so the
+sensor and Splunk machines were down too, not only the Windows guests. The remaining hypothesis
+is that a multi-day power-off, or a VM suspend-and-resume rather than a clean shutdown, leaves a
+dispatch pending that completes on restore with its original slot. **That is a hypothesis and is
+not tested**; reproducing it costs two days of downtime.
+
+**One positive control fell out of the same test, and it matters.** `Purple - Wazuh Sensor
+Health` fired at 17:45 with `fired=1` — correctly, because the heartbeat gapped while Splunk was
+stopped. So the alerting path delivers normally. `Purple - Spray Success`'s silence is
+specifically its throttle, not a broken pipeline.
+
 ### 4.3 The stale alert armed the throttle, and the live attack paid for it
 
 `alert.suppress = 1`, `alert.suppress.period = 24h`.
@@ -217,7 +251,8 @@ expect monitoring to be degraded.**
 
 | Owed | Detail |
 | ---- | ------ |
-| **Find the cause** | `realtime_schedule = 1` should have prevented this. Until it is explained, no configuration change can be claimed to fix it — reproduce it on the next restart and watch `scheduler.log` while it happens |
+| **Find the cause** | `realtime_schedule = 1` should have prevented this, and two reproduction attempts failed — a restart and a fifteen-minute stop both skipped the missed slot correctly. Until it is explained, no configuration change can be claimed as the fix |
+| **Check for it before each measurement** | The mitigation that does not require understanding the cause: run the `lag_min` query above before trusting any bundle's column. One query, and it catches a stale replay whatever produces it |
 | Mark or suppress historical results | Whatever the cause, a scheduled alert needs something that distinguishes "matched now" from "matched in a replayed window". The event timestamps are in the results; nothing reads them |
 | `#6`'s throttle key | `Client_Address` is renamed to `src` before the `table`. Not the cause here, still wrong |
 | Re-read `#6`'s before-run verdict | It is recorded as firing, and the search does fire. The alert path is not reproducible |
