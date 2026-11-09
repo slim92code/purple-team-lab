@@ -450,6 +450,42 @@ of them measures a change to it:
    >
    > The principle, stated once: **bundles that can block an attack phase go late**, so the earlier
    > ones can still run the chain they are being measured against.
+
+   > **Prepared, 9 Nov 2026 — the index cap was raised from 20 GB to 30 GB before bundle 1, and
+   > the reason is a measurement one.** Audit policy multiplies Windows event volume, and this
+   > index has already lost evidence to a size cap once: the 20 October raw data rolled off while
+   > `main` was capped at 500 MB, which is why several v3 numbers [can no longer be
+   > re-run](../detections/README.md). Losing the before-run the same way would void the entire
+   > comparison.
+   >
+   > Measured first, because the obvious estimate was wrong. Dividing total index size by calendar
+   > days gives ~90 MB/day, which is meaningless — the lab was powered off on 4, 5 and 8 November.
+   > Per **active** day:
+   >
+   > | Day | Events | MB |
+   > | --- | ------ | -- |
+   > | 3 Nov | 985,648 | **765** |
+   > | 6 Nov | 753,337 | **597** |
+   >
+   > So ~700 MB per active day, not 90. At 19 GB free that is 27 active days un-hardened, and 5 to
+   > 9 once audit policy multiplies it — too thin for five bundles plus a full re-run.
+   >
+   > **The cap was raised to 30 GB and not to 60**, because the Splunk VM has 48 GB of free disk
+   > and a cap above available disk is not a safety margin, it is a delayed disk-full. That is
+   > precisely how the Wazuh manager failed in this lab: its disk filled, `alerts.json` went to
+   > zero bytes, and sixteen hours of EDR data were lost with every health check reporting
+   > healthy. 30 GB leaves 19 GB of disk unclaimed.
+   >
+   > **And the cap is the smaller lever.** The real one is leaving `Filtering Platform Connection`,
+   > `Filtering Platform Packet Drop` and `Handle Manipulation` disabled — a deliberate deviation
+   > from the 24 October plan's "across all categories", recorded here as one. No shipped rule
+   > reads any of them, and on a domain controller they produce tens of thousands of events per
+   > hour. With them enabled neither 30 GB nor 60 GB survives the run; without them the multiplier
+   > is 2–3×, which 30 GB absorbs comfortably.
+   >
+   > **Still unwatched:** nothing monitors the Splunk VM's own disk. `Purple - Wazuh Sensor Health`
+   > covers wazuh-vm, and the indexer that holds every measurement in this repo has no rule over
+   > its own storage — the same failure mode that already cost sixteen hours. On the step 8 list.
 7. **One full kill-chain re-run at the end**, with the hardening in place — the pair to the before-run at step 4. That is the clean
    "after" state, and it is the column the before/after comparison actually rests on.
 
