@@ -96,16 +96,59 @@ The two search IDs resolve it:
 | 14:50:46 | `…_at_**1794013200**_7618` | **7 Nov 2026, 02:00** |
 | 14:50:49 | `…_at_1794232200_7620` | 9 Nov 2026, 14:50 |
 
-The first was **not a current run.** It was a catch-up execution of a slot missed while the lab
-was powered off, and the `at_` component carries the *scheduled* time, not the execution time.
+The first was **not a current run.** The `at_` component carries the slot the execution belongs
+to, not the moment it ran, and that slot is two days in the past.
 
-**A catch-up run searches the window belonging to its original slot.** For a 7 November 02:00
-slot with `dispatch.earliest_time = -24h@h`, that window is **6 Nov 02:00 to 7 Nov 02:00** — and
-the 6 November password spray sits inside it, at 11:32.
+**The job's own results settle what it searched.** Because the alert fired, the dispatch
+artifact is retained, and it can be read back directly rather than reconstructed:
 
-So the rule found the before-run's spray, three days after it happened, and alerted on it as
-though it were current. `Purple - LSASS Access` fired in the same millisecond for the same
-reason: its catch-up window contains the 6 November LSASS read at 17:06.
+```spl
+| loadjob "scheduler__nobody_cHVycGxlX2xhYg__RMD56f21d888b74d0278_at_1794013200_7618"
+| table _time src Account_Name eventcount
+```
+
+| `_time` | src | Accounts | eventcount |
+| ------- | --- | -------- | ---------- |
+| **2026-11-06 09:29:43** | `192.168.182.138` | Administrator, `SPIDERMAN$` | 10 |
+| **2026-11-06 11:32:00** | `192.168.182.133` | Administrator, SQLService, fcastle, pparker, tstark | 19 |
+
+Both rows are from **6 November**. For a 7 November 02:00 slot with
+`dispatch.earliest_time = -24h@h`, the window is 6 Nov 02:00 to 7 Nov 02:00, and these are the
+two transactions inside it — the before-run's spray at 11:32, and the clock-skew false positive
+at 09:29 that [CASE-01](CASE-01-password-spray-undercount.md) records.
+
+So the two alerts delivered at 14:50 today were **a replay of a true positive and a replay of a
+false positive, both three days old.** `Purple - LSASS Access` fired in the same millisecond, its
+own stale window containing the 6 November LSASS read.
+
+### 4.2b The mechanism is not explained, and the setting that should prevent it is enabled
+
+The obvious reading is a catch-up execution of a slot missed while the lab was powered off. The
+configuration contradicts it:
+
+```
+/opt/splunk/etc/system/default/savedsearches.conf    realtime_schedule = 1
+/opt/splunk/etc/system/default/savedsearches.conf    schedule_window = 0
+```
+
+`realtime_schedule = 1` is the effective value — nothing in the app overrides it — and under it
+the scheduler is supposed to compute the next run from the current time and **skip** missed
+slots rather than backfill them.
+
+So what is established is the behaviour, not its cause:
+
+| Established by measurement | Not established |
+| -------------------------- | --------------- |
+| A run executed at 14:50:46 on 9 Nov | Why a two-day-old slot executed at all |
+| Its slot was 7 Nov 02:00 | Whether this is restart-specific, version-specific, or something else |
+| It searched that slot's window and returned two 6 November rows | — |
+| It delivered two alerts and armed the throttle | — |
+
+That is worth stating plainly rather than papering over, because **it makes the finding worse,
+not better.** "Backfill was enabled and replayed old alerts" is a configuration mistake with an
+obvious fix. "Old alerts replayed while the setting that prevents backfill was enabled" is a
+behaviour nobody would predict from reading the configuration, which is exactly the kind of thing
+this lab exists to find. The cause is owed; the consequence below is not contingent on it.
 
 ### 4.3 The stale alert armed the throttle, and the live attack paid for it
 
@@ -158,9 +201,11 @@ Every rule involved worked correctly. The searches matched what they were writte
 throttle did what throttles do. The failure is in the interaction:
 
 - A lab that is powered off accumulates missed schedule slots.
-- On restart, each is executed against its **own historical window**.
-- Any attack inside that window re-alerts, with no marker distinguishing it from a live event.
-- And the throttle it arms then blinds the rule for 24 hours.
+- At least one was executed on restart against its **own historical window**, despite
+  `realtime_schedule = 1`, which is supposed to prevent exactly that.
+- The attacks inside that window re-alerted, with no marker distinguishing them from live events
+  — one true positive and one false positive, both three days old.
+- And the throttle they armed then blinded the rule for 24 hours.
 
 For this lab the consequence is a measurement problem: a control re-run designed to confirm the
 before column instead found that the column's `#6` verdict is not reproducible on the alerting
@@ -172,8 +217,8 @@ expect monitoring to be degraded.**
 
 | Owed | Detail |
 | ---- | ------ |
-| Decide on catch-up executions | Splunk can be told not to backfill missed slots. For detection content that is almost always right: a stale alert is worse than no alert |
-| Mark or suppress historical results | If catch-up is kept, a scheduled alert needs something that distinguishes "found now" from "found in a replayed window" |
+| **Find the cause** | `realtime_schedule = 1` should have prevented this. Until it is explained, no configuration change can be claimed to fix it — reproduce it on the next restart and watch `scheduler.log` while it happens |
+| Mark or suppress historical results | Whatever the cause, a scheduled alert needs something that distinguishes "matched now" from "matched in a replayed window". The event timestamps are in the results; nothing reads them |
 | `#6`'s throttle key | `Client_Address` is renamed to `src` before the `table`. Not the cause here, still wrong |
 | Re-read `#6`'s before-run verdict | It is recorded as firing, and the search does fire. The alert path is not reproducible |
 

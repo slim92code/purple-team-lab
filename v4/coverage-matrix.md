@@ -389,11 +389,19 @@ two hours *before* the spray, on an estate reverted to a clean snapshot an hour 
 attack in between.
 
 The search ID resolves it. That execution carries `…_at_1794013200_…`, a scheduled slot of
-**7 November 02:00** — a **catch-up run** for a slot missed while the lab was powered off. A
-catch-up searches the window belonging to its original slot, here 6 Nov 02:00 to 7 Nov 02:00,
-**which contains the before-run's spray.** The rule alerted on a three-day-old attack as though
-it were live, armed its 24-hour throttle, and the real spray two hours later was suppressed.
-`Purple - LSASS Access` fired in the same millisecond for the same reason.
+**7 November 02:00**, and because the alert fired its dispatch artifact survives — so what it
+returned can be read back with `| loadjob` rather than reconstructed. Both rows are dated
+**6 November**: the before-run's spray at 11:32, and the clock-skew false positive at 09:29.
+
+So the rule replayed a three-day-old window, delivered two stale alerts — one true positive, one
+false — armed its 24-hour throttle, and the real spray two hours later was suppressed.
+`Purple - LSASS Access` fired in the same millisecond off its own stale window.
+
+**The cause is not established, and the setting that should prevent it is on.**
+`realtime_schedule = 1` is the effective value from Splunk's system defaults, and under it the
+scheduler should skip missed slots rather than execute them. That makes the finding worse rather
+than better: a backfill that was switched on would be a configuration mistake with an obvious
+fix, while this is behaviour the configuration says should not occur.
 
 Written up as [CASE-09](investigations/CASE-09-a-stale-alert-suppressed-a-live-one.md).
 
