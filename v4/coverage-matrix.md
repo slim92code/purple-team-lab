@@ -757,6 +757,92 @@ on an event with no rule at all.
 That is the most useful thing bundle 4 produced, and it is an argument against the hardening as
 configured rather than for it.
 
+## Bundle 4b, measured 10 Nov 2026 — the control that closes 4a's hole, and logs it
+
+Protected Users was deferred out of bundle 2 for attribution, then split out of bundle 4 for the
+same reason: it and AES-only were both predicted to break phase 6. Bundle 4a's result gave it a
+sharper prediction than the one it was deferred on.
+
+**4a prevented RC4 Kerberos and the authentication moved to NTLM and succeeded**, leaving `4776`
+as its only trace and no rule reading it. Protected Users forbids NTLM outright for its members.
+So 4b's prediction became: *it closes the exact hole 4a opened.*
+
+### Control first, and the control needed its own control
+
+NTLM was forced by mapping a share **by IP address**, which gives no SPN and so no Kerberos path.
+Before adding anyone to the group, at 03:48:51:
+
+```
+net use \\192.168.182.135\IPC$ /user:MARVEL\fcastle <password>   → "The command completed successfully."
+```
+
+That is not yet evidence that NTLM was the mechanism — "SMB over an IP address usually cannot use
+Kerberos" is a belief, and 4a is what believing one costs. The events settle it:
+
+| Time | Event | Detail |
+| ---- | ----- | ------ |
+| 03:48:51.811 | `4776` | `fcastle`, `MICROSOFT_AUTHENTICATION_PACKAGE_V1_0`, `Error_Code 0x0` |
+| 03:48:51.813 | `4624` | `Logon_Type 3`, **`Authentication_Package = NTLM`**, `THEPUNISHER` |
+
+No `4768`. The rig is valid: this path is NTLM, and it worked.
+
+### Applied and re-measured
+
+`fcastle` and `SQLService` added to Protected Users. No restart — the DC enforces the NTLM refusal
+at authentication time. Same command, 96 seconds later:
+
+```
+System error 1327 has occurred.
+Account restrictions are preventing this user from signing in.
+```
+
+`1327` is `ERROR_ACCOUNT_RESTRICTION`. And unlike 4a, **the refusal is written down**, twice, on two
+different events:
+
+| Time | Event | Code | Detail |
+| ---- | ----- | ---- | ------ |
+| 03:50:27.591 | `4625` | `Status` / `Sub_Status` **`0xC000006E`** | `Logon_Type 3`, NTLM, `THEPUNISHER` |
+| 03:50:27.591 | `4776` | `Error_Code` **`0xC000006E`** | `fcastle` |
+
+`0xC000006E` is `STATUS_ACCOUNT_RESTRICTION`. Control for the window: all three hosts were logging
+heavily (THEPUNISHER 496 × `4658`, DC 73 × `4688`, SPIDERMAN 69 × `4688`), so the presence is not a
+pipeline artefact any more than 4a's absence was.
+
+### Three outcomes, not two — and this is what the matrix was built to show
+
+Bundle 2 introduced `⊘ blocked` for a control that stops the attack and erases the evidence.
+Bundles 4a and 4b together show that "prevented" splits three ways, and the difference is the whole
+argument for measuring rather than asserting:
+
+| Outcome | Example | Detectable? | Huntable? |
+| ------- | ------- | ----------- | --------- |
+| Prevented, evidence **deleted** | 4a lever 4 — RC4 refused, no Kerberos event at all | no | **no** |
+| Prevented, evidence **written, no rule** | 4b — `4625` + `4776` at `0xC000006E` | no | **yes** |
+| Prevented, evidence written, **rule fires** | none in this estate yet | yes | yes |
+
+**4b is materially better than 4a and still not good enough.** Nothing reads `4625`, nothing reads
+`4776`, nothing reads `0xC000006E`: `grep -rn` over `detections/` returns no rule for any of them.
+The difference is that 4b leaves something a hunt can find, and 4a leaves nothing — which is a
+larger gap than one notch on a coverage scale suggests.
+
+**And the repository already knew.** `detections/attack_navigator_layer.json` states *"EC4625 only
+appears if kerbrute falls back to NTLM."* The NTLM fallback was anticipated, written down as
+documentation, and never turned into a rule — the same split between what is recorded and what the
+instance does that [CASE-07](investigations/CASE-07-the-loudest-rule-is-not-in-the-repo.md) is
+about.
+
+### What 4b has not measured
+
+- **RC4 pre-authentication for members.** Protected Users also forbids RC4 in Kerberos pre-auth,
+  which makes it a **fifth lever** on 4a's question — and, unlike lever 4, it is per-account and it
+  logs. That the lever which both works and stays visible is the one that was deferred is the
+  neatest result of the bundle, and it is **untested**: it needs a member account requesting RC4.
+- **Phase 6.** Both 4a and 4b are now predicted to break Pass-the-Ticket, which is exactly the
+  collision the split was designed to avoid — but the split preserves attribution, because 4a's
+  effect was measured before 4b was applied.
+- **Delegation and cached credentials**, the group's other two effects. Neither is on this chain's
+  path and neither has a cell.
+
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
 The layer table below has four columns: Splunk, Wazuh, Suricata, Zeek. There is a fifth running
@@ -1714,12 +1800,15 @@ rule and the fix are waiting on the same event.
 
 ## Still owed to this matrix
 
-**New, from bundle 4a — a rule on the NTLM fallback path.** Lever 4 prevents RC4 Kerberos and
-leaves `4776` as the only trace of the authentication that happens instead. `grep -rn 4776
-detections/` returns nothing. Until something reads it, the hardening's own side effect is an
-uninstrumented success path, and the measured outcome of bundle 4a is that detection got worse
-rather than better. This outranks the four fixes held for step 8, because those cover cases the
-estate already partially sees and this one covers a case it does not see at all.
+**New, from bundles 4a and 4b — a rule on the NTLM path, in both directions.** Lever 4 prevents RC4
+Kerberos and leaves `4776` as the only trace of the authentication that happens instead; Protected
+Users then refuses that authentication and writes `4625` and `4776` at `0xC000006E`. `grep -rn`
+over `detections/` finds no rule for `4776`, for `4625`, or for `0xC000006E`. So the estate now
+cannot see either the fallback succeeding or the fallback being blocked — the success path and the
+control that closes it are both uninstrumented. One rule covers both: NTLM authentication for an
+account that should not be using it, split by result code. This outranks the four fixes held for
+step 8, because those cover cases the estate already partially sees and this covers two it does not
+see at all.
 
 A second item from the same finding: **`#13` needs a note in its own description** saying that
 after lever 4 its silence is expected and does not indicate absence of attack. Its current text,
