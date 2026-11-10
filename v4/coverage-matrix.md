@@ -693,11 +693,69 @@ output refutes. What the fix bought is all six TGTs, **including `rc4test`'s TGT
 is the Pass-the-Ticket equivalent.** Detection caught what prevention did not, and it caught it
 only because the scope defect had been repaired the day before.
 
-**The actual lever is `krbtgt` explicitly.** With `msDS-SupportedEncryptionTypes = 0` it inherits a
-preference; set to `24`, the KDC is forbidden to use RC4 for TGTs rather than merely disinclined.
-Applied 10 Nov 2026 with THEPUNISHER's RC4-only client policy left in place, which makes the test
-rig correct for the first time: the client demands RC4, the KDC may not use it, and whatever gets
-written is the answer to the `0xE` prediction.
+### Four levers, and only the fourth one refuses anything
+
+With THEPUNISHER pinned to RC4-only as the test rig, each candidate control was applied in turn and
+the same logon retried. The rig is the point: the client demands RC4, so any lever that forbids RC4
+has to show itself.
+
+| # | Lever | Where | Result |
+| - | ----- | ----- | ------ |
+| 1 | `DefaultDomainSupportedEncTypes = 0x18` | DC registry, domain-wide default | **RC4 issued** — 9 tickets at `0x17`, all `Result_Code 0x0` |
+| 2 | `msDS-SupportedEncryptionTypes` per account | AD attribute on `rc4test` (set to `4`) | **AES issued** to an RC4-only account — not a lever in either direction |
+| 3 | `msDS-SupportedEncryptionTypes = 24` on `krbtgt` | AD attribute | **RC4 issued** — `4768` and `4769` at `0x17`, `0x0`, 03:16:58 |
+| 4 | `SupportedEncryptionTypes = 0x18` | DC's own Kerberos policy (`…\Policies\System\Kerberos\Parameters`) | **RC4 refused** |
+
+**The three Active Directory attributes are preferences. The DC's own Kerberos policy is the
+enforcement.** An attribute says which etype the KDC prefers while a key of that type still
+exists; the machine policy says which etypes the KDC's Kerberos stack may use at all. Nothing in
+the attribute names distinguishes them, and "AES-only Kerberos" as a one-line hardening item is
+therefore not one setting. Two predictions were made here and both were wrong in the same way —
+each assumed an AD attribute forbids rather than prefers.
+
+### What lever 4 actually cost, measured
+
+After the fourth lever and a DC restart, the same logon at 03:31:26:
+
+| Event | Present? | Detail |
+| ----- | -------- | ------ |
+| `4768` for `rc4test` | **no** | not one, at any etype |
+| `4771` | **no** | — |
+| `0xE` (KDC_ERR_ETYPE_NOTSUPP) | **no** | — |
+| `4776` for `rc4test` | **yes** | 03:31:26.682, `Error_Code 0x0` — **NTLM, successful** |
+
+Control for the empty result, since an absence after a DC restart could be a forwarder gap: in the
+same 15-minute window the DC logged 21 × `4768`, 30 × `4769`, 155 × `4624` and 719 × `4673`. The
+DC was logging heavily. The absence is the estate, not the pipeline.
+
+**So RC4 Kerberos was prevented and the authentication was not.** The account logged on; it changed
+protocol. And the prediction was wrong in a worse direction than expected: the signal does not
+*move* to an uninstrumented event, it **stops existing**. No Kerberos event of any kind was written
+for a request that the KDC declined on policy grounds.
+
+**`4776` is the only remaining trace, and no rule in this repository reads it.** `grep -rn 4776
+detections/` returns nothing; the event number appears once in the whole repo, in `v2`'s audit
+policy list. Coverage on the fallback path is zero.
+
+**The mark is `✗ silent`, and deliberately not `⊘ blocked`.** `⊘` was introduced in bundle 2 for a
+control that stopped the attack and erased its evidence. Here only the *protocol* was stopped — the
+attack succeeded by another route — so `⊘` would read as a win the measurement does not support.
+The distinction is worth more than the tidiness of reusing the mark.
+
+**One nuance against overclaiming, because the phase 6 question is narrower.** This result is about
+a Windows interactive logon, where LSA negotiates and falls back on its own. `Rubeus asktgt` wants
+a Kerberos TGT specifically and has nothing to fall back to, so for the Pass-the-Ticket phase
+lever 4 probably does prevent the step. That is a prediction, not a measurement, and it stays
+labelled as one until the phase is re-run.
+
+**The net position after bundle 4a.** Prevention of RC4 Kerberos: achieved, at the fourth attempt,
+by a control three documented alternatives did not provide. Prevention of the attacker
+authenticating: not achieved. Detection: worse than before — `#13` was repaired into a rule that
+catches the real case, and lever 4 removes the case it catches while leaving the attack path open
+on an event with no rule at all.
+
+That is the most useful thing bundle 4 produced, and it is an argument against the hardening as
+configured rather than for it.
 
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
