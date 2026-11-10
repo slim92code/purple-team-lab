@@ -958,6 +958,123 @@ about.
 - **Delegation and cached credentials**, the group's other two effects. Neither is on this chain's
   path and neither has a cell.
 
+## Bundle 3b, measured 10 Nov 2026 — the default-Block prediction was wrong, and the instrument had to be found first
+
+### The DC's gap, measured
+
+| Host | `DefaultInboundAction` | Inbound allow rules |
+| ---- | ---------------------- | ------------------- |
+| HYDRA-DC | **`Allow`, explicitly, all three profiles** | 132 |
+| THEPUNISHER | `NotConfigured` | 120 |
+| SPIDERMAN | `NotConfigured` | 117 |
+
+The DC carries 13 `Active Directory Domain Services` rules, 4 `DNS Service`, 4 `Kerberos Key
+Distribution Center`, 9 `File and Printer Sharing`, 3 WMI and 2 WinRM — all enabled. **That is what
+made flipping the default survivable**, and checking it was the point: default-Block on a domain
+controller with those groups disabled takes the domain down in one command.
+
+### The intended instrument does not exist, and cannot be repaired
+
+`inputs.conf` monitors `C:\Windows\System32\LogFiles\Firewall\pfirewall.log` with
+`sourcetype = firewall`. The DC reports `LogAllowed: True` and `LogBlocked: True` on all three
+profiles. `sourcetype=firewall` has **zero events in 24 hours**, and the reason is one line:
+
+```
+Test-Path %SystemRoot%\System32\LogFiles\Firewall   →   False   (all three hosts)
+```
+
+**The target directory does not exist.** Windows reports logging as enabled, the forwarder watches
+the path, and nothing has ever been written. Nobody received an error.
+
+Creating the directory, granting `MpsSvc`, and setting `LogBlocked True` produced the file — and
+then **seven deliberately blocked connections produced no records at all.** It sat at 208 bytes,
+header only. `Restart-Service mpssvc` returns `Cannot open mpssvc service`: protected, like
+`Dnscache` and `WinHttpAutoProxySvc` in 3a.
+
+That is the **fifth and sixth** appearance of one pattern tonight, after `#13` loaded but not
+reloaded, `DefaultDomainSupportedEncTypes` as a preference, `Add-MpPreference` silently storing
+nothing, and `Set-Service` on protected services. Stated once more because the count is now the
+finding: **the interface that reports success is not the interface that holds the state.**
+
+### The instrument that works is on the sensor, not the host
+
+Zeek sees every dropped SYN as `conn_state = S0` — a connection attempt with no reply, which is
+exactly the signature of a silent drop. Seven test connections to closed ports on THEPUNISHER
+produced 23 `S0` rows naming source, destination and port.
+
+**That is the better instrument and not merely the available one.** The host firewall log asks the
+machine under test to report on itself; the sensor does not. When bundle 5b needed Defender's
+channel, the same lesson arrived from the other direction — a control is only as measurable as the
+telemetry that does not depend on it.
+
+A corroborating detail: the test ran at `16:43` by the DC's clock and Zeek logged it at `15:43`.
+That is the +1h DC skew this matrix already documents, reproducing consistently.
+
+### Default inbound Block, applied — and nothing broke
+
+Workstations first (effectively no-ops, which validates the command), then the DC. Immediately
+after:
+
+| Check | Result |
+| ----- | ------ |
+| `nltest /dsgetdc` on the DC | succeeds |
+| `Get-ADUser fcastle` | returns the account |
+| `nltest` from THEPUNISHER | finds the DC |
+| SMB 445 / LDAP 389 / Kerberos 88 → DC | **all `True`** |
+| Splunk, all five hosts, 10 min | 865 / 599 / 507 / 4010 / 382 |
+
+**The riskiest single change in v4 cost nothing**, because the rule groups were checked before the
+default was flipped rather than after.
+
+### The plan's own prediction about IPv6 was wrong, and the measurement says why
+
+[`v4/README.md`](README.md) states that the GPO's default-inbound Block *"is not scoped to an
+address or a family, so it closes the path the per-address rules missed."* Measured immediately
+after applying it, from THEPUNISHER to SPIDERMAN on 445:
+
+| Path | With default Block applied |
+| ---- | -------------------------- |
+| IPv4 `192.168.182.138` | **blocked** |
+| IPv6 `fd15:…:bb84:11a:938d:4bc8` | **open** |
+| by name `SPIDERMAN` | **open** — resolves to IPv6 |
+
+**Default-inbound Block changed nothing about the IPv6 path.** Windows Firewall evaluates the
+default *only when no rule matches*. IPv4 is refused by the v3 `Block-SPIDERMAN-SMB` rule, which is
+address-scoped; IPv6 matches an enabled **allow** rule from the `File and Printer Sharing` group,
+and an allow rule is still a match. The default is never consulted.
+
+So the v3 IPv6 gap reproduced **after** the control that was supposed to close it, and the
+correction is about precedence rather than about address families: **a default cannot close a path
+that an allow rule holds open.**
+
+### The fix, and what it preserves
+
+Disabling the `File and Printer Sharing` inbound rules on both workstations — 17 rules each — is
+scoped to the *service*, not to an address, so it covers both families by construction. That is
+precisely what the v3 per-address rules lacked.
+
+| Path | Before | After |
+| ---- | ------ | ----- |
+| IPv4 445 | blocked | blocked |
+| IPv6 445 | **open** | **blocked** |
+| by name 445 | **open** | **blocked** |
+| WinRM 5985 | open | **open** |
+
+WinRM is the monitored pivot the lateral-movement case depends on, and it survives. **Prevention
+narrows the lateral path to the one lane the detection already watches**, which is what the build
+plan asked for — reached by a different route than the one it specified.
+
+### Where this leaves the exfiltration cell
+
+The 100 MB copy that produced the `Large Outbound Transfer` row went to `\\SPIDERMAN\BenignShare`
+over IPv6. That path is now closed in both families, so the transfer cannot occur and the rule has
+nothing to return.
+
+**The mark is the middle category from bundle 4b, not `⊘ blocked`.** The attempt still writes
+evidence — Zeek records the refused SYNs as `S0`, with source, destination and port — so this is
+*prevented, evidence written, no rule reading it*, rather than bundle 2's *prevented, evidence
+erased*. The gap is a rule, not a sensor, and that is the cheaper of the two to close.
+
 ## Bundle 3a, measured 10 Nov 2026 — two test designs failed before one worked
 
 Bundle 3 is split like 4 and 5, and for the same reason. The protocol controls (LLMNR, NBT-NS,
