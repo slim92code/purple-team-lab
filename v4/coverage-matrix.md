@@ -1286,8 +1286,25 @@ checking RC4 coverage from this cell would conclude the estate has it instrument
 
 **The owed work changes accordingly.** This is no longer a rule awaiting a positive test after
 enforcement; it is a rule that needs `4768` as well as `4769` before that test means anything.
-Both are held for step 8 — the fix and then the test — and the test has to use a TGT, since that
-is where this estate actually produces RC4.
+
+> **Applied, 9 Nov 2026 — and this is the one fix that does not wait for step 8.** The rule now
+> reads `(EventCode=4768 OR EventCode=4769)` and splits the output by message type, because a
+> `0x17` TGS is a downgraded Kerberoast while a `0x17` TGT is an account still holding and using
+> an RC4 key — different findings from the same encryption type.
+>
+> It is exempt from the no-changes-between-columns discipline **because it is bundle 4's
+> prerequisite**, and the exemption is narrow: without it, AES enforcement produces
+> `✗ silent → ✗ silent`, and that silence would mean *"the rule is pointed at the wrong event"*
+> rather than *"enforcement worked"*. Fixing it afterwards cannot recover the measurement.
+>
+> The before column is unaffected — `#13`'s cell was measured as silent against a control showing
+> zero `0x17` in `4769`, which the fix does not change. What changes is that the after column can
+> now say something. The post-enforcement test still has to use a **TGT**, since that is where
+> this estate produces RC4; testing with a TGS would pass against a rule that still could not see
+> the real case.
+>
+> `enableSched` stays `0`. Pre-enforcement the rule returns this estate's legitimate RC4, which
+> is not an alertable condition; scheduling belongs with the bundle that makes `0x17` anomalous.
 
 **Why the before column could not have caught this on its own.** Pre-hardening, the rule is
 expected to be silent, so a silent result looks like confirmation. It took measuring a *different*
@@ -1415,7 +1432,7 @@ destroys the comparison those columns exist to make:
 | `#6` Spray Success | **reconsidered — see below** | the clock skew is produced by this lab's own revert procedure, not by the estate |
 | `#2` C2 Beacon | extend the OneDrive allowlist to `OneDrive\Update\OneDriveSetup.exe` | a fourth OneDrive binary in a fourth directory shape |
 | `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress, which does not exist yet |
-| `#13` RC4 Anomaly | add `4768` — the rule reads `4769` only and this estate's RC4 is in TGTs | the defect was found from a phase with no rule; the fix must precede its positive test |
+| ~~`#13` RC4 Anomaly~~ | ~~add `4768`~~ — **done 9 Nov 2026**, ahead of the others and deliberately | it is bundle 4's prerequisite: unfixed, AES enforcement would read silent-to-silent and the silence would mean "pointed at the wrong event" rather than "enforcement worked" |
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
 should produce a row, and without that test its two silences prove nothing.
