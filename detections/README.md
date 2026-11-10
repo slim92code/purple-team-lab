@@ -318,8 +318,18 @@ owner instead of the encryption type, which is what survives a domain on AES. It
 and ships unscheduled in the Splunk pack until a per-environment SPN allowlist exists.
 
 Rule 2 is kept rather than deleted, and not only as a reference for older domains. RC4 is
-not blocked on `MARVEL.LOCAL`: the service account still holds an RC4 key, and the
-Pass-the-Ticket step of the v3 run obtained a `4768` TGT for it at `0x17`. The roast came
+~~not blocked~~ **no longer obtainable** on `MARVEL.LOCAL` — but only since 10 Nov 2026 and only by
+one specific control. The service account still holds an RC4 key, and the
+Pass-the-Ticket step of the v3 run obtained a `4768` TGT for it at `0x17`.
+
+> **Dated, 10 Nov 2026.** Three documented AES-only levers were applied and measured, and all three
+> are **preferences rather than prohibitions**: with a client pinned to RC4-only, the KDC issued
+> nine RC4 tickets after `DefaultDomainSupportedEncTypes = 0x18`, and more after
+> `msDS-SupportedEncryptionTypes = 24` on `krbtgt`. Only `SupportedEncryptionTypes = 0x18` in the
+> **DC's own machine Kerberos policy** refuses an explicit downgrade. So rule 2 covered a live
+> condition for the whole project up to that date, and the condition closed by one registry value
+> on one host, not by the account properties any of this pack's notes point at. Measurement in
+> [the v4 matrix](../v4/coverage-matrix.md). The roast came
 back AES because `GetUserSPNs` requested no specific etype and the KDC issued the strongest
 one both sides shared. Rule 2 therefore still covers the explicit downgrade, which this
 domain would honour; what it cannot see is the default-etype roast, which is what a current
@@ -343,7 +353,23 @@ Zeek field, so without the package `ssl.log` has no such column and the rule can
 Splunk counterpart is `Purple - Sliver C2 Beacon by JA4 Fingerprint`, which adds the beacon
 interval and jitter the Sigma form cannot express.
 
-### The pipeline-health search, and the one bug found by reading
+### Three rules added 10 Nov 2026 for events nothing here read
+
+Written during the v4 hardening run, from conditions the bundles themselves produced. All three
+ship with `enableSched = 0` and go live at step 8, for the reason `#13`'s fix did: enabling a new
+detection between the before and after columns changes what the after column can see.
+
+| Rule | Reads | Why it exists |
+| ---- | ----- | ------------- |
+| `Purple - NTLM Authentication Path (fallback success and policy denial)` | `4776` | Bundle 4a made the KDC refuse RC4 and the authentication **moved to NTLM and succeeded** — no Kerberos event of any kind was written. Bundle 4b then refused that NTLM with `0xC000006E`. One event number carries the hole and the fix; nothing in this pack read `4776`, `4625` or `0xC000006E` before. |
+| `Purple - Defender Protection Setting Weakened (5007)` | `5007`, old/new value parsed | Weakening a protection setting is a standard post-compromise step and Microsoft's own event text says to treat an unexpected one as possible malware. It caught an unintended `PUAProtection` change on the DC within minutes of the channel being forwarded. It parses **direction** rather than counting, because `5007` also carries signature-update noise — 425 events on the DC alone. |
+| `Purple - Defender Threat Detected or Remediated (1116/1117)` | `1116` / `1117`, body parsed with `rex` | Defender has been the most consistently effective control in this estate across the whole project and had no rule and no column. The channel has no TA extractions here, so `Threat_Name`, `Severity_Name` and `Action_Name` are present and **empty** on every event — `Behavior:Win32/DumpLsass.C!attk` was readable on the console and not searchable in the index. |
+
+All three were verified against their known events on the day they were written, and the third
+returned a row nobody looked for: a detection with **no** remediation, which is the case it keeps
+`1116` and `1117` grouped in order to expose.
+
+## The pipeline-health search, and the one bug found by reading
 
 `Purple - Telemetry Gap` watches the collection path rather than the attacker: it fires when a
 host is still sending data while its Windows event logs have gone stale. It exists because

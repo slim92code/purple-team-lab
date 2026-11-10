@@ -1299,9 +1299,17 @@ is precisely the kind of signal that looks like a working control in a dashboard
 ### Bundle 5b's prerequisite, declared rather than discovered
 
 ASR writes its blocks to Defender's operational channel. That channel is forwarded from **one of
-three hosts**, and from that one it carries only `2001`, `5007` and `1152` — no detection events at
-all. **An ASR block on SPIDERMAN or the DC would be invisible**, and the cell would read a silence
-that means "we cannot see" rather than "nothing happened". That is the error bundle 4a made.
+three hosts**, and ~~from that one it carries only `2001`, `5007` and `1152` — no detection events
+at all~~. **An ASR block on SPIDERMAN or the DC would be invisible**, and the cell would read a
+silence that means "we cannot see" rather than "nothing happened". That is the error bundle 4a
+made.
+
+> **The struck clause is false and was corrected the same day.** THEPUNISHER had `1116` and `1117`
+> in the index from 6 November, one second after the events, naming the Sliver implant under
+> `C:\Users\Public\MicrosoftEdgeUpdate.exe` with `wsmprovhost.exe` as parent. The prerequisite
+> below stands — the other two hosts genuinely sent nothing — but the third host's half of it was
+> an **analysis** gap, not an ingest gap. See
+> [the correction in the Defender section](#defender-the-fifth-layer-nobody-counted--measured-9-nov-2026).
 
 So Defender forwarding is a **prerequisite for 5b**, and it collides with its own step-8
 classification. The collision is resolved the way `#13`'s was for bundle 4: a narrow, declared

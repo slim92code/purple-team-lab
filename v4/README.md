@@ -86,8 +86,17 @@ the baseline rather than pretending it is a checkbox.
 > name reaches it over IPv6 past the block. It was found by accident: a 100 MB copy to
 > `\\SPIDERMAN\…` succeeded while the same copy to `\\192.168.182.138\…` was refused. A block
 > written per address covers that address and that address family; the GPO's default-inbound
-> Block, with no rule admitting 445 on the workstations, covers every source. The re-test after
+> Block, ~~with no rule admitting 445 on the workstations~~, covers every source. The re-test after
 > hardening checks both paths — by IP and by name.
+>
+> **The struck clause was the whole load-bearing assumption, and it was false. Measured 10 Nov
+> 2026.** The workstations each carried **17 enabled `File and Printer Sharing` inbound rules**, so
+> 445 *was* admitted by a rule. With default-inbound Block applied, IPv4 to SPIDERMAN was refused
+> (by the v3 address-scoped block) while **IPv6 and by-name were still open** — the gap reproduced
+> *after* the control meant to close it. Windows Firewall consults the default only when no rule
+> matches, and an allow rule is a match. The fix was to disable those 17 rules per workstation,
+> which is scoped to the service rather than to an address and so covers both families. Full
+> measurement in [the matrix](coverage-matrix.md).
 
 ## Forwarder sourcetypes and CIM
 
@@ -751,7 +760,9 @@ Two consequences for this bundle:
    owed and held; **it must land before this bundle, not after**, or the bundle's own column is
    uninterpretable.
 2. The bundle gains a prediction it did not have, and a better one: **AES enforcement should
-   break Pass-the-Ticket outright.** `Rubeus asktgt` presenting an RC4 key to a KDC that enforces
+   break Pass-the-Ticket outright.** (**Qualified 10 Nov 2026: only at the fourth lever — the DC's
+   own machine Kerberos policy. The three Active Directory levers are preferences and the KDC
+   issues RC4 on demand under all of them. See [the matrix](coverage-matrix.md).**) `Rubeus asktgt` presenting an RC4 key to a KDC that enforces
    AES has nothing to negotiate. So phase 6 has two questions in the after-run rather than zero —
    does a rule catch the attempt, and does the attempt still work. A phase with no coverage at all
    becomes the bundle's clearest measurement.
@@ -771,7 +782,11 @@ regression.
 
 **Bundle 3, Network protocols — "the rule goes silent" is wrong.** The table predicts the firewall
 GPO's default-inbound Block kills the IPv6 SMB copy, so
-`Purple - Large Outbound Transfer` *"goes silent"*.
+`Purple - Large Outbound Transfer` *"goes silent"*. (**The mechanism in that prediction is also
+wrong — measured 10 Nov 2026: the default-inbound Block does not kill the IPv6 copy. Disabling the
+workstations' `File and Printer Sharing` inbound rules does. See
+[the matrix](coverage-matrix.md).** The conclusion below stands either way, for a reason unrelated
+to which control closes the path.)
 [CASE-06](investigations/CASE-06-exfil-uncalibrated-threshold.md) measured that the rule also
 fires on 12.5 MB of ordinary Microsoft HTTPS, which the GPO does not touch — it blocks inbound,
 and this is outbound to a Microsoft address.
@@ -866,10 +881,19 @@ finding disproves that. A 100 MB copy from THEPUNISHER to `\\SPIDERMAN\BenignSha
 over IPv6 and went through, while the same copy by IPv4 address was refused: the v3 rules are
 scoped to single IPv4 addresses. Zeek logged it, and `Purple - Large Outbound Transfer` now
 matches IPv6 sources while its `resp_h` exclusion is IPv4-only, so SPIDERMAN's IPv6 address is not
-excluded and the rule returns the row. The v4 GPO's default-inbound Block is not scoped to an
-address or a family, so it closes the path the per-address rules missed. Inbound enforcement and
+excluded and the rule returns the row. ~~The v4 GPO's default-inbound Block is not scoped to an
+address or a family, so it closes the path the per-address rules missed.~~ Inbound enforcement and
 egress observation sit on the same flow, so there is no direction mismatch: block the connection
 and the bytes never accumulate.
+
+> **Corrected 10 Nov 2026 — the struck sentence is false, and it was tested directly.** With
+> default-inbound Block applied on all three hosts, SMB from THEPUNISHER to SPIDERMAN measured
+> IPv4 **blocked**, IPv6 **open**, by name **open**. The default is consulted only when no rule
+> matches; the 17 enabled `File and Printer Sharing` inbound rules matched, and an allow rule is
+> still a match. **A default cannot close a path that an allow rule holds open.** Disabling those
+> rules — scoped to the service, so family-agnostic by construction — closed all three paths while
+> leaving WinRM 5985 open, which is the lane the lateral-movement case needs. The cell's outcome is
+> unchanged; the control that produces it is not the one named here.
 
 **The risk this cell carries, stated beside it.** The threshold is still the uncalibrated 10 MB
 placeholder, and two effects push the same way:

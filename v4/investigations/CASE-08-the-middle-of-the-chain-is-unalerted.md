@@ -212,6 +212,19 @@ outright — `Rubeus asktgt` with an RC4 key against a KDC that enforces AES has
 negotiate. So this phase has two things to measure next time rather than one: whether a rule
 catches the attempt, and whether the attempt still works.
 
+> **Qualified 10 Nov 2026 — "a KDC that enforces AES" is not what three of the four documented
+> levers produce.** `DefaultDomainSupportedEncTypes = 0x18`, a per-account
+> `msDS-SupportedEncryptionTypes`, and `msDS-SupportedEncryptionTypes = 24` on `krbtgt` are all
+> **preferences**: measured with a client pinned to RC4-only, the KDC issued nine RC4 tickets after
+> the first was applied and more after the third. Only `SupportedEncryptionTypes = 0x18` in the
+> **DC's own machine Kerberos policy** refuses RC4. So this prediction holds **from that lever
+> onward and not before**, and it is still a prediction rather than a measurement — the
+> Pass-the-Ticket phase has not been re-run. What *was* measured at that lever is that a Windows
+> interactive logon falls back to NTLM and succeeds while the Kerberos evidence disappears
+> entirely; a tool asking specifically for a Kerberos TGT has nothing to fall back to, which is why
+> the prediction is still reasonable. See [the matrix](../coverage-matrix.md).
+
+
 ## 7. What a reader should take from this
 
 **A coverage matrix reads as a list and an attack is a path.** Every cell in this column can be

@@ -450,7 +450,7 @@ counts as clean where the control is non-zero.
 | 10 | LSASS Access | **0** | **78,495** Sysmon EID 10 reads of `lsass.exe` | scheduled, threshold measured |
 | 11 | Kerbrute User Enumeration | 0 | 26 × `4768` | scheduled, threshold measured |
 | 12 | Verify Account Lockout | 0 | lockout policy already in force (see README) | schedulable now |
-| 13 | RC4 Anomaly | 0 | 71 × `4769`, zero RC4 | schedulable after AES-only |
+| 13 | RC4 Anomaly | 0 | 71 × `4769`, zero RC4 | ~~schedulable after AES-only~~ — **corrected 10 Nov 2026: schedulable only after the DC's own machine Kerberos policy forbids RC4. The three Active Directory levers are preferences and the KDC issues RC4 on demand under all of them, so `0x17` stays a live finding rather than an anomaly. Also, this row's control covers `4769` only — the rule was reading the wrong message type, see [CASE-03](investigations/CASE-03-rc4-wrong-message-type.md)** |
 | 14 | Sliver C2 Beacon by JA4 | 0 | Zeek continuous across the window | scheduled, threshold measured |
 | 15 | Large Outbound Transfer | **4 rows** | see below | **unscheduled** |
 
