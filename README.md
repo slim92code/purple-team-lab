@@ -100,16 +100,26 @@ case files rather than an attack narrative.
 The plan is committed before the work. The deliverable is a before/after comparison, so the
 predictions and the residual-gap list have to be on record first.
 
-What is done so far is the "before" half: the NDR sensor made reboot-durable, a CIM
-sourcetype defect found and fixed on the ingest path, the pre-hardening baseline verified
-across all five sources and snapshotted, a 24-hour benign window measured per rule, and the kill
-chain run against the un-hardened estate with each detection cell measured. The hardening
-bundles, the re-run and the matrix are still ahead. Each measurement is in its own dated section
-on that page, kept separate from the 24 October predictions.
+What is done so far is the "before" half plus all five hardening bundles: the NDR sensor made
+reboot-durable, a CIM sourcetype defect found and fixed on the ingest path, the pre-hardening
+baseline verified across all five sources and snapshotted, a 24-hour benign window measured per
+rule, and the kill chain run against the un-hardened estate with each detection cell measured.
+**All five bundles have since been applied and measured** — audit policy, credential protection,
+account and Kerberos, execution controls and network protocols, three of them split in two so that
+controls predicted to break the same thing could be told apart. The full kill-chain re-run and the
+second benign window are still ahead. Each measurement is in its own dated section on that page,
+kept separate from the 24 October predictions.
+
+**Three of the five bundles turned out to be substantially already applied**, which changes what
+this project measures. The "before" column was not describing an un-hardened domain but a
+partly-hardened one whose hardening nobody had inventoried. The useful question it answers is
+therefore not "does hardening improve detection" but **"what does an estate actually run, versus
+what its own documentation says it runs"** — and every instance of the gap was found by measuring
+rather than by reading a plan.
 
 The [before/after coverage matrix](v4/coverage-matrix.md) has its first column: fifteen
 attack-facing searches, twelve measured against the un-hardened estate and three not executable,
-each cell carrying the query that produced it and the raw result. Written against it: eight
+each cell carrying the query that produced it and the raw result. Written against it: nine
 [alert-triage case files](v4/investigations/), two [hunts](v4/hunts/), and one
 [incident report](v4/incident-report.md) that scopes how far the intrusion got rather than
 re-litigating each alert.
@@ -133,6 +143,15 @@ Three of the four false positives share a cause worth naming on its own. Each is
 condition the 24-hour benign window did not contain — a Sysmon restart, a fourth OneDrive binary,
 real internet egress — so the baseline that measured "zero false positives across 78,495 reads"
 measured that correctly and still supports a narrower claim than it was read as making.
+
+**One finding recurs across the hardening work and is worth stating on its own.** Six times, in six
+different products, a control reported success and held no state: a Splunk rule correct on disk and
+stale in memory until reloaded; a domain-wide Kerberos setting that turns out to be a *preference*
+the KDC overrides on request; `Add-MpPreference` storing ASR rules nowhere and returning no error;
+three Windows services that cannot be configured even by an administrator; and a firewall log
+enabled on every profile, watched by the forwarder, writing into a directory that does not exist.
+**The interface that reports success is not the interface that holds the state** — and in every
+case the only way to tell was to measure the effect rather than read the setting.
 
 ## Notes
 
