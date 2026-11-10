@@ -843,6 +843,95 @@ about.
 - **Delegation and cached credentials**, the group's other two effects. Neither is on this chain's
   path and neither has a cell.
 
+## Bundle 5a, measured 10 Nov 2026 — nothing to apply, and an empty control found while checking
+
+Bundle 5 was split for the same reason as bundle 4: it mixes a control that only *adds* events
+(PowerShell logging) with one that can *block* (ASR). Applied together, a blocked payload and a new
+telemetry source could not be told apart. 5a is the logging, 5b is ASR and tamper protection.
+
+### 5a's content was already in place, in full, on all three hosts
+
+The forwarder was checked first, because enabling a log nothing collects produces silence that
+reads as a failed control:
+
+| Host | `Microsoft-Windows-PowerShell/Operational`, 7 days |
+| ---- | -------------------------------------------------- |
+| THEPUNISHER | 3,098 |
+| SPIDERMAN | 1,912 |
+| HYDRA-DC | 1,842 |
+
+The channel arrives from all three. And the events the bundle was meant to create already exist:
+
+| Host | `4103` module logging | `4104` script-block logging |
+| ---- | --------------------- | --------------------------- |
+| THEPUNISHER | 1,910 | 1,083 |
+| SPIDERMAN | 1,095 | 593 |
+| HYDRA-DC | 1,062 | 701 |
+
+**That count alone does not prove the policy is on**, which is the trap this cell could have fallen
+into. PowerShell writes some `4104` at *Warning* level even with script-block logging **disabled**,
+for blocks it judges suspicious on its own; with the policy enabled it writes **all** of them at
+*Verbose*. 2,377 events are consistent with either. The registry settles it, on each host:
+
+| Setting | HYDRA-DC | THEPUNISHER | SPIDERMAN |
+| ------- | -------- | ----------- | --------- |
+| `EnableScriptBlockLogging` | `1` | `1` | `1` |
+| `EnableModuleLogging` | `1` | `1` | `1` |
+| `ModuleNames` | `* : *` | `* : *` | `* : *` |
+| `Transcription` | **absent** | **absent** | **absent** |
+
+`EnableModuleLogging = 1` without a `ModuleNames` list logs nothing, so that subkey was checked
+rather than assumed; `* : *` means every module. **PowerShell logging is fully configured and
+working, and bundle 5a has nothing to apply.**
+
+### Transcription is the only gap, and it belongs to step 8 rather than here
+
+Transcription writes **text files to disk**, not events to a channel. Without a forwarder input on
+the output directory it never reaches Splunk and moves no cell. Adding both the policy and the
+input would add a *data source* mid-measurement — which is exactly why Defender channel forwarding
+was already deferred to step 8. Treating them differently would be inconsistent, so transcription
+joins it there.
+
+**So 5a is an empty bundle: every cell reads `→`.** That is a measurement, not a non-event — the
+plan predicted "no rule changes verdict; event completeness improves", and completeness could not
+improve because it was already complete.
+
+### AppLocker: the SIEM can see it and it does nothing
+
+While reading the channel inventory, an unexpected source appeared:
+`THEPUNISHER WinEventLog:Microsoft-Windows-AppLocker/EXE and DLL`, 41 events since 20 October, all
+`8001` — *policy applied successfully*. Not one `8002` (allowed), `8003` (audited) or `8004`
+(blocked).
+
+```
+Get-AppLockerPolicy -Effective -Xml
+<AppLockerPolicy Version="1"><RuleCollection Type="Exe" EnforcementMode="NotConfigured" /></AppLockerPolicy>
+```
+
+**An empty policy.** The service runs, applies a policy on schedule, and the policy contains no
+rules — which is why the only event it ever writes is "applied successfully".
+
+**This is the inverse of the Defender finding and the pair is worth stating together.** Defender
+works and the SIEM cannot see it: an ingest gap hiding a real control. AppLocker is visible to the
+SIEM and does nothing: telemetry without a control behind it. Counting sources would score
+AppLocker as coverage and Defender as absent, and both scores would be backwards.
+
+It is **not** a sixth layer and gets no column. It is recorded because `8001` at a steady 41 events
+is precisely the kind of signal that looks like a working control in a dashboard.
+
+### Bundle 5b's prerequisite, declared rather than discovered
+
+ASR writes its blocks to Defender's operational channel. That channel is forwarded from **one of
+three hosts**, and from that one it carries only `2001`, `5007` and `1152` — no detection events at
+all. **An ASR block on SPIDERMAN or the DC would be invisible**, and the cell would read a silence
+that means "we cannot see" rather than "nothing happened". That is the error bundle 4a made.
+
+So Defender forwarding is a **prerequisite for 5b**, and it collides with its own step-8
+classification. The collision is resolved the way `#13`'s was for bundle 4: a narrow, declared
+exemption, because a fix applied afterwards cannot recover the measurement. The difference from
+`#13` is worth noting — that was a rule change, this is a new source, which is the more invasive of
+the two. It is justified only for the hosts 5b is measured on.
+
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
 The layer table below has four columns: Splunk, Wazuh, Suricata, Zeek. There is a fifth running
@@ -1797,6 +1886,32 @@ step 8 exists to fix, which means its threshold cannot be calibrated until that 
 rule and the fix are waiting on the same event.
 
 ---
+
+## What four bundles revealed about v4's own premise
+
+v4 was built to measure an **un-hardened** estate, harden it, and re-measure. Four bundles in, that
+premise is partly false, and the measurement is what found it:
+
+| Bundle | Planned content | Actually missing |
+| ------ | --------------- | ---------------- |
+| 1 — Audit policy | advanced audit subcategories, SACLs | **one** subcategory (`Directory Service Access`) |
+| 2 — Credential protection | six controls | **three** |
+| 4 — Account and Kerberos | AES-only, lockout, 14-char, quota, LAPS, gMSA | lockout and password policy were in force since June; AES-only needed a lever none of the three documented ones provided |
+| 5a — PowerShell logging | script-block, module, transcription | **transcription only**, and that is a step-8 item |
+
+**Three of the four were substantially already applied.** The "before" column was not measuring an
+un-hardened domain; it was measuring a partly-hardened one whose hardening nobody had inventoried.
+
+That changes what the before/after frame is worth, and not downwards. A matrix that compared a
+truly bare estate to a hardened one would mostly restate vendor documentation. This one keeps
+finding that **the configuration and the belief about the configuration had drifted apart** — and
+every instance was found by measuring rather than by reading a plan: `SQLService` already at AES256
+while the register called it the RC4 exception, PowerShell logging already complete while the plan
+budgeted a bundle for it, AppLocker applying an empty policy on a schedule.
+
+The honest statement of what v4 measures is therefore not "hardening improves detection". It is
+**"what an estate actually runs, versus what its own documentation says it runs"** — which is the
+more useful question and the one this lab turned out to be able to answer.
 
 ## Still owed to this matrix
 
