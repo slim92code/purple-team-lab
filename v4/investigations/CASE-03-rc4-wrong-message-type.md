@@ -183,6 +183,24 @@ One divergence recorded rather than left to be found later: the instance kept th
 `description`, the repository carries the longer two-message-type text. Behaviourally irrelevant,
 but it is the same species of drift as [CASE-07](CASE-07-the-loudest-rule-is-not-in-the-repo.md).
 
+**The mechanism, found 10 Nov 2026 while applying bundle 4a.** This case established *that* the
+RC4 was in `4768` and never in `4769`. It did not establish why, and the why matters because it
+is not an account defect at all.
+
+`SQLService` held `msDS-SupportedEncryptionTypes = 16` — AES256 only, no RC4 — **before** the 6
+November run, and still received an RC4 TGT. The two fields answer to different principals:
+
+- `4768`'s `Ticket_Encryption_Type` is the **TGT's** etype, encrypted with the **`krbtgt`** key.
+  `krbtgt` held `0`, meaning "inherit the domain default"; `DefaultDomainSupportedEncTypes` was
+  absent on the DC, so the built-in `0x27` applied, and `0x27` permits RC4.
+- `4769`'s is the **service ticket's** etype, governed by the **target account**. `SQLService`
+  held `16`, so all 1,649 baseline service tickets were `0x12`.
+
+**So the split this case documented is structural, not a sampling accident**, and no user account
+was misconfigured — the domain default was. Nothing in the account properties showed it: the one
+principal that decided the outcome read `0`, which reads as a non-finding. It also means an
+AES-only rollout applied account by account would have changed neither `0x17`.
+
 **The rest is still held until after the hardening run, like everything else in this column.**
 
 | Owed | Detail |

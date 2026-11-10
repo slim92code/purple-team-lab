@@ -444,7 +444,7 @@ of them measures a change to it:
    > | - | ------ | -------- |
    > | **1** | Audit policy | **A control measurement.** It only *adds* events — blocks nothing, removes nothing, and no attack phase can fail because of it. The plan predicts no cell changes verdict, so **if one does, the measurement procedure is broken**, not the estate: wrong window, contaminated index, or the chain re-run differently. Worth discovering on the harmless bundle rather than on the third, with three columns already resting on it. And it has to be first for a second reason — every later column is read through the telemetry this bundle provides, so hardening first and improving audit later makes earlier columns less complete and leaves no way to separate a control's effect from a logging change. |
    > | **2** | Credential protection | `RunAsPPL` goes on one endpoint and not the other by design, so the chain still runs on the unprotected host and the pair is the measurement. |
-   > | **4** | Account and Kerberos | **Blocked on one prerequisite:** `#13` must read `4768` before AES enforcement, or the bundle measures nothing. AES-only may also break Pass-the-Ticket outright, which is this bundle's clearest prediction. |
+   > | **4** | Account and Kerberos | **Blocked on one prerequisite:** `#13` must read `4768` before AES enforcement, or the bundle measures nothing. AES-only may also break Pass-the-Ticket outright, which is this bundle's clearest prediction. **Split on 10 Nov 2026 into 4a (AES-only, `MachineAccountQuota`) and 4b (Protected Users), with a measurement between them** — both controls are predicted to break phase 6, and applied together neither could be credited for it. Prerequisite cleared and 4a applied the same day. |
    > | **5** | Execution controls | ASR can **block the payload** — a legitimate result that would leave later bundles with no implant to run. So it follows the bundles that still need the chain working. |
    > | **3** | Network protocols | **Last, on blast radius.** The firewall GPO is the only control here that can sever the forwarders' path to Splunk — a bad rule costs the evidence, not just the column. Its cell is also coupled to the step 8 threshold work, so it benefits from going last. |
    >
@@ -837,7 +837,7 @@ predicted to move. Writing that column is what exposed the lockout row below.
 | Control | Rule whose cell it moves | Predicted outcome | Stays |
 | ------- | ------------------------ | ----------------- | ----- |
 | Advanced audit policy | all of them — it generates the events the rules key on | no rule changes verdict; event completeness improves and SACL telemetry becomes available with no rule yet keyed on it | yes |
-| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets; rule 2's verdict is unchanged, its zero-FP property becomes enforced | yes |
+| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | ~~RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets~~ — **wrong, twice; see the dated correction below.** Measured outcome: RC4 Anomaly returns **zero** rows; rule 2's verdict is unchanged, its zero-FP property becomes enforced | yes |
 | Account lockout / FGPP † | `Purple - Verify Account Lockout (post FGPP)` | **does not fire** under the spray the register specifies — see below | yes † |
 | `RunAsPPL` split (one endpoint, not both) | the LSASS access rules — `CASE-04` | attack fails on the protected host; the **risk is that it also goes silent**, because the `GrantedAccess` a PPL-denied open returns may not be in the rule's measured mask list | yes |
 | PowerShell script-block / module logging | the PowerShell execution rules | existing rules unchanged — they key on `4688` and Sysmon; `4104` arrives as a second corroborating source | yes |
@@ -934,8 +934,8 @@ this domain issued 1,649 service tickets, every one of them `0x12` (AES-256), an
 the rule fires on nothing benign today. What AES-only changes is narrower:
 
 - **Prevention:** an explicit RC4 downgrade currently succeeds — the v3 Pass-the-Ticket step
-  obtained a `4768` TGT at `0x17`. Under AES-only it is refused everywhere except the legacy
-  account.
+  obtained a `4768` TGT at `0x17`. ~~Under AES-only it is refused everywhere except the legacy
+  account.~~ **Corrected 10 Nov 2026: there is no RC4 legacy account.** See below.
 - **Detection:** rule 2's zero-false-positive property moves from accidental to enforced. Today
   nothing happens to use RC4; afterwards policy forbids it. A baseline can drift, a policy
   cannot.
@@ -943,6 +943,32 @@ the rule fires on nothing benign today. What AES-only changes is narrower:
   counts every `0x17` regardless of SPN ownership, which is not a usable alert while RC4 is
   permitted. Its own description is "after AES enforcement every `0x17` is an anomaly —
   threshold inverts."
+
+**Corrected 10 Nov 2026, on applying bundle 4a — this row's prediction was wrong twice over.**
+
+1. **Wrong message type.** [CASE-03](investigations/CASE-03-rc4-wrong-message-type.md) found the
+   rule read `4769` while this estate's RC4 arrives in `4768`. Fixed and verified on the running
+   instance before 4a was applied, since otherwise the bundle measured nothing.
+2. **Wrong account model.** "Refused everywhere except the legacy account" assumed `SQLService`
+   was an RC4 exception. **It was not — it already held `msDS-SupportedEncryptionTypes = 16`,
+   AES256 only, before the 6 November run.** `SQLService` is this estate's legacy exception in the
+   *gMSA* sense, a human-managed account with an SPN; it was never an RC4 exception. The two were
+   conflated. There is no RC4 exception in this domain.
+
+The RC4 came from `krbtgt` holding `0` against an absent `DefaultDomainSupportedEncTypes`, so the
+built-in `0x27` default applied — and `0x27` permits RC4. One DC registry value, not an account
+property, and invisible in every per-account listing.
+
+**So the prediction becomes stronger, not weaker: `#13` returns zero after enforcement, not "only
+the legacy tickets".** Measured on 10 November, that is exactly what it returns, against a control
+showing 56 tickets in the same window, all `0x12`. The cell detail is in
+[the matrix](coverage-matrix.md).
+
+**And the schedulability claim in the bullet above survives, for a reason it did not state.** It
+is usable precisely because there is no exception to allowlist. Had `SQLService` genuinely kept
+RC4, the rule would have become a permanent false-positive generator on the exception the bundle
+itself introduced — schedulable only with an allowlist that its own description ("every `0x17` is
+an anomaly") denies the need for.
 
 ### Benign baseline — the measurement that comes first
 

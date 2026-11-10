@@ -498,6 +498,106 @@ host is attributable to the control rather than to nobody having tried.
 the one-endpoint split the plan specified and the reason it must survive into the remaining
 bundles.
 
+## Bundle 4a, measured 10 Nov 2026 — the RC4 was never a misconfigured account, it was the domain default
+
+Bundle 4 is split in two, and the split is about attribution rather than caution. Two of its
+controls are predicted to break the same thing: AES-only leaves `Rubeus asktgt` nothing to
+negotiate, and Protected Users membership forbids RC4 for its members, which is why Protected
+Users was deferred out of bundle 2 in the first place. Applied together, phase 6 would fail with
+two candidate causes. So **4a is AES-only plus `MachineAccountQuota`, 4b is Protected Users**, with
+a measurement between them.
+
+### What the pre-change state actually was, and why it rewrites CASE-03's mechanism
+
+`msDS-SupportedEncryptionTypes` read as follows before any change, where `4` is RC4, `8` is
+AES128 and `16` is AES256:
+
+| Principal | Value | Meaning |
+| --------- | ----- | ------- |
+| `Administrator` | `28` | AES256 + AES128 + **RC4** |
+| `HYDRA-DC`, `THEPUNISHER`, `SPIDERMAN` | `28` | AES256 + AES128 + **RC4** |
+| `SQLService` | `16` | **AES256 only — no RC4** |
+| `krbtgt` | `0` | unset: inherit the domain default |
+| `Guest`, `fcastle`, `pparker`, `tstark` | empty | unset: inherit the domain default |
+| `DefaultDomainSupportedEncTypes` (DC registry) | **not present** | the built-in default, `0x27`, **which contains RC4** |
+
+**`SQLService` was already AES256-only, and it still received a `4768` TGT at `0x17` on 6
+November.** That is not a contradiction; it is the mechanism
+[CASE-03](investigations/CASE-03-rc4-wrong-message-type.md) recorded the effect of without
+identifying the cause.
+
+- In a `4768`, `Ticket_Encryption_Type` is the etype of the **TGT**, and the TGT is encrypted with
+  the **`krbtgt`** key. `krbtgt` held `0`, meaning "use the domain default"; the default was
+  absent, so the built-in `0x27` applied, and `0x27` permits RC4.
+- In a `4769`, the field is the etype of the **service ticket**, governed by the **target
+  account**. `SQLService` held `16`, so every one of the 1,649 service tickets in the 30-day
+  baseline was `0x12`.
+
+**So both RC4 tickets were `4768` and no `4769` was ever RC4 for a structural reason, not a
+sampling one.** No user account was misconfigured. The domain default was, and nothing in the
+estate's own account properties showed it — the one principal that governed the outcome read `0`,
+which looks like a non-finding.
+
+This also moves the lever. Setting AES-only on user accounts would not have touched either `0x17`,
+because both were TGTs. The fix is one DC registry value, which has the side benefit of being
+revertible by deleting it and of never touching the `krbtgt` object.
+
+### What 4a changed
+
+| Change | From | To |
+| ------ | ---- | -- |
+| `DefaultDomainSupportedEncTypes` (HYDRA-DC) | absent (`0x27` implied) | `0x18` — AES256 + AES128, no RC4, no DES |
+| `Administrator`, all three computer accounts | `28` | `24` |
+| `ms-DS-MachineAccountQuota` | `10` | `0` |
+| `krbtgt`, `fcastle`, `pparker`, `tstark`, `Guest` | unset | **left unset, deliberately** |
+
+The empties were left empty on purpose. They inherit the new default, so if `fcastle`'s RC4 TGT
+disappears it is evidence that the domain lever worked, not that RC4 was switched off on that
+account by hand. The accounts holding `28` had to be changed explicitly, because an explicit value
+overrides the default and RC4 would have survived on them.
+
+Domain and forest are at `Windows2016`, and `krbtgt` last changed its password on 3 March 2026, so
+AES keys exist and no `krbtgt` password reset was required.
+
+### Measured after the DC restart, with ticket caches purged on both member hosts
+
+| Message type | Etype | Count | Window |
+| ------------ | ----- | ----- | ------ |
+| TGS (service ticket) | `0x12` | 32 | 01:58:52–02:19:32 |
+| TGT (AS-REP) | `0x12` | 24 | 01:58:52–02:19:05 |
+
+**Zero `0x17`. Zero `0x11`. Zero Kerberos failures of any code.** `4624` continues across the
+whole hour with one `4625` at 01:55, around the restart itself; the 02:15 spike of 145 logons and
+22 TGTs is the two member hosts re-authenticating after `klist purge` and `gpupdate`.
+
+| Cell | Before | After 4a | Mark |
+| ---- | ------ | -------- | ---- |
+| `#13` RC4 Anomaly | ✗ silent — read the wrong message type | **✗ silent — zero `0x17` exists to return** | M, partial |
+| `#3` Kerberoasting RC4 Service Ticket | ✗ silent by design | → | → |
+
+**And this zero is a demonstrated zero, which is the point.** The population query returned 56
+tickets in the same window, so the rule's empty result is a claim about the estate and not about
+the rule. Three case files in this column turn on refusing to collapse those two, and this is the
+first cell in the project where the distinction resolved in the hardening's favour rather than
+against it.
+
+### Why the cell is marked partial, and the prediction for the re-run
+
+What is measured is that **the KDC does not issue RC4 to normal activity**. What is not measured is
+that **RC4 is refused when deliberately requested**, and that is the attack. Until phases 4a and 6
+are re-run the cell is half a result.
+
+**Prediction, recorded before the re-run rather than after it.** When `Rubeus` or `impacket`
+requests RC4 against this KDC, no ticket is issued, so `#13` still returns nothing. The signal
+should move to a `4768` failure with `Failure_Code 0xE`, KDC_ERR_ETYPE_NOTSUPP. **No rule in this
+repository reads `0xE`.** If that holds, AES-only does not repair this detection — it relocates the
+evidence onto an uninstrumented event, and bundle 4 opens a gap in the act of closing one. That
+would make it the second control in this project whose prevention costs visibility, after
+`RunAsPPL` in bundle 2, and two instances is a pattern worth naming rather than a coincidence.
+
+The `4625` at 01:55 is the hour's only non-success and is owed one query; it is noted here so it
+is not quietly dropped.
+
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
 The layer table below has four columns: Splunk, Wazuh, Suricata, Zeek. There is a fifth running
