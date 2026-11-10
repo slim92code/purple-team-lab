@@ -1714,6 +1714,19 @@ rule and the fix are waiting on the same event.
 
 ## Still owed to this matrix
 
+**New, from bundle 4a — a rule on the NTLM fallback path.** Lever 4 prevents RC4 Kerberos and
+leaves `4776` as the only trace of the authentication that happens instead. `grep -rn 4776
+detections/` returns nothing. Until something reads it, the hardening's own side effect is an
+uninstrumented success path, and the measured outcome of bundle 4a is that detection got worse
+rather than better. This outranks the four fixes held for step 8, because those cover cases the
+estate already partially sees and this one covers a case it does not see at all.
+
+A second item from the same finding: **`#13` needs a note in its own description** saying that
+after lever 4 its silence is expected and does not indicate absence of attack. Its current text,
+"after AES enforcement every `0x17` is an anomaly — threshold inverts", is true and useless at the
+same time, because enforcement removes the population it inverts the threshold on.
+
+
 Two things this column does not yet have, recorded so they are not discovered later as gaps.
 
 **The remaining layer coverage.** The Splunk table is one of four layers, and
