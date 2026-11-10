@@ -457,6 +457,31 @@ an estate where nobody tried.** That is the risk
 that it also goes silent"* — confirmed in its sharpest form: not a mask outside the rule's list,
 but no event at all.
 
+### What bundle 2 actually changed
+
+Measured before applying anything, which is the discipline bundle 1 established and which saved
+most of the work again. Of six controls in the plan, **three were already in place and one was
+deferred:**
+
+| Control | Before | After | Cell |
+| ------- | ------ | ----- | ---- |
+| `RunAsPPL` | absent, all three hosts | **`1` on THEPUNISHER only** | `#10` → `⊘ blocked` |
+| `UseLogonCredential` (WDigest) | absent — modern default is already off | `0`, explicit, all three | none |
+| `LmCompatibilityLevel` | absent — default `3` | `5`, all three | none — the chain is Kerberos, and [HUNT-01](hunts/HUNT-01-spray-without-the-4771-count.md) measured zero `4625` |
+| `NoLMHash` | **already `1`** | unchanged | — |
+| `RestrictAnonymousSAM` | **already `1`** | unchanged | — |
+| Protected Users | empty | **deliberately left empty** | deferred — see below |
+
+**Protected Users was deferred on purpose, and the reason is attribution.** Members of that group
+cannot use RC4 Kerberos. Adding `SQLService` or `fcastle` would therefore break the
+Pass-the-Ticket — which is **bundle 4's clearest prediction**. Done here, bundle 4 loses its best
+measurement and a broken PtT after bundle 2 could not be attributed to either control. It goes
+with bundle 4 or not at all.
+
+**The one-endpoint split is verified rather than assumed**, because the `⊘ blocked` mark depends
+on it: `RunAsPPL` reads `1` on THEPUNISHER and is absent on SPIDERMAN and HYDRA-DC. If it had
+spread, the unprotected half of the pair would be gone and the bundle's only measurement with it.
+
 ### Which is why this column needed a new mark
 
 Three marks existed: fires, silent, not executable. None of them says *the attack ran and the
