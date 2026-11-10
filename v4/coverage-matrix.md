@@ -598,6 +598,50 @@ would make it the second control in this project whose prevention costs visibili
 The `4625` at 01:55 is the hour's only non-success and is owed one query; it is noted here so it
 is not quietly dropped.
 
+### A test designed to confirm that prediction, and the reason it could not
+
+The prediction above needed a deliberate RC4 request. Rather than wait for an attack re-run, an
+administrative probe was built: create `rc4test`, set its `msDS-SupportedEncryptionTypes` to `4`
+(RC4 only), log on with it from THEPUNISHER, and watch the KDC refuse.
+
+**It did not refuse. It issued an AES ticket to an account flagged RC4-only:**
+
+| Time | Event | Account | Etype | Code |
+| ---- | ----- | ------- | ----- | ---- |
+| 02:41:12.145 | `4768` | `rc4test` | **`0x12`** | `Result_Code 0x0` — success |
+| 02:41:12.148 | `4769` | `rc4test@MARVEL.LOCAL` | `0x12` | `0x0` |
+| 02:41:12.246 | `4769` | `rc4test@MARVEL.LOCAL` | `0x12` | `0x0` |
+
+`4624` confirms `Logon_Type 3` with `Authentication_Package = Kerberos` from `192.168.182.137`. No
+`4771`, no `0xE`, no failure of any kind.
+
+**The probe was designed wrong, and the reason is the mechanism this very section established two
+hours earlier.** `msDS-SupportedEncryptionTypes` on a *user* account does not govern the TGT's
+etype — `krbtgt` does, and `krbtgt` now inherits the AES-only default. Worse, the etype list in an
+`AS-REQ` is chosen by the **client**, and a Windows client asks for AES. AD stores AES keys for the
+account regardless of the flag, so the KDC had an AES key available and used it.
+
+So the probe measured that **a Windows client never requests RC4**. It did not measure whether the
+KDC refuses RC4 when RC4 is actually requested. Those are different claims and only the second one
+is the attack.
+
+**The negative result is not empty, though — it is the strongest evidence yet for 4a's mechanism,
+obtained by setting the flag the opposite way.** An account explicitly marked RC4-only received an
+AES-256 ticket. The per-account flag is not a lever in either direction; the domain default and
+`krbtgt` decide. Three independent observations now agree: `SQLService` at `16` got RC4 before the
+change, `rc4test` at `4` got AES after it, and the only thing that moved between them was one
+registry value on the DC.
+
+**The corrected probe moves the lever to the client**, where the `AS-REQ` etype list is actually
+decided: `SupportedEncryptionTypes = 0x4` under
+`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos\Parameters` on
+THEPUNISHER, which makes Windows itself offer RC4 and nothing else against a KDC that permits
+neither. That is configuration rather than tooling, and it produces the exact condition the
+prediction is about. Applied 10 Nov 2026; result recorded below once measured.
+
+**The `0xE` prediction is therefore neither confirmed nor refuted — it is untested**, and labelled
+so rather than being quietly credited to the probe that did not test it.
+
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
 The layer table below has four columns: Splunk, Wazuh, Suricata, Zeek. There is a fifth running
