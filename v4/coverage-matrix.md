@@ -839,6 +839,22 @@ built around is unavailable in this estate. The layer that actually stops creden
 Defender's behaviour monitoring, which was already on, already working, and until today invisible
 to the SIEM on two of three hosts.
 
+### Print Spooler, the one control in 5b that applied cleanly
+
+`Stop-Service Spooler -Force` and `Set-Service Spooler -StartupType Disabled` on HYDRA-DC;
+`Stopped` / `Disabled` confirmed. Left running on the two workstations, where printing is a
+plausible need and the bundle never asked for it.
+
+**It moves no cell and gets none**, like `ms-DS-MachineAccountQuota=0` in bundle 4 — no rule in this
+estate covers the spooler path and the chain does not use it. It is applied because a known
+privilege-escalation surface on a domain controller is not worth leaving open to preserve a tidy
+table, and it is labelled "no cell" rather than quietly counted as coverage. **Counting it as
+hardening while the matrix cannot observe it is exactly the error the AppLocker entry warns
+about.**
+
+So bundle 5b in full: one control already in place (tamper protection), one unavailable in this
+estate (ASR), one applied and unobservable (spooler).
+
 ### Two configuration changes made for diagnosis, and put back
 
 Recorded because an undeclared change mid-measurement is drift, however small:
