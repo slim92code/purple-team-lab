@@ -958,6 +958,151 @@ about.
 - **Delegation and cached credentials**, the group's other two effects. Neither is on this chain's
   path and neither has a cell.
 
+## Bundle 3a, measured 10 Nov 2026 — two test designs failed before one worked
+
+Bundle 3 is split like 4 and 5, and for the same reason. The protocol controls (LLMNR, NBT-NS,
+mDNS, WPAD, SMB signing, SMBv1, LDAP signing) move no rule cell and cannot cut telemetry. The
+firewall GPO moves `Purple - Large Outbound Transfer` and is the only item in v4 with a blast
+radius that includes the forwarders' path to Splunk. **3a is the protocols, 3b is the firewall.**
+
+### Pre-measurement
+
+| Control | HYDRA-DC | THEPUNISHER | SPIDERMAN |
+| ------- | -------- | ----------- | --------- |
+| SMBv1 | **already removed** | **already removed** | **already removed** |
+| SMB signing required | **already on** (DC default) | missing | missing |
+| LLMNR | default = on | `EnableMulticast = 1` — **explicitly enabled** | `EnableMulticast = 1` |
+| mDNS | default = on | default = on | default = on |
+| NBT-NS | `0` = take from DHCP | `0` | `0` |
+| WPAD service | `Manual` | `Manual` | `Manual` |
+| LDAP signing | `LDAPServerIntegrity = 1` — **not required** | n/a | n/a |
+| LDAP channel binding | absent = off | n/a | n/a |
+| Firewall default inbound | **`Allow`, explicitly, all three profiles** | `NotConfigured` | `NotConfigured` |
+
+Two things in that table are findings rather than inventory.
+
+**LLMNR is explicitly enabled by policy on both workstations.** Not left at default — switched on.
+That is almost certainly a leftover from a v2 or v3 exercise that needed Responder, and it means
+the estate was carrying a deliberate weakening nobody had recorded.
+
+**`NotConfigured` is not `Block`.** The workstations' effective inbound behaviour is the Windows
+default, which is Block, so they look hardened. Nothing holds them there: one GPO or one local
+change flips it silently. An explicit `Block` is a statement; `NotConfigured` is a coincidence that
+currently has the right value. The DC meanwhile is explicitly `Allow` on all three profiles — the
+gap the build plan names, now measured rather than assumed.
+
+### Two controls that cannot be applied the way the documentation says
+
+`Set-Service WinHttpAutoProxySvc -StartupType Disabled` → **`Access is denied`**, elevated, on all
+three hosts. `Restart-Service Dnscache -Force` → **`Cannot open Dnscache service`**, likewise. Both
+are protected services on modern Windows; their ACLs exclude administrators, and only
+`TrustedInstaller` may change them.
+
+**So "disable the service" — the step most WPAD hardening guides give — is not available at all**,
+and the DNS Client cannot be restarted to reload a policy either. WPAD was closed the way Microsoft
+has recommended since MS16-077 instead: a `hosts` entry pointing `wpad` and `wpad.marvel.local` at
+`255.255.255.255`, verified with `Resolve-DnsName wpad` returning `255.255.255.255` on all three.
+Two of WPAD's three resolution paths were already gone with LLMNR and NBT-NS; the `hosts` entry
+closes the third.
+
+This is the same shape as `Add-MpPreference` in bundle 5b and the unreloaded `#13`: **the documented
+interface is not the one that holds the state.** Three bundles, three products, three instances.
+
+### The LLMNR test failed twice, and the second failure was the useful one
+
+Neither failure was about the control. Both were about the instrument, and both were caught by
+A-B-A rather than by thinking harder.
+
+**First design: `Resolve-DnsName` against a nonexistent single-label name.** Zero LLMNR. Then the
+A arm — the same lookup with `EnableMulticast = 1`, LLMNR explicitly **on** — also produced zero.
+`Resolve-DnsName` queries DNS directly and does not walk the OS name-resolution fallback chain, so
+it never reaches LLMNR. The first zero had proved nothing.
+
+**Second design: `ping` against a nonexistent name**, which does use `GetAddrInfo` and does fall
+back. Still zero in both arms. `dns.log` shows why, by name:
+
+```
+nepostojeciaaa111.marvel.local  →  192.168.182.135:53  →  NXDOMAIN
+nepostojecibbb333.marvel.local  →  192.168.182.135:53  →  NXDOMAIN
+```
+
+**Every query went to the DC on port 53 and none to `224.0.0.252:5355`, in both arms.** DNS
+devolution appended the primary suffix, the DC is authoritative for `marvel.local`, and an
+authoritative negative answer ends resolution — Windows has no reason to try LLMNR. **On a
+domain-joined host with an authoritative DNS server, a forced single-label lookup cannot trigger
+LLMNR at all.**
+
+So the control's effect is not demonstrable by forcing. It has to be measured as a rate.
+
+### Asking what actually generates LLMNR produced a negative control for free
+
+| Source | Query | Count, 24 h |
+| ------ | ----- | ----------- |
+| `192.168.182.1` | `slim` | 46 |
+| `192.168.182.137` (+ its `fe80::`) | `thepunisher` | 24 each |
+| `192.168.182.135` (+ its `fe80::`) | `hydra-dc` | 19 each |
+| `192.168.182.138` (+ its `fe80::`) | `spiderman` | 11 each |
+
+**Every host is asking LLMNR for its own name** — Windows' periodic duplicate-name check. So the
+control bites exactly this traffic, which makes a rate comparison meaningful.
+
+And `192.168.182.1` is the VMware host asking for `slim`. **It is in the same capture, it is not
+ours, and we are not touching it** — an uncontrolled source that must *not* change. If every row
+goes to zero, the cause is the sensor or the capture, not the control. That negative control was
+not designed; it fell out of asking what generated the traffic.
+
+### Result, after the reboot NBT-NS required
+
+| Protocol | Sources remaining |
+| -------- | ----------------- |
+| LLMNR | **`192.168.182.1` only** |
+| NBT-NS name | **`192.168.182.1` only** |
+| NBT-NS datagram | **none** |
+| mDNS | `192.168.182.1`, `192.168.182.131` (Splunk, not in scope), and one unattributed IPv6 |
+
+All three Windows hosts are gone from LLMNR and NBT-NS, their `fe80::` addresses with them, and the
+uncontrolled host is still there. **The control is demonstrated and the negative control holds.**
+
+**One loose end, recorded rather than rounded off.** A single mDNS event from
+`fd15:4ba5:5a2b:1008:7524:3526:dff9:677c`. None of the three Windows hosts holds that address now;
+each has its own ULA plus, on the workstations, a `Random` temporary address — and those rotate,
+which this matrix already notes for the IPv6 exfil attribution. The hosts rebooted inside the same
+window, which regenerates them. **It cannot be attributed retroactively and is not claimed either
+way**; the next window settles it.
+
+### The LDAP prediction was wrong, in the direction that costs nothing
+
+Recorded before applying: LDAP signing and channel binding might blind Zeek's `ldap.log` and
+`ldap_search.log`, which carry 575 and 292 events a day and which
+[CASE-02](investigations/CASE-02-kerberos-enumeration.md) depends on. That would make 3a the first
+bundle in v4 to trade network visibility for prevention.
+
+**It did not happen.** With `LDAPServerIntegrity = 2` and `LdapEnforceChannelBinding = 2` applied
+and the DC rebooted, both logs are still being written — 4 and 9 events in the 15:20 bucket, 4 and
+7 in 15:25, both after the workstations came back.
+
+The reason is a distinction stated for SMB in the same prediction and then not applied to LDAP:
+**signing is not sealing.** A signed LDAP exchange still travels in clear text with a MIC attached,
+so Zeek parses it. Only encryption would blind the parser.
+
+`smb_files.log`, `smb_mapping.log`, `kerberos.log` and `dce_rpc.log` all continue as predicted.
+
+### Domain health after the riskiest change in 3a
+
+`LDAPServerIntegrity = 2` is the one setting here that can take Active Directory down. After the DC
+restart: `nltest /dsgetdc` succeeds, `Get-ADDomain` returns `Windows2016Domain`, `Get-ADUser
+fcastle` returns the account. All five hosts report into Splunk continuously across the window,
+with no gap beyond the reboots themselves.
+
+**One anomaly not reproduced:** a `stats count by host` over the preceding 10 minutes returned
+nothing while a Zeek query over 15 minutes returned data. A 45-minute timechart contradicts it —
+every host is present in every bucket. Recorded as unreproduced rather than explained.
+
+**A note for 3b.** After the restart `nltest` returns the DC's **IPv6** address where it previously
+returned `192.168.182.135`. Harmless in itself, but this estate has already been caught once by a
+control written for IPv4 while traffic took IPv6 — the east-west SMB block, which is why the
+firewall GPO has a cell at all. Every rule written in 3b has to cover both families.
+
 ## Bundle 5a, measured 10 Nov 2026 — nothing to apply, and an empty control found while checking
 
 Bundle 5 was split for the same reason as bundle 4: it mixes a control that only *adds* events
