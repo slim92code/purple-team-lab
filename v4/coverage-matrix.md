@@ -570,16 +570,22 @@ AES keys exist and no `krbtgt` password reset was required.
 whole hour with one `4625` at 01:55, around the restart itself; the 02:15 spike of 145 logons and
 22 TGTs is the two member hosts re-authenticating after `klist purge` and `gpupdate`.
 
-| Cell | Before | After 4a | Mark |
-| ---- | ------ | -------- | ---- |
-| `#13` RC4 Anomaly | ✗ silent — read the wrong message type | **✗ silent — zero `0x17` exists to return** | M, partial |
+| Cell | Before | After 4a, as first read | Mark |
+| ---- | ------ | ----------------------- | ---- |
+| `#13` RC4 Anomaly | ✗ silent — read the wrong message type | ~~✗ silent — zero `0x17` exists to return~~ | **withdrawn** |
 | `#3` Kerberoasting RC4 Service Ticket | ✗ silent by design | → | → |
 
-**And this zero is a demonstrated zero, which is the point.** The population query returned 56
-tickets in the same window, so the rule's empty result is a claim about the estate and not about
-the rule. Three case files in this column turn on refusing to collapse those two, and this is the
-first cell in the project where the distinction resolved in the hardening's favour rather than
-against it.
+> **This reading was wrong and is withdrawn. See
+> [the refutation](#the-enforcement-was-a-preference-and-the-zero-was-client-behaviour) below.** It
+> is left on the page rather than deleted, because the error it makes is the one this entire column
+> exists to guard against and hiding it would cost the lesson.
+>
+> What was written here: *"this zero is a demonstrated zero… the population query returned 56
+> tickets in the same window, so the rule's empty result is a claim about the estate and not about
+> the rule… the first cell in the project where the distinction resolved in the hardening's favour."*
+>
+> The control proved the population existed. It did not prove RC4 was refused, because **not one
+> of those 56 tickets had asked for RC4.** The zero measured client preference, not KDC policy.
 
 ### Why the cell is marked partial, and the prediction for the re-run
 
@@ -641,6 +647,57 @@ prediction is about. Applied 10 Nov 2026; result recorded below once measured.
 
 **The `0xE` prediction is therefore neither confirmed nor refuted — it is untested**, and labelled
 so rather than being quietly credited to the probe that did not test it.
+
+### The enforcement was a preference, and the zero was client behaviour
+
+The corrected probe ran at 02:54 with THEPUNISHER's client policy set to RC4 only. The KDC did not
+refuse. **It issued RC4 tickets, after AES-only was applied, nine of them:**
+
+| Principal | Service | Message type | Count | Window |
+| --------- | ------- | ------------ | ----- | ------ |
+| `THEPUNISHER$` | `krbtgt` | TGT (AS-REP) | 4 | 02:50:48–02:52:43 |
+| `THEPUNISHER$@MARVEL.LOCAL` | `THEPUNISHER$` | TGS | 2 | 02:50:57–02:52:43 |
+| `Administrator` | `krbtgt` | TGT (AS-REP) | 1 | 02:51:15 |
+| `rc4test` | `krbtgt` | TGT (AS-REP) | 1 | 02:54:25 |
+| `rc4test@MARVEL.LOCAL` | `THEPUNISHER$` | TGS | 1 | 02:54:25 |
+
+Every one at `0x17`, every one with `Result_Code 0x0` — success. All from `192.168.182.137`.
+
+**`DefaultDomainSupportedEncTypes` is a default, not an enforcement.** It governs which etype the
+KDC uses when the client does not insist. When a client offers RC4 and nothing else, the KDC checks
+whether `krbtgt` holds an RC4 key — it always does — and issues an RC4 ticket. Nothing was refused
+at any point.
+
+So the `0x18` registry value did not harden Kerberos. It changed a preference that Windows clients
+already expressed on their own.
+
+**The error in the first reading, named plainly.** The 56-ticket control established that tickets
+were being issued. It did not establish that RC4 was being refused, because **none of those 56
+requests had asked for RC4.** The absence of `0x17` was a property of the clients, not of the KDC,
+and it was recorded as evidence of a control. That is precisely the failure
+[CASE-01](investigations/CASE-01-password-spray-undercount.md),
+[CASE-02](investigations/CASE-02-kerberos-enumeration.md) and
+[CASE-08](investigations/CASE-08-the-middle-of-the-chain-is-unalerted.md) are each about, and it
+was committed in the section of this document that names it. A control that proves the population
+exists is not a control that proves the condition is prevented — **the control has to request the
+thing the policy is supposed to forbid.**
+
+**Consequence for phase 6.** The prediction that AES-only breaks Pass-the-Ticket does not hold at
+this configuration. `Rubeus asktgt` requesting RC4 would have been served, exactly as `rc4test`
+was.
+
+**Consequence for `#13`, and it is the one good outcome.** The fixed rule returns all nine rows,
+split by message type. The pre-fix rule read `4769` only, so it would have returned **three of
+nine** — not zero, and an earlier draft of this section overstated that to "invisible", which the
+output refutes. What the fix bought is all six TGTs, **including `rc4test`'s TGT at 02:54:25, which
+is the Pass-the-Ticket equivalent.** Detection caught what prevention did not, and it caught it
+only because the scope defect had been repaired the day before.
+
+**The actual lever is `krbtgt` explicitly.** With `msDS-SupportedEncryptionTypes = 0` it inherits a
+preference; set to `24`, the KDC is forbidden to use RC4 for TGTs rather than merely disinclined.
+Applied 10 Nov 2026 with THEPUNISHER's RC4-only client policy left in place, which makes the test
+rig correct for the first time: the client demands RC4, the KDC may not use it, and whatever gets
+written is the answer to the `0xE` prediction.
 
 ## Defender, the fifth layer nobody counted — measured 9 Nov 2026
 
