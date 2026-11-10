@@ -1331,6 +1331,41 @@ enforcement; it is a rule that needs `4768` as well as `4769` before that test m
 > `enableSched` stays `0`. Pre-enforcement the rule returns this estate's legitimate RC4, which
 > is not an alertable condition; scheduling belongs with the bundle that makes `0x17` anomalous.
 
+> **Deployed and verified on the live instance, 10 Nov 2026.** The repository commit was not the
+> deploy. Three things had to be true, and only the third is evidence:
+>
+> 1. The stanza on disk parses. `btool savedsearches list --debug` attributed the five-line
+>    `search` to `purple_lab/default/savedsearches.conf` with every continuation intact.
+> 2. `splunkd` serves it. It did not, at first — `btool` reads the file, `| rest` reads memory, and
+>    for several minutes they disagreed: `ima_4768` returned `ne` while the file was already
+>    correct. A `savedsearch/_reload` against the app's namespace fixed it, after which `| rest`
+>    returned `da`.
+> 3. The rule returns the events it was blind to. It does:
+>
+> | `Account_Name` | `Service_Name` | Message type | Count | Source |
+> | -------------- | -------------- | ------------ | ----- | ------ |
+> | `SQLService` | `krbtgt` | TGT (AS-REP) | 1 | `192.168.182.138` |
+> | `fcastle` | `krbtgt` | TGT (AS-REP) | 1 | `192.168.182.133` |
+>
+> **Both are `4768`. Neither is `4769`.** The cell above inferred this from a control count; the
+> post-fix rule now produces it directly. The old rule was not under-scoped on these two tickets,
+> it was structurally incapable of returning either one at any threshold — and `fcastle`'s came
+> from `.133`, the attacker's own host.
+>
+> One divergence recorded rather than left silent: the instance kept the original one-line
+> `description`, while the repository carries the longer text explaining the two message types.
+> Behaviourally irrelevant, every other field identical, but it is drift of exactly the kind
+> [CASE-07](investigations/CASE-07-the-loudest-rule-is-not-in-the-repo.md) is about, so it is
+> written down here instead of being discovered later.
+
+**A method correction this deploy forces.** Every "the fix is applied" claim in this matrix so far
+has rested on the repository diff. That is not sufficient: for an interval of this deploy the file
+was right, `btool` agreed it was right, and the running rule still read only `4769`. Had AES
+enforcement been switched on in that window, `#13` would have measured
+`✗ silent → ✗ silent` for precisely the reason the fix existed to remove, and the matrix would have
+recorded "enforcement worked" over a rule that never changed. **A config edit is not a rule change
+until `| rest` says so.** Fixes held for step 8 are owed this three-step check, not a diff.
+
 **Why the before column could not have caught this on its own.** Pre-hardening, the rule is
 expected to be silent, so a silent result looks like confirmation. It took measuring a *different*
 phase — Pass-the-Ticket, which has no rule and therefore no cell — to find out that RC4 was
@@ -1457,10 +1492,13 @@ destroys the comparison those columns exist to make:
 | `#6` Spray Success | **reconsidered — see below** | the clock skew is produced by this lab's own revert procedure, not by the estate |
 | `#2` C2 Beacon | extend the OneDrive allowlist to `OneDrive\Update\OneDriveSetup.exe` | a fourth OneDrive binary in a fourth directory shape |
 | `#15` Large Outbound Transfer | calibrate the placeholder threshold | needs the second benign window's real egress, which does not exist yet |
-| ~~`#13` RC4 Anomaly~~ | ~~add `4768`~~ — **done 9 Nov 2026**, ahead of the others and deliberately | it is bundle 4's prerequisite: unfixed, AES enforcement would read silent-to-silent and the silence would mean "pointed at the wrong event" rather than "enforcement worked" |
+| ~~`#13` RC4 Anomaly~~ | ~~add `4768`~~ — **committed 9 Nov, deployed and verified on the instance 10 Nov 2026**, ahead of the others and deliberately | it is bundle 4's prerequisite: unfixed, AES enforcement would read silent-to-silent and the silence would mean "pointed at the wrong event" rather than "enforcement worked" |
 
 `#13` is owed a positive test rather than a fix: after AES enforcement, a deliberate RC4 request
-should produce a row, and without that test its two silences prove nothing.
+should produce a row, and without that test its two silences prove nothing. The fix itself is now
+past all three checks — file, loaded rule, and returned events — which is the standard the four
+remaining fixes in this table inherit. Each is a repository edit today and nothing more; none may
+be called applied until `| rest` shows the running rule changed.
 
 **One measurement, not a fix: `60205`'s false-positive rate over a clean full day.** It is the
 only thing detecting phase 2a, it is a generic built-in, and the number behind it is currently

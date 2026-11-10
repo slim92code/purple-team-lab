@@ -12,7 +12,7 @@ reasoning over it.
 | ---- | ----- | ------- |
 | [CASE-01 — a password spray that fired two alerts, neither from the spray rule](CASE-01-password-spray-undercount.md) | 2a | True positive. The rule written for it did not fire; two other things did. |
 | [CASE-02 — account enumeration: four layers, one holds the evidence, none alerts](CASE-02-kerberos-enumeration.md) | 1 | True positive, undetected. Structural, not a threshold. |
-| [CASE-03 — the RC4 rule reads the wrong Kerberos message, and its own description says so](CASE-03-rc4-wrong-message-type.md) | 4a, 6 | Two RC4 tickets issued to an attacker, neither detected. Scope defect, not tuning. |
+| [CASE-03 — the RC4 rule reads the wrong Kerberos message, and its own description says so](CASE-03-rc4-wrong-message-type.md) | 4a, 6 | Two RC4 tickets issued to an attacker, neither detected. Scope defect, not tuning. **Fix deployed and verified 10 Nov 2026.** |
 | [CASE-04 — the lockout alert fires correctly and cannot say which account](CASE-04-lockout-alert-with-no-account.md) | 2c | True positive, unusable output. Two causes, one not the rule's fault. |
 | [CASE-05 — two C2 rules, one endpoint each, and neither covers both](CASE-05-c2-two-rules-one-host-each.md) | 5a, 5b | True positive on two hosts. Both rules correct, neither complete. |
 | [CASE-06 — exfiltration detected twice, and a Windows download that looks the same](CASE-06-exfil-uncalibrated-threshold.md) | 11, 12 | Two true positives, one false positive. No rule defect; the open item is a number. |

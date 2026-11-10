@@ -152,11 +152,42 @@ principals, two tools is no longer an inference.
 
 ## 6. What this changes
 
-**Held until after the hardening run, like everything else in this column.**
+**Resolved, 10 Nov 2026 — the one item not held for step 8.** This case's first owed item is
+closed, because it is bundle 4's prerequisite and could not wait: with `#13` reading the wrong
+message type, AES enforcement would have measured silence both sides of the hardening and the
+silence would have meant *"the rule looks at the wrong event"*, not *"enforcement worked"*.
+
+The fixed rule, run over the preceding seven days, returns the two tickets this case was written
+about:
+
+| `Account_Name` | `Service_Name` | Message type | Count | Source |
+| -------------- | -------------- | ------------ | ----- | ------ |
+| `SQLService` | `krbtgt` | TGT (AS-REP) | 1 | `192.168.182.138` |
+| `fcastle` | `krbtgt` | TGT (AS-REP) | 1 | `192.168.182.133` |
+
+**Both are `4768`; neither is `4769`.** Section 3 inferred that from a control count of zero
+`0x17` in `4769`; the rule now states it directly. It settles the question of degree this case
+left slightly open: the old rule was not under-scoped on these tickets, it could not have returned
+either at any threshold. And `fcastle`'s TGT came from `192.168.182.133`, the attacker's host —
+RC4 issued to the attack path itself, by the rule named for RC4, unseen.
+
+**A second finding came out of the deploy rather than the rule.** For an interval the file on disk
+was correct, `btool savedsearches list --debug` confirmed it parsed and from which file, and the
+running rule still read only `4769`: `btool` reads the file, `| rest` reads `splunkd`'s memory, and
+a `savedsearch/_reload` was needed between them. Verifying the fix by diff or by `btool` would
+have reported success over an unchanged rule. **Three steps, and only the third is evidence: the
+file parses, `| rest` shows the loaded search changed, the rule returns the events it was blind
+to.** The remaining four fixes in this column inherit that standard.
+
+One divergence recorded rather than left to be found later: the instance kept the short original
+`description`, the repository carries the longer two-message-type text. Behaviourally irrelevant,
+but it is the same species of drift as [CASE-07](CASE-07-the-loudest-rule-is-not-in-the-repo.md).
+
+**The rest is still held until after the hardening run, like everything else in this column.**
 
 | Owed | Detail |
 | ---- | ------ |
-| `#13` reads `4768` as well as `4769` | The rule's description already describes the behaviour; the search has to match it |
+| ~~`#13` reads `4768` as well as `4769`~~ | **Done** — deployed and verified above, 10 Nov 2026 |
 | `#13`'s positive test uses a TGT | After enforcement, a deliberate RC4 request should produce a row. Testing with a TGS would pass against a rule that still cannot see the real case |
 | `#3`'s cell wording | "No RC4 anywhere" corrected to the scope the control actually covered |
 
