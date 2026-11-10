@@ -757,6 +757,105 @@ on an event with no rule at all.
 That is the most useful thing bundle 4 produced, and it is an argument against the hardening as
 configured rather than for it.
 
+## Bundle 5b, measured 10 Nov 2026 — ASR configures, does not enforce, and four hypotheses died on the way
+
+### What was actually missing
+
+| Control | State before 5b |
+| ------- | --------------- |
+| Tamper protection | **already on**, all three hosts |
+| Defender real-time, behaviour monitoring, IOAV | **already on**, `AMRunningMode: Normal`, all three |
+| ASR rules | **zero**, all three |
+| Print Spooler on the DC | `Running`, `Automatic` |
+
+Defender being fully armed on all three hosts is the explanation for why it kept catching things
+through the whole project: it was never the product that was missing, only the forwarding.
+
+### `Add-MpPreference` silently does nothing, and it took four wrong hypotheses to find out
+
+Five chain-relevant rules were set to **Audit** (`2`) with `Add-MpPreference`. The command returned
+no error. `Get-MpPreference` still returned `null`, and both ASR registry paths were empty.
+
+| # | Hypothesis | Refuted by |
+| - | ---------- | ---------- |
+| 1 | ASR needs Defender for Endpoint on Server SKUs | it failed on the Windows 10 clients too |
+| 2 | Tamper Protection blocks the change | `Set-MpPreference -PUAProtection` succeeded, `0 → 1` |
+| 3 | Windows 10 Pro cannot configure ASR at all | the **policy** registry path was accepted and `Get-MpPreference` immediately read back 5 |
+| 4 | LSA protection had auto-enabled on SPIDERMAN | `RunAsPPL`, `RunAsPPLBoot` and `LsaCfgFlags` all absent; no Wininit event 12; Credential Guard `0x0` |
+
+**The answer was the tool.** `Add-MpPreference` writes ASR settings to
+`HKLM\SOFTWARE\Microsoft\Windows Defender\…`, the non-policy path, which is not retained for ASR on
+this edition — and it reports success either way. Writing the five GUIDs under
+`HKLM\SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules` works,
+on all three hosts including the DC, and `Get-MpPreference` reflects it at once.
+
+**A cmdlet that returns success and changes nothing is the same failure mode as `#13`'s unreloaded
+rule and as `DefaultDomainSupportedEncTypes`.** Three instances in one session, in three different
+products. The general form: **the interface that reports success is not the interface that holds
+the state.**
+
+### A claim made on one trial, and refuted on the third
+
+With the LSASS rule at Audit, Task Manager's *Create dump file* against `lsass.exe` returned
+`Access is denied`. Setting that one rule to `0` and retrying, the dump succeeded. That was written
+up here as a finding — *"ASR audit mode blocks and logs nothing"* — on **one trial in each
+direction**.
+
+**An A-B-A then refuted it.** With the rule set back to `2`, Sysmon recorded
+`Taskmgr.exe → lsass.exe` at `0x1fffff` at 04:45:13 and the dump succeeded again. ASR audit mode
+did not block.
+
+The claim is withdrawn, and the error is recorded rather than quietly deleted: it was made ten
+minutes after insisting in this same document that one trial is not a measurement.
+
+**What the telemetry actually shows.** At 04:43 and 04:45 there is a dense run of `Taskmgr.exe`
+accesses to `lsass.exe` — `0x1400` once per second, which is Task Manager refreshing its *Details*
+tab, then `0x1fffff` at the moment of the dump. In the 04:34 and 04:37 windows, where `Access is
+denied` appeared, **there is not one `Taskmgr` event at all, including no `0x1400` polling.** Task
+Manager was never reading `lsass.exe` in those windows, which is what a non-elevated Task Manager
+looks like.
+
+So the most consistent reading is the dullest one — **elevation** — and the ASR change simply
+coincided with the first elevated launch. The evidence for it is an absence with a specific shape
+(the missing per-second polling), not a guess.
+
+### What 5b did measure
+
+| Observation | Evidence |
+| ----------- | -------- |
+| **ASR configures but does not enforce** | the LSASS rule sat in Audit through two successful `0x1fffff` dumps and produced **zero `1121`/`1122`** — its own case, unremarked |
+| **The taskmgr bypass of `#10` is confirmed a third time** | `Taskmgr.exe → lsass.exe` at `0x1fffff`, 04:43:25 and 04:45:13 |
+| **Defender detects and acts on it** | `1116` 04:43:37, `1117` 04:43:42; again `1116`/`1117` at 04:45 |
+| **And for the first time the SIEM sees it live** | the channel was forwarded 40 minutes earlier; on 9 November the identical detection existed only on the console |
+
+**ASR's non-enforcement is consistent with `Windows 10 Pro` and an unonboarded `Server 2022
+Evaluation`** — ASR requires Windows E3/E5 or Defender for Endpoint — but that is an inference from
+the licence state, not a measurement, and after four wrong hypotheses it is labelled as such. What
+is measured is narrower and sufficient: **the rules are configured, the matching activity occurred
+twice, and nothing was audited or blocked.**
+
+**So bundle 5b's headline is a negative with a positive inside it.** The control the bundle was
+built around is unavailable in this estate. The layer that actually stops credential theft here is
+Defender's behaviour monitoring, which was already on, already working, and until today invisible
+to the SIEM on two of three hosts.
+
+### Two configuration changes made for diagnosis, and put back
+
+Recorded because an undeclared change mid-measurement is drift, however small:
+
+- `PUAProtection` was toggled `0 → 1` on both clients as a tamper-protection probe, and restored to
+  `0`.
+- On **HYDRA-DC** it was set to `Disabled` by mistake — and `5007` named the cost precisely:
+  `Old value: …\PUAProtection = 0x1`, `New value: … = 0x0`. The DC had it **enabled**. Restored
+  to `1`.
+
+**The newly forwarded channel caught an unintended weakening of the DC's own configuration within
+minutes, with the old and new values.** Microsoft's own text in `5007` reads *"If this is an
+unexpected event you should review the settings as this may be the result of malware."* Disabling
+protection settings is a standard attacker step, the population exists (425 events on the DC, 246
+on SPIDERMAN, 210 on THEPUNISHER), and **no rule in this repository reads `5007`.** That is the
+third rule this session's work has shown to be owed, after the NTLM path in both directions.
+
 ## Bundle 4b, measured 10 Nov 2026 — the control that closes 4a's hole, and logs it
 
 Protected Users was deferred out of bundle 2 for attribution, then split out of bundle 4 for the
@@ -1987,6 +2086,13 @@ control that closes it are both uninstrumented. One rule covers both: NTLM authe
 account that should not be using it, split by result code. This outranks the four fixes held for
 step 8, because those cover cases the estate already partially sees and this covers two it does not
 see at all.
+
+**New, from bundle 5b — a rule on `5007`, Defender configuration changes.** Disabling or weakening
+a protection setting is a standard attacker step, and Microsoft's own event text says to treat an
+unexpected one as possible malware. The population exists on all three hosts and nothing reads it.
+The rule should fire on **weakening** specifically — `5007` also carries signature-update noise, so
+it needs the old-value / new-value pair parsed rather than a bare event count. It proved its worth
+on the day it became available, by catching an unintended change to the DC's own configuration.
 
 A second item from the same finding: **`#13` needs a note in its own description** saying that
 after lever 4 its silence is expected and does not indicate absence of attack. Its current text,
