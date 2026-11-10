@@ -1557,7 +1557,7 @@ per hour, no gap — its parent rule `60104` fired 764 times, and the compositio
 | `4674` | 744 | **exactly 48 on every full hour**, flat | failed operation on a privileged object |
 | `4771` | 20 | 4 at 09:00, 16 at 11:32 | the Kerberos failures, 16 of them the spray |
 
-`60205` fired **twice, both at 11:00**, and not once across the 744 events of `4674`. So the
+`60205` fired **twice, both at 11:32**, and not once across the 744 events of `4674`. So the
 separation it makes is **burst against rate**: one failed privileged operation every seventy-five
 seconds, forever, does not trigger it; sixteen pre-authentication failures in six seconds does.
 That is the correct behaviour for a frequency rule and it is the opposite of noisy.

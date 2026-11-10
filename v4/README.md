@@ -837,7 +837,7 @@ predicted to move. Writing that column is what exposed the lockout row below.
 | Control | Rule whose cell it moves | Predicted outcome | Stays |
 | ------- | ------------------------ | ----------------- | ----- |
 | Advanced audit policy | all of them — it generates the events the rules key on | no rule changes verdict; event completeness improves and SACL telemetry becomes available with no rule yet keyed on it | yes |
-| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | ~~RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets~~ — **wrong, twice; see the dated correction below.** Measured outcome: RC4 Anomaly returns **zero** rows; rule 2's verdict is unchanged, its zero-FP property becomes enforced | yes |
+| AES-only Kerberos | `Purple - RC4 Anomaly (post AES enforcement)` and Sigma rule 2 | ~~RC4 Anomaly goes schedulable and returns only the legacy `SQLService` tickets~~ — **wrong three times over; see the dated correction below.** Measured outcome: RC4 Anomaly returns **zero** rows, but only because no client asked for RC4 — the KDC still issued it on demand until the DC's own Kerberos policy was set, and rule 2's "enforced" zero-FP property only holds from that point | yes |
 | Account lockout / FGPP † | `Purple - Verify Account Lockout (post FGPP)` | **does not fire** under the spray the register specifies — see below | yes † |
 | `RunAsPPL` split (one endpoint, not both) | the LSASS access rules — `CASE-04` | attack fails on the protected host; the **risk is that it also goes silent**, because the `GrantedAccess` a PPL-denied open returns may not be in the rule's measured mask list | yes |
 | PowerShell script-block / module logging | the PowerShell execution rules | existing rules unchanged — they key on `4688` and Sysmon; `4104` arrives as a second corroborating source | yes |
@@ -944,7 +944,8 @@ the rule fires on nothing benign today. What AES-only changes is narrower:
   permitted. Its own description is "after AES enforcement every `0x17` is an anomaly —
   threshold inverts."
 
-**Corrected 10 Nov 2026, on applying bundle 4a — this row's prediction was wrong twice over.**
+**Corrected 10 Nov 2026, on applying bundle 4a — this row was wrong three times over, and the
+third error was mine rather than the register's.**
 
 1. **Wrong message type.** [CASE-03](investigations/CASE-03-rc4-wrong-message-type.md) found the
    rule read `4769` while this estate's RC4 arrives in `4768`. Fixed and verified on the running
@@ -955,20 +956,39 @@ the rule fires on nothing benign today. What AES-only changes is narrower:
    *gMSA* sense, a human-managed account with an SPN; it was never an RC4 exception. The two were
    conflated. There is no RC4 exception in this domain.
 
-The RC4 came from `krbtgt` holding `0` against an absent `DefaultDomainSupportedEncTypes`, so the
-built-in `0x27` default applied — and `0x27` permits RC4. One DC registry value, not an account
-property, and invisible in every per-account listing.
+   The RC4 came from `krbtgt` holding `0` against an absent `DefaultDomainSupportedEncTypes`, so
+   the built-in `0x27` default applied — and `0x27` permits RC4. One DC registry value, not an
+   account property, and invisible in every per-account listing.
 
-**So the prediction becomes stronger, not weaker: `#13` returns zero after enforcement, not "only
-the legacy tickets".** Measured on 10 November, that is exactly what it returns, against a control
-showing 56 tickets in the same window, all `0x12`. The cell detail is in
-[the matrix](coverage-matrix.md).
+   That correction produced a replacement prediction — **`#13` returns zero after enforcement,
+   not "only the legacy tickets"** — and on 10 November that is what it returned, against a control
+   showing 56 tickets in the same window, all `0x12`. **That reading is superseded by item 3 and
+   is kept here only so the sequence of errors is legible.**
 
-**And the schedulability claim in the bullet above survives, for a reason it did not state.** It
-is usable precisely because there is no exception to allowlist. Had `SQLService` genuinely kept
-RC4, the rule would have become a permanent false-positive generator on the exception the bundle
-itself introduced — schedulable only with an allowlist that its own description ("every `0x17` is
-an anomaly") denies the need for.
+3. **And that zero was wrong too — the third error on this one row, found the same day.** The 56
+   tickets proved the population existed. They did not prove RC4 was refused, **because not one of
+   those 56 requests had asked for RC4.** The zero measured what Windows clients prefer, not what
+   the KDC permits.
+
+   With a client pinned to RC4-only as a test rig, the KDC **issued nine RC4 tickets** — six TGTs
+   and three service tickets, every one `Result_Code 0x0` — *after* `DefaultDomainSupportedEncTypes`
+   was set to `0x18`. Setting `msDS-SupportedEncryptionTypes = 24` on `krbtgt` changed nothing
+   either. **The Active Directory attributes are preferences, not prohibitions.** Only the fourth
+   lever — `SupportedEncryptionTypes = 0x18` in the DC's **own machine Kerberos policy** — actually
+   refuses RC4, and when it does the authentication falls back to NTLM and succeeds while the
+   Kerberos evidence stops existing entirely.
+
+**So the schedulability claim in the bullet above does not survive as stated.** It is true only
+from lever 4 onward, and for a different reason than "there is no exception to allowlist": after
+lever 4 the rule is silent because the condition is **prevented**, not because it is anomalous, and
+a silence that means "prevented" cannot be told from one that means "not looked for". Before lever
+4 the rule is not schedulable at all — RC4 remains obtainable by anyone who asks for it, so every
+`0x17` is still a live finding rather than an anomaly against an enforced baseline.
+
+**The full measurement, all four levers and what lever 4 cost, is in
+[the matrix](coverage-matrix.md).** The first reading of bundle 4a is left on that page struck
+through rather than deleted, because the error it makes — reading an absence as a control — is the
+one this whole column exists to guard against.
 
 ### Benign baseline — the measurement that comes first
 
