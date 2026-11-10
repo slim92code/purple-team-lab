@@ -961,11 +961,74 @@ index=main source="WinEventLog:Microsoft-Windows-Windows Defender/Operational" e
 
 Defender's operational channel is forwarded from **one of three hosts**. The detection happened
 on one of the two that do not forward it. And the host that does forward sends only `2001`,
-`5007` and `1152` — signature updates and configuration changes. **Not one detection event
-(`1116`/`1117`) exists in the index from any host.**
+`5007` and `1152` — signature updates and configuration changes. ~~**Not one detection event
+(`1116`/`1117`) exists in the index from any host.**~~
+
+> **That sentence is false, and the correction is worse than the original finding. Measured 10
+> November 2026**, when the channel was forwarded from all three hosts as bundle 5b's prerequisite.
+> Two `1116`/`1117` events from THEPUNISHER were in the index already, and `_indextime` shows when
+> they arrived:
+>
+> | `_time` | indexed at | Host | Event | Path |
+> | ------- | ---------- | ---- | ----- | ---- |
+> | 6 Nov 16:24:58.863 | **6 Nov 16:24:59** | THEPUNISHER | `1116` | `C:\Users\Public\MicrosoftEdgeUpdate.exe` |
+> | 6 Nov 16:25:31.535 | **6 Nov 16:25:32** | THEPUNISHER | `1117` | `C:\Users\Public\MicrosoftEdgeUpdate.exe` |
+>
+> **One second from event to index, on the day of the measured attack run.** `MicrosoftEdgeUpdate.exe`
+> under `C:\Users\Public` is the Sliver implant under a masquerading name, and the parent process
+> recorded by Defender is `wsmprovhost.exe` — WinRM, the lateral-movement path. `1117` means
+> Defender did not merely detect it, it acted.
+>
+> So the Defender finding splits in two, and only half of it is an ingest gap:
+>
+> - **On SPIDERMAN and HYDRA-DC**, the channel was not collected at all. A genuine ingest gap.
+> - **On THEPUNISHER**, the detection was in Splunk in real time and **nobody queried for it.** An
+>   analysis gap, which is the more uncomfortable of the two: no configuration change was needed to
+>   see it, only the question.
+>
+> This is the same shape as
+> [CASE-07](investigations/CASE-07-the-loudest-rule-is-not-in-the-repo.md) — 28 firings from a rule
+> in nobody's inventory — and as the six alerts with zero responses. The data was present; the
+> question was not asked. A matrix built from the sources someone remembered to look at cannot find
+> the ones they forgot.
 
 So Defender is detecting credential theft on this estate, correctly and at severity *Severe*, and
-the SIEM has never seen it do so.
+**on two of three hosts** the SIEM had never seen it do so — while on the third it had, and no
+column recorded it.
+
+### What the backfill delivered, 10 November 2026
+
+`start_from = oldest` with `current_only = 0` pulled the whole existing channel on both newly
+forwarded hosts. Eleven `1116`/`1117` events now exist where the matrix recorded none; nine of them
+arrived today with historical timestamps:
+
+| `_time` | Host | Event | Detail |
+| ------- | ---- | ----- | ------ |
+| 22 Oct 14:16:26–14:16:54 | SPIDERMAN | `1116` ×2, `1117` | `C:\Temp\MicrosoftEdgeUpdate.exe` — the implant, detected and acted on during the **v3** run |
+| 6 Nov 16:24:58–16:25:31 | THEPUNISHER | `1116`, `1117` | already indexed; see the correction above |
+| 9 Nov 20:30:14–20:30:59 | SPIDERMAN | `1116` ×4, `1117` ×2 | `behavior:_process: C:\Windows\System32\Taskmgr.exe, pid:9260` and `file:_…\Temp\lsass.DMP` |
+
+**The 9 November rows are Defender's own corroboration of the taskmgr bypass.** Bundle 2's write-up
+established from `GrantedAccess` masks that Task Manager's *Create dump file* is a complete bypass
+of `#10`'s exclusion; Defender independently recorded the same action, named the process, named the
+dump file, and acted on it — and the SIEM could not see any of it. Two layers reached the same
+conclusion about the same action and neither could tell the other.
+
+**And the implant was caught on two separate runs, three weeks apart**, on two different hosts,
+under two different paths. Defender has been the most consistently effective control in this estate
+across the whole project, and it is the one with no cell in the matrix.
+
+**A field-extraction gap, owed.** `Threat_Name`, `Severity_Name` and `Action_Name` are empty on
+every one of these events — the `WinEventLog:Defender` sourcetype has no extractions for them. The
+evidence is readable only out of `Path` and `Process_Name`, so `Behavior:Win32/DumpLsass.C!attk`,
+which the console displayed plainly, is not a searchable value in the index. A Defender column needs
+this fixed or it will have nothing to put in it.
+
+**Consequence for measurement discipline, stated rather than discovered later.** The backfill
+inserted events with timestamps from 14 October onward. Any earlier window re-queried from now on
+will contain Defender events it did not contain when it was first measured — including the 6
+November attack window. That is a declared change to what the before column can see, accepted
+because 5b is unmeasurable without it, and it is the second such exemption in v4 after `#13`.
 
 **This is the v3 Wazuh finding in a new product.** That run recorded *"a Sysmon ingestion gap left
 the EDR blind on two of three hosts"*. Here a second EDR is blind to the SIEM on two of three
