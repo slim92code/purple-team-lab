@@ -2749,6 +2749,25 @@ coverage questions, and keeps the signature-drift confound from erasing half the
 | 8 | 10 persistence (`Register-ScheduledTask`) | implant on THEPUNISHER | `#9` on `4698`, Wazuh `60228` | fires — nothing in five bundles touches task creation |
 | 9 | 11/12 exfil, **both paths** | internal SMB + outbound C2 | `#15` on each path | internal SMB to SPIDERMAN **blocked** (Zeek `S0`); outbound C2 to `.133` **still open and detectable** |
 
+**The attacker's own etype choice interacts with AES-only — a second contingency, found on review.**
+`kerbrute` and `Rubeus asktgt /password` request RC4 pre-authentication. Against the lever-4 KDC
+they receive `KDC_ERR_ETYPE_NOSUPP` (`0xE`) — already seen on `Guest` in the v3 spray, un-hardened.
+
+- **Phase 6 (Rubeus):** this is the *intended* result — the RC4 request fails, which is the whole
+  prediction. The Rubeus call must match v3 (RC4, no `/aes256`) or the before/after is not clean.
+- **Phases 1–2 (kerbrute):** here it is a hazard. If kerbrute offers only RC4, AES-only may stop it
+  **recovering `fcastle:Password1` at all**, which would stall the chain at phase 2. That is itself a
+  prevention finding — *"AES-only incidentally breaks an RC4-only credential-discovery tool"* — but
+  it must not erase the downstream detection measurement. Because the credentials are already known
+  from the before run, the resolution is: measure whether the spray still recovers the account
+  (testing the tool under AES-only) and whether the detection fires; if the tool returns `0xE` and
+  recovers nothing, record the prevention and **continue with the known credentials** so phases 4a
+  onward still execute and their detection cells are still measured.
+
+This is the same prevention-versus-detection split as the Defender contingency, one layer earlier in
+the chain, and it is the reason the spray phase measures `4771` failure codes (`0x18` bad-password
+vs `0xE` etype-refused) rather than a bare `4771` count.
+
 **Cross-bundle regression watch, for the whole run:** the targeted per-bundle runs could not see a
 bundle breaking a detection it has no obvious relationship to. This is the run that can. Any cell
 that goes silent where no bundle targets it — a Zeek parse lost to a protocol change, a Sysmon event
