@@ -2428,6 +2428,64 @@ The honest statement of what v4 measures is therefore not "hardening improves de
 **"what an estate actually runs, versus what its own documentation says it runs"** — which is the
 more useful question and the one this lab turned out to be able to answer.
 
+## Windows Update frozen, 11 Nov 2026 — declared, with its cost
+
+All three hosts installed updates on 10 November, between the bundles and the re-run. **An update
+mid-measurement changes binaries, Defender definitions and sometimes firewall rules**, so a
+before/after comparison that straddles one is comparing two estates rather than two configurations.
+It is frozen from here to the end of step 8.
+
+### The service cannot be held disabled on Windows 10, and the Server can
+
+`wuauserv`, `UsoSvc` and `WaaSMedicSvc` were set to `Start = 4` through the registry rather than
+`Set-Service`, because `WaaSMedicSvc` is protected and is the component that re-enables the others.
+
+| Host | After first reboot |
+| ---- | ------------------ |
+| HYDRA-DC (Server 2022) | all three **`Disabled` / `Stopped`** — held |
+| THEPUNISHER (Win10 22H2) | `wuauserv` back to **`Manual` / `Running`** |
+| SPIDERMAN (Win10 22H2) | `wuauserv` back to **`Manual` / `Running`** |
+
+Disabling the scheduled tasks under `\Microsoft\Windows\UpdateOrchestrator\` and
+`\Microsoft\Windows\WindowsUpdate\` disabled 6 of 16 on each workstation — Windows protects the
+other 10 — and after a **second** reboot `wuauserv` was `Manual` / `Running` again on both.
+
+**This is the seventh appearance of the session's pattern, with a new variant.** The others refused
+the change (`Set-Service`, `Get-NetFirewallRule`) or accepted it and stored nothing
+(`Add-MpPreference`). This one **accepts it, persists it, and then silently undoes it at boot** — the
+registry read back `4` every time, right up to the restart. Only a reboot could tell the difference,
+which is why the check was run twice: the first reboot is what reverts it, so one reboot proves
+nothing.
+
+### The lever that works is the policy, not the service
+
+| Setting | Value | Effect |
+| ------- | ----- | ------ |
+| `NoAutoUpdate` | `1` | never check automatically |
+| `AUOptions` | `1` | never download, never install |
+| `DoNotConnectToWindowsUpdateInternetLocations` | `1` | no Microsoft update endpoints |
+| `WUServer` / `WUStatusServer` | `http://127.0.0.1:8530` | points the client at a WSUS that does not exist |
+| `UseWUServer` | `1` | makes the redirect binding |
+
+The service may run; it has nowhere to go. Verified on both workstations; the DC needs none of it.
+
+**Baseline marker, so the freeze is testable rather than asserted:** both workstations at
+`10.0.19045` **UBR 6456**. `Get-HotFix` is not the instrument — it returns 10 entries and does not
+carry Windows 10 quality updates — so `UBR` is the number to re-read. If it has not moved by the
+end of step 8, the freeze held.
+
+### The cost, declared rather than discovered later
+
+**Defender signature updates travel partly over the same channel.** Defender has been the most
+effective control in this estate — it quarantined the Sliver implant on 22 October and again on 6
+November, under two different threat names — and its behaviour in the step 7 re-run may differ from
+November's because its definitions are now pinned. That is a real confound on the one cell the
+hardening did not create, and it is written here so that a different Defender result in step 7 is
+read as *possibly frozen signatures* rather than as a finding about the hardening.
+
+**Revert** is deleting `WUServer`, `WUStatusServer` and `UseWUServer`, and setting `NoAutoUpdate` to
+`0`.
+
 ## Step 7 — the full re-run, predicted before it happens
 
 Written on 11 Nov 2026, before the chain is run against the hardened estate. The point of writing
