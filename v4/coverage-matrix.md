@@ -2469,10 +2469,19 @@ nothing.
 
 The service may run; it has nowhere to go. Verified on both workstations; the DC needs none of it.
 
-**Baseline marker, so the freeze is testable rather than asserted:** both workstations at
-`10.0.19045` **UBR 6456**. `Get-HotFix` is not the instrument — it returns 10 entries and does not
-carry Windows 10 quality updates — so `UBR` is the number to re-read. If it has not moved by the
-end of step 8, the freeze held.
+**Baseline marker, so the freeze is testable rather than asserted:**
+
+| Host | Build | UBR |
+| ---- | ----- | --- |
+| THEPUNISHER | `10.0.19045` | **6456** |
+| SPIDERMAN | `10.0.19045` | **6456** |
+| HYDRA-DC | `10.0.20348` | **169** |
+
+`Get-HotFix` is not the instrument — it returns 10 entries and does not carry Windows 10 quality
+updates — so `UBR` is the number to re-read. If none has moved by the end of step 8, the freeze
+held. The DC's three services were re-checked after its reboot and are still `Disabled` /
+`Stopped`, so the Server/Windows 10 split is confirmed on a second reading rather than inferred
+from one.
 
 ### The cost, declared rather than discovered later
 
