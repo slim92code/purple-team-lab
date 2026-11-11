@@ -2620,7 +2620,8 @@ matter.**
   firewall work kept open on purpose; a *failure* here would be a regression, not a win.
 - **Phase 8 — LSASS, and the cleanest bundle-2 before/after in the project.** In v3,
   `execute-assembly SharpKatz.exe --Command logonpasswords` **on THEPUNISHER** recovered
-  `MARVEL\\administrator : P@$$w0rd!` from CredMan, in clear. THEPUNISHER now carries `RunAsPPL`
+  the domain administrator's credential from CredMan, in clear (the value is in `v2/01_lab_setup.md`;
+  it is not repeated in this analysis doc). THEPUNISHER now carries `RunAsPPL`
   (bundle 2), so step 7's SharpKatz should return **nothing** — SharpKatz reads LSASS cross-process
   and the implant is not a PPL. Note this is a different access pattern from the Task Manager dump
   tested in bundle 2 (in-process .NET assembly vs a GUI dump), but both cross the same PPL boundary,
