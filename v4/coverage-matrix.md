@@ -2699,6 +2699,61 @@ RC4 Kerberos pushes authentication onto NTLM, and nothing in the pack reads `477
 exists but is unscheduled. Running its SPL over the run's window is the first real test of whether
 it catches an attacker doing what the hardening pushed them into.
 
+### Operational run plan — the order, the measurement, and the five things easy to miss
+
+Written 11 Nov 2026, before the run. The attack commands come from the lab's own materials
+(`v2/02_attack_playbook.md` and the v3 captures the phase register maps); this plan does not
+re-author them. What is fixed here is the **order**, the **measurement per phase**, and the
+**global rules** that keep the column comparable.
+
+**Global rules, applied to every phase:**
+
+1. **Capture the attack START timestamp** for each phase. Every measurement window is bounded from
+   it and widened by **+1 h** for the HYDRA-DC clock skew this matrix documents. Correlate on
+   content, never on exact host time.
+2. **Spray uses `fcastle:Password1`** — the before-column account (6 Nov), not v3's
+   `pparker:Password2`. Pass-the-Ticket stays `SQLService`; there is no account choice there.
+3. **Phase 8 runs on BOTH hosts** — THEPUNISHER (has `RunAsPPL`, predicted to fail) and SPIDERMAN
+   (no PPL, predicted to succeed). v3 ran only THEPUNISHER; the asymmetry is unmeasurable from one.
+4. **N/E phases stay N/E** — phases 3 (LOLBin), 9b (SAM hive) and 9c (DCSync) were not in the before
+   column, so running them now would break before/after symmetry. DCSync and the AMSI block that
+   stopped it in v2 are owed a dedicated measurement, not folded into step 7.
+5. **Every "silent" cell gets a population control** — the count of the event the rule reads, in the
+   same window — because this column has already produced three zeros meaning three different things.
+6. **The three unscheduled rules are measured by SPL over the window**, not by alert history:
+   `#4776` (NTLM path), `5007` (Defender weakened), `1116/1117` (Defender detection). They are the
+   whole point of the night's findings and must be read on this run.
+7. **Record the implant's build time and hash** — a fresh Sliver build may evade Defender
+   differently than the 6 Nov binary, which is a variable independent of the five bundles.
+
+**The Defender contingency, decided in advance so the run is not improvised:** run with Defender
+live. Measure its response as its own result — does `1116/1117` fire, and when. If it blocks the
+implant *at launch* (it did **not** in the before column, so a launch-block is signature drift, not
+a bundle), that prevents phases 6–12 from executing and leaves their **detection** cells unmeasured.
+Only then, and only with the user's go, add a narrow declared Defender exclusion for the implant
+path and re-run phases 5–12, marking those cells *"detection measured with Defender prevention
+suppressed."* This separates *Defender prevents* from *the SIEM detects*, which are different
+coverage questions, and keeps the signature-drift confound from erasing half the matrix.
+
+**Per-phase measurement:**
+
+| Order | Phase | Source of events | What is measured | Prediction |
+| ----- | ----- | ---------------- | ---------------- | ---------- |
+| 1 | 1 recon (`kerbrute userenum`) | Kali → DC, no implant | `#11` on `4768` `0x6` + control | silent, structural — `0x6` is never written by this DC |
+| 2 | 2 spray (`fcastle:Password1`) | Kali → DC | `#5`, `#6`, `#12`, Wazuh `60205`, **`#4776`** | `60205` fires, spray rule silent, lockout fires-but-unusable; watch NTLM fallback |
+| 3 | 4a Kerberoast | Kali → DC | `#3` (RC4) + control, `#4` (etype-agnostic) | `#3` **structurally silent** (SQLService has no RC4 key), `#4` fires |
+| 4 | 5a/5b implant + C2 | Kali hosts implant; THEPUNISHER runs it | `#2`, `#14`, **`1116/1117`**, **`5007`** | beacons fire; Defender detects/acts — see contingency |
+| 5 | 6 Pass-the-Ticket (Rubeus RC4) | implant on SPIDERMAN | **`#13`** (now `4768`+`4769`), and whether the TGT is issued at all, **`#4776`** | request **fails** at lever 4; no `0x17`, `#13` silent = *prevented*; watch NTLM |
+| 6 | 7 WinRM lateral | implant SPIDERMAN→THEPUNISHER | Zeek `conn.log` 5985 (Sigma logic as SPL) | **succeeds, unalerted** — the lane 3b kept open; a failure is a regression |
+| 7 | 8 LSASS, **both hosts** | implant on each | `#10` (EID 10 `GrantedAccess`) + `1116/1117` | THEPUNISHER **fails** (PPL), SPIDERMAN **succeeds**; `#10` measured on both |
+| 8 | 10 persistence (`Register-ScheduledTask`) | implant on THEPUNISHER | `#9` on `4698`, Wazuh `60228` | fires — nothing in five bundles touches task creation |
+| 9 | 11/12 exfil, **both paths** | internal SMB + outbound C2 | `#15` on each path | internal SMB to SPIDERMAN **blocked** (Zeek `S0`); outbound C2 to `.133` **still open and detectable** |
+
+**Cross-bundle regression watch, for the whole run:** the targeted per-bundle runs could not see a
+bundle breaking a detection it has no obvious relationship to. This is the run that can. Any cell
+that goes silent where no bundle targets it — a Zeek parse lost to a protocol change, a Sysmon event
+suppressed — is a regression and gets its own line, not a shrug.
+
 ### What the operator runs, and what is measured
 
 The attack half comes from the lab's own materials; this document does not restate it. The
