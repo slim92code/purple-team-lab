@@ -2547,6 +2547,60 @@ matrix rather than in a conversation about the matrix later.
 the *instruments* as well as the subject. This project pinned the estate carefully and never
 thought to pin the attacker, which is half the experiment.
 
+## Phase register — what this matrix's phase numbers actually point at
+
+Built 11 Nov 2026, before writing the step 7 hand-over, because **this mapping existed nowhere.**
+The matrix labels cells `2a`, `4a`, `5b`, `9c`; `v2/02_attack_playbook.md` has eight phases
+numbered differently; `v3/README.md` names phases in prose with no numbers at all. Three schemes,
+no key.
+
+It has already cost one error in this project: an instruction in this session pointed an operator
+at *"phase 6 in the playbook"* for Pass-the-Ticket. Playbook phase 6 is credential dumping. **Had it
+been run, the wrong phase would have executed and the wrong cell been measured, and nothing in the
+output would have said so.**
+
+| Matrix phase | What it is | Where the commands are |
+| ------------ | ---------- | ---------------------- |
+| **1** | `kerbrute userenum` | `v2` **PHASE 1**, step 1.5 |
+| **2 / 2a / 2c** | password spray, and the lockout it provokes | `v2` **PHASE 2** |
+| **3** | LOLBin execution | `v2` **PHASE 3** — **never executed, N/E in both columns** |
+| **4a** | Kerberoasting | `v2` **PHASE 4** |
+| **5a / 5b** | Sliver implant and C2 beacon | `v2` **PHASE 5** |
+| **6** | Pass-the-Ticket | **no playbook entry** — `v3/README.md` prose only: `Rubeus asktgt /user:SQLService` on SPIDERMAN with the cracked credential |
+| **7** | WinRM lateral movement | **no playbook entry** — `v3` prose only: SPIDERMAN → THEPUNISHER, port 5985 |
+| **8** | LSASS access | `v2` **PHASE 6**, the dump half |
+| **9b** | SAM hive via `reg save` | `v2` **PHASE 6**, step 6.2 — **N/E in v4** |
+| **9c** | DCSync | `v2` **PHASE 6**, step 6.4 — **N/E in v4; it also failed in v2** |
+| **10** | scheduled-task persistence | `v2` **PHASE 7** |
+| **11, 12** | exfiltration, two transfers | `v2` **PHASE 8** |
+
+### Two phases have no written commands anywhere
+
+**Phases 6 and 7 — Pass-the-Ticket and WinRM lateral movement — exist only as v3 prose.** They are
+not in the playbook. Phase 6 is the cell where both bundle 4a and bundle 4b were predicted to act,
+and phase 7 is the lane the firewall work deliberately kept open. **The two phases carrying the
+sharpest predictions in step 7 are the two with no reproducible procedure**, which means their
+re-run depends on an operator reconstructing them from a paragraph.
+
+That is recorded as a gap in the project, not as a note about the hand-over.
+
+### One thing the register surfaced on the way past
+
+`v2`'s own phase 6 write-up already states: *"Defender real-time scan flagged `reg save HKLM\SAM`
+on behaviour (**EC1116/1117**), not just signature"*, and that **AMSI blocked the Mimikatz DCSync
+call in memory** — *"the control that actually worked against DCSync"*.
+
+So Defender detection events were documented in this repository in v2, while the v4 Defender
+section asserted that none existed in the index. The claim was
+[corrected on 10 November](#defender-the-fifth-layer-nobody-counted--measured-9-nov-2026) from
+`_indextime` evidence; this is a second, independent corroboration that was sitting in the
+repository the whole time.
+
+**And AMSI is a seventh layer with no cell**, named in the lab's own playbook as the only thing
+that stopped DCSync. The matrix counts Splunk, Wazuh, Suricata, Zeek, and now Defender. It does not
+count AMSI, and the phase it blocked is marked N/E — so the one control with a confirmed block in
+this estate's history appears nowhere in its coverage measurement.
+
 ## Step 7 — the full re-run, predicted before it happens
 
 Written on 11 Nov 2026, before the chain is run against the hardened estate. The point of writing
