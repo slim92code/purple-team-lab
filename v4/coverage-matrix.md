@@ -958,6 +958,73 @@ about.
 - **Delegation and cached credentials**, the group's other two effects. Neither is on this chain's
   path and neither has a cell.
 
+## Pre-run verification for step 7, 11 Nov 2026 — a 96% drop that was not a drop
+
+Before re-running the chain against the hardened estate, the pipeline was checked, because an
+after column measured through a degraded pipeline measures the pipeline.
+
+All five sources are alive: Windows Security and Sysmon from all three hosts, Zeek and Suricata
+from `security-vm`, Wazuh from `wazuh-vm`.
+
+**Then the Zeek log counts looked alarming.** Against the 24-hour baseline taken before 3a:
+
+| log | before 3a | 24 h after | change |
+| --- | --------- | ---------- | ------ |
+| `kerberos.log` | 711 | **31** | −96% |
+| `smb_files.log` | 662 | **34** | −95% |
+| `ldap_search.log` | 575 | **51** | −91% |
+| `ldap.log` | 292 | **29** | −90% |
+| `smb_mapping.log` | 278 | below 16 | fell out of the top 20 |
+| `dce_rpc.log` | 28,981 | 21,327 | −26% |
+
+Those are exactly the logs predicted to go blind under LDAP signing — the prediction recorded
+before 3a and then called refuted on a **15-minute** window, which was too short to see this.
+
+**It is still not blindness, and the confound is obvious once named.** The earlier window was a
+working day; this one is a night with nobody logged in. Less authentication produces less
+`kerberos.log` without any loss of visibility, and the Windows side agrees — `4768`, `4769` and
+`4771` do not appear in the top twenty events at all.
+
+So the number cannot distinguish *"Zeek cannot see"* from *"there was nothing to see"*. Those are
+opposite conclusions with the same count, and the entire after column for every Kerberos phase
+rests on which one is true.
+
+### Forced, with the trigger proved this time
+
+From THEPUNISHER: `klist purge`, then `dir \\HYDRA-DC.MARVEL.local\SYSVOL` (Kerberos + SMB), then
+`([ADSI]"LDAP://HYDRA-DC.MARVEL.local").distinguishedName` (LDAP), then a 45-second wait for Zeek's
+UDP flow timeout — the lag that produced a false negative once already in 3a.
+
+**The trigger validated itself, which is what the LLMNR tests never managed:**
+
+```
+DC=MARVEL,DC=local
+        Server: krbtgt/MARVEL.LOCAL @ MARVEL.LOCAL
+        Server: ldap/hydra-dc.marvel.local @ MARVEL.LOCAL
+```
+
+`klist` proves the TGT and the LDAP service ticket were actually obtained, and the DN proves the
+LDAP bind returned data. The exchanges happened; the only question left was whether the sensor saw
+them.
+
+| log, 10-minute window | count |
+| --------------------- | ----- |
+| `dce_rpc.log` | 7,117 |
+| `ldap_search.log` | 25 |
+| `kerberos.log` | 15 |
+| `ldap.log` | 10 |
+| `smb_mapping.log` | 4 |
+| `smb_files.log` | 1 |
+
+**Zeek parses all of them after the hardening.** The 96% fall was activity, not blindness, and the
+pre-3a prediction stays refuted — now on evidence strong enough to carry it, rather than on a
+window too short to test it.
+
+**The method point, since it cost two rounds.** A rate comparison across two windows cannot
+separate a dead sensor from a quiet estate; only a forced event with a *proved* trigger can. The
+LLMNR work in 3a failed twice because the trigger was never proved. Here `klist` proves it in the
+same output, which is why this took one attempt.
+
 ## Bundle 3b, measured 10 Nov 2026 — the default-Block prediction was wrong, and the instrument had to be found first
 
 ### The DC's gap, measured
