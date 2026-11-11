@@ -2495,6 +2495,58 @@ read as *possibly frozen signatures* rather than as a finding about the hardenin
 **Revert** is deleting `WUServer`, `WUStatusServer` and `UseWUServer`, and setting `NoAutoUpdate` to
 `0`.
 
+## Attacker toolchain pinned, 11 Nov 2026 — and the gap it exposes in the before column
+
+Kali was updated the same day, for the same reason the Windows hosts' updates were frozen: the
+estate had drifted and the drift needed to stop before the re-run. The update broke partway —
+`dpkg-deb: <decompress> subprocess failed`, a corrupt `texlive` archive — and left `apt` with
+unsatisfied dependencies, which is a worse state to measure from than either the old or the new one.
+Clearing the cache and removing `texlive*` and `tipa` restored consistency.
+
+**It is deliberately left unfinished at 205 packages pending.** `apt` is consistent, every tool runs,
+and completing the upgrade would change more variables immediately before the measurement. The same
+reasoning as the Windows freeze: stability beats currency inside a measurement window.
+
+| Package | Version |
+| ------- | ------- |
+| `python3-impacket` | **0.13.1-1** |
+| `impacket-scripts` | 1.10 |
+| `hashcat` | **7.1.2+ds1-4** |
+| `netexec` | 1.5.1-0kali2 |
+| `crackmapexec` | 5.4.0-0kali7 |
+| `responder` | 3.2.2.0-0kali2 |
+| `bloodhound` | 9.8.0~rc3-0kali1 |
+| `sharphound` | 2.17.1-0kali1 |
+| `azurehound` | 3.1.2-0kali1 |
+| kernel | 7.2.15+kali-amd64 |
+
+Verified running, not merely installed: `GetUserSPNs.py` prints `Impacket v0.13.1`, `hashcat`
+prints `v7.1.2`, and `~/kerbrute/` still holds `users.txt`, `users_clean.txt` and `spray.sh` — the
+inputs the 6 November run used.
+
+### The gap this exposes, which is the more useful half
+
+**The 6 November run has no toolchain record.** Nobody wrote down which `impacket` produced the
+before column, and it cannot be recovered now.
+
+That matters for one cell specifically. The Kerberoast prediction turns on **which etype `impacket`
+requests by default** — `#3` keys on RC4 and this estate's roast came back AES because
+`GetUserSPNs` asked for no particular etype. That default has changed between impacket releases.
+So if phase 4a moves in step 7, the candidate causes are:
+
+1. the hardening (AES-only at the fourth lever),
+2. Defender's pinned signatures,
+3. **a different `impacket` default than the before run used** — and this one cannot be ruled out,
+   because the before run's version was never recorded.
+
+**Three named candidate causes is still better than an argument**, and two of the three are now
+pinned and written down. The third is a permanent limitation on one cell, and it belongs in the
+matrix rather than in a conversation about the matrix later.
+
+**Generalised, because it is the cheapest lesson here:** a before/after comparison has to version
+the *instruments* as well as the subject. This project pinned the estate carefully and never
+thought to pin the attacker, which is half the experiment.
+
 ## Step 7 — the full re-run, predicted before it happens
 
 Written on 11 Nov 2026, before the chain is run against the hardened estate. The point of writing
