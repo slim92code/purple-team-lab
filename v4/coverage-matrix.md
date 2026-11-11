@@ -2539,6 +2539,18 @@ So if phase 4a moves in step 7, the candidate causes are:
 3. **a different `impacket` default than the before run used** — and this one cannot be ruled out,
    because the before run's version was never recorded.
 
+**Addendum, 11 Nov 2026 — v3's own captures close candidate 3 for this target.** Archived
+screenshots from the v3 run (20 Oct, impacket **v0.14.0.dev0**) show `GetUserSPNs` against
+`SQLService` returning **`$krb5tgs$18$`** — etype 18, AES256 — on the *un-hardened* domain with RC4
+still permitted. A TGS is encrypted with the service account's own key, and `SQLService` holds
+`msDS-SupportedEncryptionTypes = 16` (AES256 only, measured 10 Nov), so the KDC has no RC4 key to
+issue for it whatever the tool requests or the domain default allows. **So `#3` is structurally
+silent for `SQLService` across every version of this experiment** — v3, the before column and step
+7 alike — and the impacket-version candidate is moot for that one cell. It would matter only against
+an SPN account that holds an RC4 key, and this estate has none. (The version also moved the wrong
+way for a forward comparison: v3 ran `0.14.0.dev0`, the pin is `0.13.1` — the apt repair replaced a
+dev build with the packaged release.)
+
 **Three named candidate causes is still better than an argument**, and two of the three are now
 pinned and written down. The third is a permanent limitation on one cell, and it belongs in the
 matrix rather than in a conversation about the matrix later.
