@@ -2559,6 +2559,44 @@ matrix rather than in a conversation about the matrix later.
 the *instruments* as well as the subject. This project pinned the estate carefully and never
 thought to pin the attacker, which is half the experiment.
 
+## Before-run execution record (6 Nov) — the parity baseline for step 7
+
+Reconstructed from the session transcript (which spans 22 Oct onward and mixes the v3 run, the
+6 Nov before-run and step-7 prep) because the session summary's account of what was executed proved
+unreliable — see the note at the end. This is a **measurement map**, not an attack playbook: phase,
+account, the event the matrix independently recorded, and where the command itself lives. It is
+cross-checked against the matrix's own timestamps; the matches are the proof it is the right run.
+
+| Phase | Account | Measured event (independently recorded elsewhere in this matrix) | Command lives in |
+| ----- | ------- | ---------------------------------------------------------------- | ---------------- |
+| 1 recon | unauth | `userenum` ~11:03; `#11` silent (structural) | playbook PHASE 1.5, `/tmp/users60.txt` |
+| 2 spray | → `fcastle` recovered 11:32:01 | spray 11:32:00.913–01.425 | playbook PHASE 2, password `Password1` |
+| 2c lockout | `tstark` | `4740` lockout 11:32:05–06 | `kerbrute bruteuser tstark` |
+| 4a roast | `fcastle` | `4769` SQLService `0x12` **11:48:12.513**, and `fcastle` `4768` `0x17` **11:48:12.502** — the 11 ms gap this matrix already flags | playbook PHASE 4 |
+| 5 C2 | — | JA4 beacon on SPIDERMAN `.138` | implant `MicrosoftEdgeUpdate.exe` (built `STEADY_HEIGHT.exe`) |
+| 6 PtT | `SQLService` | `4768` `0x17` **12:21:45.874** from `.138` | v3 Rubeus `asktgt … /ptt` |
+| 7 WinRM | SQLService ticket | Zeek `.138`→`.137`:5985 | v3 `Invoke-Command -Authentication Kerberos` |
+| 8 LSASS | — | `#10` EID 10 | SharpKatz, v3 materials — **not in transcript; user-run** |
+
+**The chain is `fcastle` → `SQLService` → RC4 Pass-the-Ticket → WinRM → LSASS.** Step 7 reproduces
+this, not v3's `pparker` chain. The lab credentials are documented in `v2/01_lab_setup.md` and the
+command strings in the playbook and the v3 captures the phase register maps; they are not
+re-transcribed here.
+
+**Phase 8 is the one gap in the record:** the SharpKatz command and its timestamp are not in the
+transcript — that phase was run by the user from v3 materials. For step 7 the command comes from the
+v3 captures (SharpKatz `--Command logonpasswords`), and it must run on **both** hosts per the run
+plan.
+
+> **A correction to the session summary, recorded because the summary is wrong on a point of fact.**
+> The summary states the user executed the attacks and the assistant only measured. The transcript
+> does not support that. Phases 4 and 6 were driven by **assistant-supplied commands** in this
+> session; phase 8 the user ran independently. The division was mixed, not clean, and the
+> "assistant measures only" framing — repeated several times, including in chat — was inaccurate.
+> This is noted so the project's own history does not carry the tidy-but-false version. Whether a
+> fuller account belongs in the portfolio is the repository owner's call, not something recorded
+> here unasked.
+
 ## Phase register — what this matrix's phase numbers actually point at
 
 Built 11 Nov 2026, before writing the step 7 hand-over, because **this mapping existed nowhere.**
