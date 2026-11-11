@@ -2596,6 +2596,29 @@ re-run depends on an operator reconstructing them from a paragraph.
 
 That is recorded as a gap in the project, not as a note about the hand-over.
 
+**Partly closed, 11 Nov 2026 — v3's screenshots recover the Pass-the-Ticket procedure.** Archived
+captures from the v3 run (20 Oct) document phase 6 exactly: over a Sliver session on SPIDERMAN,
+`execute-assembly Rubeus.exe asktgt /user:SQLService /password:MYpassword123# /domain:MARVEL.LOCAL
+/dc:192.168.182.135 /ptt` (Rubeus v1.6.4). It is reproducible now, so phase 6 is no longer
+reconstruction-from-prose; phase 7 (WinRM) still is.
+
+**And they fix the un-hardened baseline this phase's step-7 prediction is measured against.** In v3,
+Rubeus derived an `rc4_hmac` hash and the request **succeeded** — "TGT request successful", and the
+imported ticket carried `KeyType: rc4_hmac`. That is the `4768` `0x17` RC4 TGT the matrix discusses,
+captured at source. The step-7 prediction is that after lever 4 this exact call **fails**: Rubeus
+asks specifically for a Kerberos TGT with an RC4 key and has no NTLM path to fall back to, unlike
+the interactive logon in the Nov 10 `rc4test` probe. The before-behaviour is now evidence rather
+than inference, so a failure in step 7 is a clean measurement of lever 4.
+
+**A Defender-timing nuance that bears on the signature freeze.** On 20 Oct the implant **ran** —
+the Sliver session established and Windows Security showed "No current threats" — and Defender's
+`ExclusionPath`/`ExclusionProcess`/`ExclusionExtension` were all empty, so the bypass was genuine,
+not a misconfigured exclusion. Defender quarantined the same-named binary only on 22 Oct, after a
+signature update. So this implant's detection depends on a definition that post-dates its first run,
+and the freeze pins definitions at the current (up-to-date) state — step 7 should therefore catch
+it, but the dependency is why the freeze was recorded as a confound rather than ignored.
+
+
 ### One thing the register surfaced on the way past
 
 `v2`'s own phase 6 write-up already states: *"Defender real-time scan flagged `reg save HKLM\SAM`
