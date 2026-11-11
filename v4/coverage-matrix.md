@@ -2428,6 +2428,56 @@ The honest statement of what v4 measures is therefore not "hardening improves de
 **"what an estate actually runs, versus what its own documentation says it runs"** — which is the
 more useful question and the one this lab turned out to be able to answer.
 
+## Step 7 — the full re-run, predicted before it happens
+
+Written on 11 Nov 2026, before the chain is run against the hardened estate. The point of writing
+it now is that a prediction recorded afterwards is a description.
+
+**Measurement method is unchanged and does not require enabling anything.** Every cell in this
+project is measured by re-running the rule's SPL over the run's window, not by reading alert
+history — that is how the benign baseline was measured and how the before column was. So the three
+rules added on 10 November stay `enableSched = 0` and their cells are still measurable. The
+no-changes-between-columns discipline holds.
+
+### What each phase meets now that it did not before
+
+| Phase | Control it now meets | Prediction | Confidence |
+| ----- | -------------------- | ---------- | ---------- |
+| 1 — enumeration | none | **unchanged**: structural gap, four layers hold evidence, nothing alerts | high — nothing in five bundles targets it |
+| 2a — password spray | none new; the FGPP predates v4 | **unchanged**: `60205` fires, the spray rule does not | high |
+| 2c — lockout | none | **unchanged** | high |
+| 4a — Kerberoast | AES-only at lever 4 | **split**: a default-etype roast still succeeds and `#10` still catches it; an *explicit RC4 downgrade* is now refused by the KDC | medium — the roast's etype choice is the tool's, not ours |
+| 5a/5b — C2 implant | **Defender, now forwarded from all three hosts** | **the implant may not survive at all.** Defender quarantined it on 22 Oct (`Trojan:Win32/Sabsik.EN.A!ml`) and on 6 Nov (`Trojan:Win32/Gracing.I`) — both times unseen by the SIEM. It is now visible. | **high that Defender acts, unknown whether the operator works around it** |
+| 6 — Pass-the-Ticket | AES-only at lever 4, **plus** Protected Users | **should fail twice over**: `Rubeus asktgt` with an RC4 key has nothing to negotiate, and `SQLService` is in Protected Users so its NTLM fallback is refused too | medium-high — predicted, never measured |
+| 7 — lateral WinRM | deliberately untouched | **unchanged and still unalerted** — the lane the plan kept open on purpose | high |
+| 8 — LSASS dump | `RunAsPPL` on THEPUNISHER only | **asymmetric by design**: fails on THEPUNISHER, succeeds on SPIDERMAN, and Defender catches it on both — now visibly | high, measured three times already |
+| 11/12 — exfil to `\\SPIDERMAN` | SMB closed in **both** address families | **the transfer cannot start.** Zeek records refused SYNs as `S0`; `Large Outbound Transfer` has nothing to return | high — measured directly on 10 Nov |
+
+### The three predictions most worth being wrong about
+
+**Defender may end the run early.** It has stopped this implant twice, three weeks apart, under two
+different threat names. If it does so again the chain never reaches the later phases — a legitimate
+result, and one that would leave several cells unmeasured rather than measured-as-silent. **Those
+two outcomes must not be collapsed**, which is what the `M` and `→` marks exist for.
+
+**Phase 6 is the only cell where prevention and detection were predicted to move together**, and
+both predictions are untested. If Pass-the-Ticket fails, `#13` stays silent — and that silence will
+mean *prevented*, not *missed*. The matrix now has three categories for that
+(evidence erased, evidence written with no rule, rule fires) and this cell is the test of whether
+they are distinguishable in practice.
+
+**The NTLM fallback path is the one new thing to watch everywhere.** Bundle 4a showed that blocking
+RC4 Kerberos pushes authentication onto NTLM, and nothing in the pack reads `4776` yet — the rule
+exists but is unscheduled. Running its SPL over the run's window is the first real test of whether
+it catches an attacker doing what the hardening pushed them into.
+
+### What the operator runs, and what is measured
+
+The attack half comes from the lab's own materials; this document does not restate it. The
+measurement half is fixed in advance, per phase: the rule's SPL over the run's window, plus the
+population control that proves the events the rule reads exist in that window. **Every cell gets
+both**, because this column has already produced three zeros that meant three different things.
+
 ## Still owed to this matrix
 
 **New, from bundles 4a and 4b — a rule on the NTLM path, in both directions.** Lever 4 prevents RC4
