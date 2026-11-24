@@ -2819,6 +2819,74 @@ measurement half is fixed in advance, per phase: the rule's SPL over the run's w
 population control that proves the events the rule reads exist in that window. **Every cell gets
 both**, because this column has already produced three zeros that meant three different things.
 
+## After-run (step 7), 13 Nov 2026 — measured cell by cell
+
+> **Re-recorded 24 Nov 2026.** The phase-1 commit made 13 Nov was never pushed and was lost with
+> its container; these results are reconstructed from the run's raw outputs. The GPG signing key is
+> also gone with that container, so commits from here are unsigned until it is regenerated.
+
+Pre-flight (13 Nov) confirmed the hardened estate intact after two days: AES lever 4 `= 24`,
+`krbtgt = 24`, firewall `Block` on all DC profiles, `RunAsPPL = 1` on THEPUNISHER and **absent** on
+SPIDERMAN (the deliberate split), 17 File-and-Printer rules disabled, UBR frozen at `169`/`6456`,
+and all five sources flowing. One gap: the three rules added 10 Nov live in the repo but were
+**never deployed to the instance**, so their cells are measured by running their SPL by hand, as the
+plan specified. Attacker is Kali `192.168.182.133` (the network briefly dropped to the wrong subnet
+and recovered).
+
+**Clock, measured not assumed:** the DC's Kerberos events land in Splunk at **real time** — the
+`4771`/`4768` from the spray carried `_time 03:31:16`, matching the Kali wall clock, with no `+1h`
+offset. The documented DC skew does not manifest in Splunk `_time`, so normal windows suffice; the
+`latest=+90m` widening used early was a harmless precaution.
+
+### Phase 1 — recon, `#11`: ✗ silent, structural — unchanged, and demonstrated
+
+`kerbrute userenum` from `.133`, 03:23:27–32, 59 usernames, **1 valid (`administrator`)** — parity
+with the before run. Ran under AES-only with **no `0xE`**: contingency 2 did not trigger for recon.
+
+Windows: **no `4768`, no `4771`, no `0x6`**. Silent — and the zero is demonstrated, because Zeek
+caught every request the SIEM missed:
+
+| orig | resp | AS-REQs | distinct clients | DC response |
+| ---- | ---- | ------- | ---------------- | ----------- |
+| `192.168.182.133` | `192.168.182.135` | 59 | 59 | `KDC_ERR_C_PRINCIPAL_UNKNOWN` (fakes) + `KDC_ERR_PREAUTH_REQUIRED` (`administrator`) |
+
+The DC answered every enumeration request — separating valid from invalid exactly as kerbrute reads
+— and Windows audited none of it, because it does not write `4768` `0x6` for a no-preauth AS-REQ.
+**Coverage exists on the NDR (Zeek), not in the SIEM rule.**
+
+### Phase 2 — spray, `#5`/`#6`/`#4776`: fires / silent / no-fallback — all three match before
+
+`kerbrute passwordspray … 'Password1'` from `.133`, 03:31:15–16, recovered
+**`fcastle@MARVEL.LOCAL:Password1`** — parity. Ran under AES-only with **no `0xE`**: contingency 2
+did not trigger for the spray either; kerbrute validated the password and the chain proceeds with a
+genuinely-recovered credential.
+
+| Event | Account | Code | From |
+| ----- | ------- | ---- | ---- |
+| `4768` success | `fcastle` | `0x0` | `.133` |
+| `4771` fail | `Administrator` | `0x18` | `.133` |
+| `4771` fail | `SQLService` | `0x18` | `.133` |
+| `4771` fail | `pparker` | `0x18` | `.133` |
+
+`frankcastle`/`peterparker` do not exist (no event); `Guest` silent.
+
+- **`#6` Spray Success (4771 then 4768, same source): ✓ FIRES** — the failures and the `fcastle`
+  success share source `.133`.
+- **`#5` Password Spray (multi-user from one source): ✗ SILENT** — 3 distinct failing accounts,
+  below the threshold of 5.
+- **`#4776` NTLM path: no fallback** — the spray is pure Kerberos and the authentication succeeded,
+  so nothing fell to NTLM. Correctly silent, not a gap.
+
+| Cell | Before | After (step 7) | Mark |
+| ---- | ------ | -------------- | ---- |
+| `#11` Kerbrute Enum | ✗ silent, structural | ✗ silent, structural — demonstrated | M |
+| `#5` Password Spray | ✗ silent, below threshold | ✗ silent, below threshold | M |
+| `#6` Spray Success | ✓ fires | ✓ fires | M |
+| `#4776` NTLM path | (new rule, n/a before) | ⊘ no fallback — Kerberos succeeded | M |
+
+**Still owed in phase 2:** the lockout leg (`kerbrute bruteuser tstark` → `4740`, cell `#12`) was
+not yet run when the session paused.
+
 ## Still owed to this matrix
 
 **New, from bundles 4a and 4b — a rule on the NTLM path, in both directions.** Lever 4 prevents RC4
